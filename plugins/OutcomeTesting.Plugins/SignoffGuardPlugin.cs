@@ -105,7 +105,12 @@ namespace OutcomeTesting.Plugins
             if (caseRef != null)
             {
                 var caseStatus = CaseTransitions.CurrentStatus(service, caseRef.Id);
-                if (caseStatus != CaseLifecycle.AwaitingSignoff)
+                // A rejection moves the case to Awaiting Remediation on the first action of the
+                // sitting (SignoffProgressPlugin.MoveCase), and the portal then rejects the rest
+                // one by one (TEST case 258841914, 2026-11-19).
+                var restOfRejectionSitting = caseStatus == CaseLifecycle.AwaitingRemediation
+                    && decision != null && decision.Value == DecisionRejectedValue;
+                if (caseStatus != CaseLifecycle.AwaitingSignoff && !restOfRejectionSitting)
                 {
                     throw new InvalidPluginExecutionException(
                         CommandHelpers.PreconditionPrefix + "This case is "

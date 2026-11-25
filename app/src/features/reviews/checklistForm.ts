@@ -17,7 +17,7 @@ import { date, text } from '../../lib/format';
 import { withoutUnaskedRootCause } from './gradingRules';
 import { checkerLabel } from '../cases/checkerNames';
 import { lookupLabel } from '../cases/lookupLabel';
-import { REVIEW_ROUTES, type ReviewRoute } from '../../types/domain';
+import { REVIEW_ROUTES, SERVICE_CASE_REF_LABEL, type ReviewRoute } from '../../types/domain';
 import type { FormRow, ReviewSection, SectionedAnswer } from './reviewSections';
 
 /**
@@ -67,8 +67,11 @@ export const SCALE_OPTIONS: Record<number, ChoiceOption[]> = {
   120910008: [YES, NO, NA],
   120910009: [YES, NO, INSUFFICIENT],
   120910010: [PASS, PASS_WITH_ISSUES, INSUFFICIENT, POTENTIAL_HARM],
-  // Pass with issues offered, and Fail read as Potential harm (client decisions, 2026-11-06).
-  120910012: [PASS, PASS_WITH_ISSUES, { value: 120910301, label: 'Potential harm' }, INSUFFICIENT, NA],
+  // Pass with issues offered, and Fail read as Potential harm (client decisions, 2026-11-06),
+  // shown after Insufficient evidence (client, 2026-11-24).
+  120910012: [PASS, PASS_WITH_ISSUES, INSUFFICIENT, { value: 120910301, label: 'Potential harm' }, NA],
+  // The Consumer Duty outcomes from 2026-11-24: exactly the four, Potential harm stored as itself.
+  120910014: [PASS, PASS_WITH_ISSUES, INSUFFICIENT, POTENTIAL_HARM],
   120910003: ROOT_CAUSES,
   // Several root causes at once from 2026-09-24: Q-GR-02's successor version.
   120910013: ROOT_CAUSES,
@@ -82,7 +85,7 @@ export const SCALE_OPTIONS: Record<number, ChoiceOption[]> = {
 };
 
 /** The three-column scales that the document lays out as a tick grid. */
-const GRID_SCALES = new Set([120910005, 120910006, 120910007, 120910008, 120910009, 120910012]);
+const GRID_SCALES = new Set([120910005, 120910006, 120910007, 120910008, 120910009, 120910012, 120910014]);
 
 /**
  * Whether a row on `rowScale` draws in the tick columns of a grid headed by `gridScale`.
@@ -136,7 +139,7 @@ export function optionsFor(
  * the option, and only this path applies it. The root cause list is title case in the
  * document and is deliberately absent.
  */
-const UPPER_CASE_INLINE = new Set([120910005, 120910006, 120910007, 120910010, 120910012]);
+const UPPER_CASE_INLINE = new Set([120910005, 120910006, 120910007, 120910010, 120910012, 120910014]);
 
 /**
  * The tax check outcome as the document orders it: PASS, PASS WITH ISSUES, FAIL. The
@@ -367,6 +370,10 @@ export function caseHeaderFields(
     // ClientRef, not the TaskID. al_casereference is the TaskID and is the page heading;
     // binding it here showed a checker the wrong identifier on every case (F6, 2026-09-20).
     { label: 'IO reference', value: text(record.al_ioreference) },
+    // Both references, side by side: the TaskID keys the case, and the service case reference
+    // is the one people quote but two tasks can share (client, 2026-11-24).
+    { label: 'Case reference', value: text(record.al_casereference) },
+    { label: SERVICE_CASE_REF_LABEL, value: text(record.al_servicecaseref) },
     {
       label: 'Pre or post check',
       value:
@@ -435,27 +442,33 @@ export interface FailPoint {
   ticked: boolean;
 }
 
+/** al_failreason.al_category "Tax file quality": the Tax team's points (CompletedCheck.TaxFileQualityCategory). */
+export const TAX_FILE_QUALITY_CATEGORY = 120910404;
+
 /**
- * The standalone File Quality fail points block: every reason on the list, ticked where it
- * is recorded against any answer on the review.
+ * The standalone File Quality fail points block: the reasons of the review's team, ticked
+ * where they are recorded against any answer on the review.
  *
- * Both teams get the whole list. The document draws one undivided twenty-row table, and the
- * category is a grouping of the reasons, not a split of who may pick them (project owner,
- * 2026-09-09). Filtering by category - Tax check to the Tax team, the rest to AQS, which is
- * what this did until now - was an inference from the prefixes, and it left a Tax reviewer
- * who found a record-keeping failure with nowhere to record it. Each team still records its
- * own ticks: they hang off that team's File quality outcome answer (Q-FQ-01 for AQS,
- * Q-FQTAX-01 for Tax) through the response-keyed intersect, so the two sets never collide.
+ * Tax file quality points are the Tax team's alone and every other point is AQS's (client
+ * decision, 2026-11-06, replacing "both teams get the whole list" of 2026-09-09). A point the
+ * review ticked is kept whatever its category, as the portal and the PDF draw it. Each team
+ * still records its own ticks: they hang off that team's File quality outcome answer (Q-FQ-01
+ * for AQS, Q-FQTAX-01 for Tax) through the response-keyed intersect.
  */
 export function failPoints(
   reasons: FailReasonRef[],
   ticked: ReadonlySet<string>,
   submitted = false,
+  isTax = false,
 ): FailPoint[] {
   // A retired point is not part of a check in progress, ticked or not (the submit unticks it);
   // a submitted review keeps the points it was submitted with.
   return reasons
     .filter((reason) => !reason.retired || (submitted && ticked.has(reason.id)))
+    .filter(
+      (reason) =>
+        ticked.has(reason.id) || (reason.categoryValue === TAX_FILE_QUALITY_CATEGORY) === isTax,
+    )
     .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name))
     .map((reason) => ({
       id: reason.id,
@@ -534,7 +547,8 @@ const BLOCKS: Record<string, BlockSpec> = {
     title: 'Consumer Duty overlay',
     layout: 'grid',
     columnHeading: 'Outcome',
-    scale: 120910009,
+    // Pass to Potential harm since 2026-11-24; a review answered on Yes / No is headed by its rows.
+    scale: 120910014,
     noIntro: true,
   },
   'S-GRADE': { id: 'grade', title: 'Checker judgement and grading', layout: 'inline' },

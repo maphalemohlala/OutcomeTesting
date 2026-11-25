@@ -37,4 +37,25 @@ describe('removing a case', () => {
       expect(html).toBe('');
     }
   });
+
+  it('says why a Tier 1 high-risk case cannot be removed', () => {
+    const html = renderToStaticMarkup(
+      <CaseRemoveAction
+        detail={{ id: 'c1', status: 'Queued', checklist: { items: ['Tax Check', 'High Risk Item 1'] } }}
+        onRemoved={() => {}}
+      />,
+    );
+    expect(html).not.toContain('Remove case');
+    expect(html).toContain('Tier 1');
+  });
+
+  it('still offers removal when only High Risk Item 2 is ticked', () => {
+    const html = renderToStaticMarkup(
+      <CaseRemoveAction
+        detail={{ id: 'c1', status: 'Queued', checklist: { items: ['High Risk Item 2'] } }}
+        onRemoved={() => {}}
+      />,
+    );
+    expect(html).toContain('Remove case');
+  });
 });

@@ -24,6 +24,9 @@ import {
 } from './SecurityModals';
 import './SecurityConfigPage.css';
 import { messageForFailure } from '../../services/errors';
+import { Skeleton } from '../../components/feedback/Skeleton';
+import { Pager } from '../../components/navigation/Pager';
+import { usePaged } from '../../components/navigation/paging';
 
 function NotFound({ code }: { code: string }) {
   return (
@@ -99,13 +102,14 @@ export function RoleDetailPage() {
   // runs with an empty code until then, and useRoleHolders no-ops on that (AD-089).
   const holdersState = useRoleHolders(role?.code ?? '', reloadKey);
   const holders = holdersState.status === 'ready' ? holdersState.holders : [];
+  const holdersPage = usePaged(holders);
 
   function reloadConfig() {
     setReloadKey((key) => key + 1);
   }
 
   if (roles.status === 'loading') {
-    return <p role="status">Loading role…</p>;
+    return <Skeleton page label="Loading role…" />;
   }
 
   if (roles.status === 'unavailable') {
@@ -392,7 +396,7 @@ export function RoleDetailPage() {
           ) : null}
 
           {loading ? (
-            <p role="status">Loading permissions…</p>
+            <Skeleton label="Loading permissions…" />
           ) : config.status === 'unavailable' ? null : grants.length === 0 ? (
             <p>
               This role grants nothing. No permission rule is stored for it, and the built-in
@@ -477,7 +481,7 @@ export function RoleDetailPage() {
           ) : null}
 
           {holdersState.status === 'loading' ? (
-            <p role="status">Loading holders…</p>
+            <Skeleton label="Loading holders…" />
           ) : holdersState.status === 'unavailable' ? (
             // Distinct from the config-unavailable section above: this hook has its own
             // failure mode (the Custom API, not the mappings/permissions read), and its own
@@ -498,7 +502,7 @@ export function RoleDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {holders.map((holder) => {
+                {holdersPage.rows.map((holder) => {
                   const state = classifyHolder(holder);
                   return (
                     <tr
@@ -538,6 +542,7 @@ export function RoleDetailPage() {
               </tbody>
             </table>
           )}
+          {holders.length > 0 && <Pager {...holdersPage} label="holders" />}
         </section>
       </div>
 

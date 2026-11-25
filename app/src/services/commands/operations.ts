@@ -11,7 +11,6 @@ export const COMMAND_OPERATIONS = [
   'al_AmendOutcome',
   'al_AssignCase',
   'al_AssignUserRole',
-  'al_CreateExportBatch',
   'al_CreateRole',
   'al_CreateUser',
   'al_DeleteCase',

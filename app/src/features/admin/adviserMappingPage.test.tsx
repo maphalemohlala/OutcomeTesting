@@ -21,7 +21,7 @@ describe('AdviserMappingPage wording', () => {
   const html = renderToStaticMarkup(<AdviserMappingPage />);
 
   it('says only the mapped T&C Manager can sign off or record the final outcome', () => {
-    expect(html).toContain('only they can sign it off or record its final outcome in the portal');
+    expect(html).toContain('any of them can sign it off or record its final outcome in the portal');
     expect(html).not.toContain('notifications only');
   });
 

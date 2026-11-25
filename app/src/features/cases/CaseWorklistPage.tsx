@@ -1,16 +1,24 @@
-import { useDeferredValue, useMemo } from 'react';
+import { Fragment, useDeferredValue, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { PageIntro } from '../../components/layout/PageIntro';
 import { OutcomeIndicator, TaxOutcomeIndicator } from '../../components/status/OutcomeIndicator';
 import { StageLabel } from '../../components/status/StageLabel';
 import { FilterBar, FilterField } from '../../components/form/FilterBar';
 import { ExportMenu } from '../../components/export/ExportMenu';
+import { Icon } from '../../components/icons/Icon';
+import { Avatar } from '../../components/people/Avatar';
+import { Pager } from '../../components/navigation/Pager';
+import { date } from '../../lib/format';
+import { pageOf } from '../../components/navigation/paging';
+import '../../components/navigation/Tabs.css';
 import { CASE_STATUSES, OUTCOMES, REVIEW_ROUTES } from '../../types/domain';
-import type { ReviewRoute, ReviewType } from '../../types/domain';
+import type { CaseStatus, ReviewRoute } from '../../types/domain';
 import { CHECKER_LABELS, checkerState } from './checkerNames';
 import { CASE_EXPORT_HEADERS, caseExportRow } from './caseExport';
 import { useCaseWorklist } from './useCaseWorklist';
+import { CaseReferenceLink } from './CaseReferenceLink';
 import type { CaseRemediation } from './caseRemediation';
+import type { CaseSummary } from './caseWorklistMapping';
 import { applyFilters, FILTER_KEYS, type FilterKey, type Filters } from './worklistFilters';
 import { useUserDirectory } from '../../hooks/useUserDirectory';
 import {
@@ -21,45 +29,74 @@ import {
   type ContactEmails,
 } from '../people/peopleDirectory';
 import './CaseWorklistPage.css';
+import { Skeleton } from '../../components/feedback/Skeleton';
+
+const PAGE_SIZE = 15;
 
 /**
- * One discipline's checker.
+ * Both checkers in one cell, one line per discipline, each labelled Tax or AQS. Never one
+ * merged name: a case on Tax then AQS has two checkers, and a single unlabelled name is the
+ * defect Fixes 2 removed from the header (2026-09-19).
  *
- * A name is a person; an absence is one of two different things, and they are not
- * interchangeable - a case that will never take a Tax check has not been overlooked, a case
- * awaiting allocation has. `checkerState` reads the route to tell them apart, and the two
- * are styled differently so a column of them can be skimmed.
+ * A discipline the route never calls for gets no line - the route chips beside it already say
+ * so. One that is owed but not allocated says so, muted, because that is outstanding work.
  */
-function CheckerCell({
-  name,
-  contactId,
-  contactEmails,
-  route,
-  type,
-}: {
-  name: string | null;
-  contactId: string | null;
-  contactEmails: ContactEmails;
-  route: ReviewRoute | null;
-  type: ReviewType;
-}) {
-  const state = checkerState(name, route, type);
-
-  if (state.kind === 'named') {
-    const identity = checkerIdentity(state.name, contactId, contactEmails);
-    return (
-      <td>
-        <Link to={`/people/Checker/${encodeURIComponent(identity)}`}>{state.name}</Link>
-      </td>
-    );
-  }
+function CheckersCell({ item, contactEmails }: { item: CaseSummary; contactEmails: ContactEmails }) {
+  const lines = (
+    [
+      ['Tax', item.taxChecker, item.taxCheckerId],
+      ['AQS', item.aqsChecker, item.aqsCheckerId],
+    ] as const
+  )
+    .map(([type, name, contactId]) => ({ type, contactId, state: checkerState(name, item.route, type) }))
+    .filter((line) => line.state.kind !== 'not-required');
 
   return (
-    <td className={`worklist__checker worklist__checker--${state.kind}`}>
-      {CHECKER_LABELS[state.kind]}
+    <td>
+      <ul className="worklist__checkers">
+        {lines.map(({ type, contactId, state }) => (
+          <li key={type}>
+            <span className="worklist__checker-type">{type}</span>
+            {state.kind === 'named' ? (
+              <>
+                <Avatar name={state.name} size="sm" />
+                <Link
+                  to={`/people/Checker/${encodeURIComponent(checkerIdentity(state.name, contactId, contactEmails))}`}
+                >
+                  {state.name}
+                </Link>
+              </>
+            ) : (
+              <span className="worklist__muted">{CHECKER_LABELS.unallocated}</span>
+            )}
+          </li>
+        ))}
+      </ul>
     </td>
   );
 }
+
+/** The route as the checks it runs, in order: "Tax → AQS". The words are read out, the chips are not. */
+function RouteCell({ route }: { route: ReviewRoute | null }) {
+  if (!route) return <td className="worklist__muted">Not routed</td>;
+  const steps = route === 'Tax then AQS' ? ['Tax', 'AQS'] : [route.replace(' only', '')];
+  return (
+    <td>
+      <span className="visually-hidden">{route}</span>
+      <span className="worklist__route" aria-hidden="true">
+        {steps.map((step, index) => (
+          <Fragment key={step}>
+            {index > 0 ? <Icon name="arrowRight" className="icon worklist__route-arrow" /> : null}
+            <span className="worklist__chip">{step}</span>
+          </Fragment>
+        ))}
+      </span>
+    </td>
+  );
+}
+
+/** A status as the tabs word it: sentence case, so "Awaiting Sign-off" reads "Awaiting sign-off". */
+const tabLabel = (status: string) => status.charAt(0) + status.slice(1).toLowerCase();
 
 /**
  * Where the case's remediation stands, in actions, so a list filtered to Open or Complete
@@ -70,19 +107,20 @@ function RemediationCell({ remediation }: { remediation: CaseRemediation | null 
   if (!remediation) return <td className="worklist__muted">None</td>;
   if (remediation.state === 'complete') {
     return (
-      <td>
-        Complete{' '}
-        <span className="worklist__muted">
-          ({remediation.total} action{remediation.total === 1 ? '' : 's'})
-        </span>
+      <td className="worklist__remediation">
+        <Icon name="check" className="icon worklist__done" />{' '}
+        {remediation.total === 1 ? '1 action done' : `All ${remediation.total} done`}
       </td>
     );
   }
+  const done = remediation.total - remediation.open;
   return (
-    <td>
-      Open{' '}
-      <span className="worklist__muted">
-        ({remediation.open} of {remediation.total} action{remediation.total === 1 ? '' : 's'})
+    <td className="worklist__remediation">
+      <span className="worklist__open">
+        {remediation.open} of {remediation.total} open
+      </span>
+      <span className="worklist__bar" aria-hidden="true">
+        <span style={{ width: `${(done / remediation.total) * 100}%` }} />
       </span>
     </td>
   );
@@ -130,6 +168,44 @@ export function CaseWorklistPage() {
   // describe a list other than the one on screen.
   const isFiltered = FILTER_KEYS.some((key) => appliedFilters[key] !== '');
 
+  // Every status that holds a case, counted over the whole list so a tab's number does not
+  // move with the other filters. "All" leaves out No Check Required, as the list itself does.
+  const statusCounts = useMemo(() => {
+    const counts = new Map<CaseStatus, number>();
+    for (const item of allCases) counts.set(item.status, (counts.get(item.status) ?? 0) + 1);
+    return counts;
+  }, [allCases]);
+  const allCount = allCases.length - (statusCounts.get('No Check Required') ?? 0);
+  const statusTabs = [
+    { status: '', label: 'All', count: allCount },
+    ...CASE_STATUSES.filter((status) => statusCounts.has(status) || status === filters.status).map((status) => ({
+      status,
+      label: tabLabel(status),
+      count: statusCounts.get(status) ?? 0,
+    })),
+  ];
+  const tabButtons = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  // The page resets to the first whenever the filters change, without an effect: the page
+  // number is held against the filters it was chosen under.
+  const filterKey = params.toString();
+  const [paging, setPaging] = useState({ key: filterKey, page: 1 });
+  const page = pageOf(filtered, paging.key === filterKey ? paging.page : 1, PAGE_SIZE);
+
+  function onTabKey(event: KeyboardEvent<HTMLDivElement>) {
+    const index = statusTabs.findIndex((tab) => tab.status === filters.status);
+    let next: number;
+    if (event.key === 'ArrowRight') next = (index + 1) % statusTabs.length;
+    else if (event.key === 'ArrowLeft') next = (index - 1 + statusTabs.length) % statusTabs.length;
+    else if (event.key === 'Home') next = 0;
+    else if (event.key === 'End') next = statusTabs.length - 1;
+    else return;
+    event.preventDefault();
+    const status = statusTabs[next].status;
+    set('status', status);
+    tabButtons.current[status]?.focus();
+  }
+
   function set(key: FilterKey, value: string) {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value);
@@ -156,7 +232,7 @@ export function CaseWorklistPage() {
         }
       />
 
-      {state.status === 'loading' ? <p role="status">Loading cases…</p> : null}
+      {state.status === 'loading' ? <Skeleton label="Loading cases…" rows={6} /> : null}
 
       {state.status === 'unavailable' ? (
         <section className="worklist__unavailable" aria-labelledby="worklist-unavailable">
@@ -170,33 +246,51 @@ export function CaseWorklistPage() {
 
       {state.status === 'ready' ? (
         <>
+          <div className="tabs__list worklist__tabs" role="tablist" aria-label="Case status" onKeyDown={onTabKey}>
+            {statusTabs.map((tab) => {
+              const selected = tab.status === filters.status;
+              return (
+                <button
+                  key={tab.status || 'all'}
+                  ref={(element) => {
+                    tabButtons.current[tab.status] = element;
+                  }}
+                  type="button"
+                  role="tab"
+                  id={`worklist-tab-${tab.status.replace(/\W+/g, '-') || 'all'}`}
+                  className="tabs__tab"
+                  aria-selected={selected}
+                  aria-controls="worklist-panel"
+                  tabIndex={selected ? 0 : -1}
+                  onClick={() => set('status', tab.status)}
+                >
+                  {tab.label}
+                  <span className="tabs__count">{tab.count}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div
+            id="worklist-panel"
+            role="tabpanel"
+            className="worklist__panel"
+            aria-labelledby={`worklist-tab-${filters.status.replace(/\W+/g, '-') || 'all'}`}
+          >
           <FilterBar
-            summary={`${filtered.length} of ${allCases.length} cases`}
+            summary={`${filtered.length} of ${allCount} cases`}
             onClear={() => setParams(new URLSearchParams(), { replace: true })}
             clearDisabled={!isFiltered}
           >
-            <FilterField label="Search" htmlFor="worklist-search">
+            <FilterField label="Search" htmlFor="worklist-search" search>
               <input
                 id="worklist-search"
                 type="search"
                 value={filters.q}
                 onChange={(e) => set('q', e.target.value)}
-                placeholder="Case ref, client, adviser or owner"
+                placeholder="Case ref, client or adviser"
+                title="Searches the case reference, service case reference, client, adviser and owner"
               />
-            </FilterField>
-            <FilterField label="Status" htmlFor="worklist-status">
-              <select
-                id="worklist-status"
-                value={filters.status}
-                onChange={(e) => set('status', e.target.value)}
-              >
-                <option value="">All statuses</option>
-                {CASE_STATUSES.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
             </FilterField>
             <FilterField label="Outcome" htmlFor="worklist-outcome">
               <select
@@ -204,7 +298,7 @@ export function CaseWorklistPage() {
                 value={filters.outcome}
                 onChange={(e) => set('outcome', e.target.value)}
               >
-                <option value="">All outcomes</option>
+                <option value="">All</option>
                 {OUTCOMES.map((outcome) => (
                   <option key={outcome} value={outcome}>
                     {outcome}
@@ -220,7 +314,7 @@ export function CaseWorklistPage() {
                   value={filters.remediation}
                   onChange={(e) => set('remediation', e.target.value)}
                 >
-                  <option value="">All cases</option>
+                  <option value="">All</option>
                   <option value="open">Open</option>
                   <option value="complete">Complete</option>
                   <option value="none">None raised</option>
@@ -233,7 +327,7 @@ export function CaseWorklistPage() {
                 value={filters.route}
                 onChange={(e) => set('route', e.target.value)}
               >
-                <option value="">All routes</option>
+                <option value="">All</option>
                 {REVIEW_ROUTES.map((route) => (
                   <option key={route} value={route}>
                     {route}
@@ -249,7 +343,7 @@ export function CaseWorklistPage() {
                   value={filters.priority}
                   onChange={(e) => set('priority', e.target.value)}
                 >
-                  <option value="">All priorities</option>
+                  <option value="">All</option>
                   {priorities.map((priority) => (
                     <option key={priority} value={priority}>
                       {priority}
@@ -259,7 +353,7 @@ export function CaseWorklistPage() {
               </FilterField>
             ) : null}
             {checks.length > 0 ? (
-              <FilterField label="Pre or post check" htmlFor="worklist-check">
+              <FilterField label="Check" htmlFor="worklist-check">
                 <select
                   id="worklist-check"
                   value={filters.check}
@@ -274,21 +368,23 @@ export function CaseWorklistPage() {
                 </select>
               </FilterField>
             ) : null}
-            <FilterField label="Imported from" htmlFor="worklist-from">
-              <input
-                id="worklist-from"
-                type="date"
-                value={filters.from}
-                onChange={(e) => set('from', e.target.value)}
-              />
-            </FilterField>
-            <FilterField label="Imported to" htmlFor="worklist-to">
-              <input
-                id="worklist-to"
-                type="date"
-                value={filters.to}
-                onChange={(e) => set('to', e.target.value)}
-              />
+            <FilterField label="Imported" htmlFor="worklist-from">
+              <span className="worklist__dates">
+                <input
+                  id="worklist-from"
+                  type="date"
+                  aria-label="Imported from"
+                  value={filters.from}
+                  onChange={(e) => set('from', e.target.value)}
+                />
+                <span aria-hidden="true">to</span>
+                <input
+                  type="date"
+                  aria-label="Imported to"
+                  value={filters.to}
+                  onChange={(e) => set('to', e.target.value)}
+                />
+              </span>
             </FilterField>
           </FilterBar>
 
@@ -346,97 +442,82 @@ export function CaseWorklistPage() {
             </p>
           ) : null}
 
-          <div className="worklist__scroll">
-            <table className="worklist">
-              <caption className="visually-hidden">
-                Cases assigned to you or your team, oldest first
-              </caption>
-              <thead>
-                <tr>
-                  <th scope="col">Case</th>
-                  <th scope="col">Client</th>
-                  <th scope="col">Adviser</th>
-                  <th scope="col">Route</th>
-                  {/*
-                    TWO columns, not one. A case on Tax then AQS has two checkers, and the
-                    single checker column these replace named whichever discipline was
-                    allocated second - which is the defect Fixes 2 removed from the header
-                    (2026-09-19). Merging them back here would put it straight back.
-
-                    They sit after Route because Route is what decides which of the two
-                    empty states an absent name means.
-                  */}
-                  <th scope="col">Tax checker</th>
-                  <th scope="col">AQS checker</th>
-                  <th scope="col">Status</th>
-                  <th scope="col" className="worklist__numeric">
-                    Age
-                  </th>
-                  <th scope="col">Latest outcome</th>
-                  {remediationKnown ? <th scope="col">Remediation</th> : null}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.length === 0 ? (
+          <div className="worklist__card">
+            <div className="worklist__scroll">
+              <table className="worklist">
+                <caption className="visually-hidden">
+                  Cases assigned to you or your team, oldest first
+                </caption>
+                <thead>
                   <tr>
-                    <td colSpan={remediationKnown ? 10 : 9} className="worklist__empty">
-                      No cases match your current filters.
-                    </td>
+                    <th scope="col">Case</th>
+                    <th scope="col">Adviser</th>
+                    <th scope="col">Route</th>
+                    <th scope="col">Checkers</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Added on</th>
+                    <th scope="col" className="worklist__numeric">
+                      Age
+                    </th>
+                    <th scope="col">Latest outcome</th>
+                    {remediationKnown ? <th scope="col">Remediation</th> : null}
                   </tr>
-                ) : (
-                  filtered.map((item) => (
-                    <tr key={item.id}>
-                      <th scope="row">
-                        <Link to={`/cases/${item.id}`}>{item.caseReference}</Link>
-                      </th>
-                      <td>{item.client ?? '—'}</td>
-                      <td>
-                        {item.adviser ? (
-                          <Link to={`/people/Adviser/${encodeURIComponent(adviserIdentity(item))}`}>
-                            {item.adviser}
-                          </Link>
-                        ) : (
-                          '—'
-                        )}
+                </thead>
+                <tbody>
+                  {filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan={remediationKnown ? 9 : 8} className="worklist__empty">
+                        No cases match your current filters.
                       </td>
-                      <td>{item.route ?? 'Not routed'}</td>
-                      <CheckerCell
-                        name={item.taxChecker}
-                        contactId={item.taxCheckerId}
-                        contactEmails={contactEmails}
-                        route={item.route}
-                        type="Tax"
-                      />
-                      <CheckerCell
-                        name={item.aqsChecker}
-                        contactId={item.aqsCheckerId}
-                        contactEmails={contactEmails}
-                        route={item.route}
-                        type="AQS"
-                      />
-                      <td>
-                        <StageLabel status={item.status} />
-                      </td>
-                      <td className="worklist__numeric">{item.ageInDays} days</td>
-                      <td>
-                        {item.latestOutcome ? (
-                          <OutcomeIndicator outcome={item.latestOutcome} />
-                        ) : item.taxOutcome ? (
-                          // A Tax check grades on its own scale and writes no al_outcome row
-                          // (AD-055), so a Tax-only case has no BR-005 outcome to show and
-                          // read as ungraded however it was graded. Labelled "Tax:" so the
-                          // two scales are not silently mixed in one column.
-                          <TaxOutcomeIndicator outcome={item.taxOutcome} />
-                        ) : (
-                          'Not yet graded'
-                        )}
-                      </td>
-                      {remediationKnown ? <RemediationCell remediation={item.remediation} /> : null}
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    page.rows.map((item) => (
+                      <tr key={item.id}>
+                        <th scope="row">
+                          <span className="worklist__ref">
+                            <CaseReferenceLink id={item.id} caseReference={item.caseReference} serviceCaseRef={item.serviceCaseRef} />
+                          </span>
+                          <span className="worklist__client" title={item.client ?? undefined}>
+                            {item.client ?? 'No client recorded'}
+                          </span>
+                        </th>
+                        <td>
+                          {item.adviser ? (
+                            <Link to={`/people/Adviser/${encodeURIComponent(adviserIdentity(item))}`}>
+                              {item.adviser}
+                            </Link>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                        <RouteCell route={item.route} />
+                        <CheckersCell item={item} contactEmails={contactEmails} />
+                        <td>
+                          <StageLabel status={item.status} />
+                        </td>
+                        <td>{date(item.createdOn) ?? '—'}</td>
+                        <td className="worklist__numeric">{item.ageInDays} days</td>
+                        <td>
+                          {item.latestOutcome ? (
+                            <OutcomeIndicator outcome={item.latestOutcome} />
+                          ) : item.taxOutcome ? (
+                            // A Tax check grades on its own scale and writes no outcome row, so
+                            // a Tax-only case would read as ungraded however it was graded.
+                            // Labelled "Tax:" so the two scales are not silently mixed.
+                            <TaxOutcomeIndicator outcome={item.taxOutcome} />
+                          ) : (
+                            <span className="worklist__muted">Not yet graded</span>
+                          )}
+                        </td>
+                        {remediationKnown ? <RemediationCell remediation={item.remediation} /> : null}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <Pager {...page} setPage={(next) => setPaging({ key: filterKey, page: next })} label="cases" />
+          </div>
           </div>
         </>
       ) : null}

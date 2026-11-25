@@ -208,6 +208,21 @@ describe('outcomeOf', () => {
     );
   });
 
+  it('shows an amended grade in place of the one written at submit, keeping the Tax half', () => {
+    const raised = [
+      'Issues found on the check:',
+      '- One',
+      '',
+      'Raised automatically when the review was submitted (Potential harm; Tax check: Fail).',
+    ].join('\n');
+
+    expect(outcomeOf([action('a', raised)], 'Insufficient evidence')).toBe(
+      'Insufficient evidence; Tax check: Fail',
+    );
+    expect(outcomeOf([action('a', raised)])).toBe('Potential harm; Tax check: Fail');
+    expect(outcomeOf([action('a', DESCRIPTION)], 'Pass')).toBe('Tax check: Insufficient evidence');
+  });
+
   it('names both when a Tax and an AQS review each raised remediation', () => {
     const raisedFor = (reason: string) =>
       [

@@ -102,7 +102,7 @@ namespace OutcomeTesting.Plugins.Tests
             Remediation.AssignOpenActions(svc, Ref(), Correlation);
 
             var queued = Queued(svc);
-            Assert.Equal("Remedial needed - insufficient evidence/ potential harm: IO-TEST-100 - Mr and Mrs Smith",
+            Assert.Equal("Remedial needed - Potential harm: IO-TEST-100 - Mr and Mrs Smith",
                 queued.GetAttributeValue<string>("al_subject"));
             Assert.Contains("liaise with your T&amp;C Manager", queued.GetAttributeValue<string>("al_body"));
         }
@@ -242,8 +242,11 @@ namespace OutcomeTesting.Plugins.Tests
         [InlineData("Tax only", 120910701, "", true)]
         [InlineData("Tax then AQS", 120910701, "", false)]
         [InlineData("AQS only", 120910701, "Pre-CAS Adviser", true)]
-        [InlineData("AQS only", 120910702, "Pre-CAS Adviser", false)]
-        public void The_tc_manager_is_copied_on_tax_only_and_new_entrant_pass_with_issues(
+        [InlineData("AQS only", 120910702, "Pre-CAS Adviser", true)]
+        [InlineData("AQS only", 120910703, "Pre-CAS Adviser", true)]
+        [InlineData("AQS only", 120910700, "Pre-CAS Adviser", true)]
+        [InlineData("AQS only", 120910702, "", false)]
+        public void The_tc_manager_is_copied_on_tax_only_and_on_every_new_entrant_grading(
             string route, int outcome, string items, bool copied)
         {
             var svc = Case();

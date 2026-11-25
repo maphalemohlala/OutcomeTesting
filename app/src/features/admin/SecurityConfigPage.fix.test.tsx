@@ -25,6 +25,7 @@ vi.mock('../../services/commands/permissions', () => ({
 }));
 vi.mock('../../services/commands/commandClient', () => ({ executeCommand: vi.fn() }));
 vi.mock('../../services/errors', () => ({ logTechnical: vi.fn() }));
+vi.mock('../../hooks/useUserDirectory', () => ({ useUserDirectory: () => ({ status: 'loading' }) }));
 vi.mock('./useRoles', () => ({
   useRoles: () => ({
     status: 'ready',
@@ -40,6 +41,9 @@ vi.mock('./useSecurityConfig', () => ({
     mappings: [
       { id: 'm1', email: 'a@example.com', role: 'old role', active: false },
       { id: 'm2', email: 'b@example.com', role: 'Live Role', active: false },
+      // Someone still holds each role, so both matrix columns are shown by default.
+      { id: 'm3', email: 'c@example.com', role: 'Live Role', active: true },
+      { id: 'm4', email: 'c@example.com', role: 'Old Role', active: true },
     ],
     permissions: [
       { id: 'p1', role: 'Old Role', resource: 'page.cases', level: 'Edit', active: false },
@@ -58,10 +62,13 @@ describe('Security configuration, retired roles', () => {
   );
 
   it('offers Restore only for the rule and the assignment of a role that is still active', () => {
-    // One withdrawn assignment and one withdrawn rule per role. The retired role's two rows
-    // say so; the live role's two rows can be restored. Retiring is the role table's own
-    // button, so "Restore" there (for the retired role) is the third.
-    expect(html.match(/>Restore</g)).toHaveLength(3);
+    // One withdrawn assignment and one withdrawn rule per role. The rules table's live row and
+    // the role registry's retired role (its own Restore) are the two Restore buttons.
+    expect(html.match(/>Restore</g)).toHaveLength(2);
+    // In the matrix the live role's withdrawn cell restores; the retired role's says why it cannot.
+    expect(html).toContain('aria-label="Restore Live Role for b@example.com"');
+    expect(html).toMatch(/<button[^>]*data-state="withdrawn"[^>]*aria-label="old role withdrawn from a@example.com. Role retired, so it cannot be restored"[^>]*disabled/);
     expect(html.match(/Role retired/g)).toHaveLength(2);
+    expect(html).toContain('2 of 2 shown');
   });
 });

@@ -1,8 +1,8 @@
 <customapi uniquename="al_GenerateExport">
   <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
   <bindingtype>0</bindingtype>
-  <description default="Snapshots each Closed case into an al_exportrecord in the AD-039 20-column Trail Light shape and marks the batch Generated. Enforces the caller holds Edit on export.generate, is idempotent per batch and writes an immutable Audit Event.">
-    <label description="Snapshots each Closed case into an al_exportrecord in the AD-039 20-column Trail Light shape and marks the batch Generated. Enforces the caller holds Edit on export.generate, is idempotent per batch and writes an immutable Audit Event." languagecode="1033" />
+  <description default="Produces one Trail Light file: creates the batch under the id given and snapshots the Daily or Quarterly file rows for the check dates given. Needs Edit on export.generate; idempotent per intent; writes an Audit Event.">
+    <label description="Produces one Trail Light file: creates the batch under the id given and snapshots the Daily or Quarterly file rows for the check dates given. Needs Edit on export.generate; idempotent per intent; writes an Audit Event." languagecode="1033" />
   </description>
   <displayname default="Generate Export">
     <label description="Generate Export" languagecode="1033" />

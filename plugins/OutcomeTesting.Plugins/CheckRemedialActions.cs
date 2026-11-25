@@ -103,9 +103,10 @@ namespace OutcomeTesting.Plugins
 
                         // The action's own columns sit on its first issue; the rows under it
                         // belong to the same action, as on the remediation form.
-                        foreach (var detail in details)
+                        // The remedial action, first, is the checker's own words and may be formatted.
+                        for (var d = 0; d < details.Length; d++)
                         {
-                            cells.Add(i == 0 ? PdfCell.Of(detail) : PdfCell.Blank());
+                            cells.Add(i > 0 ? PdfCell.Blank() : d == 0 ? PdfCell.FromMarkup(details[d]) : PdfCell.Of(details[d]));
                         }
 
                         table.Add(cells.ToArray());

@@ -47,14 +47,15 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void Exactly_twenty_one_codes_and_one_prefix_are_protected()
+        public void Exactly_nineteen_codes_and_one_prefix_are_protected()
         {
             // Pinned deliberately. A code appearing here without a matching read in the
             // plug-in or portal template that uses it is how this guard drifts out of truth.
             // Q-GR-02 joined on 2026-09-19, when GradingRules began reading it by name (item 3);
             // the Tax categories, the two notes cards' codes and the Q-AML prefix on 2026-11-16,
             // when ChecklistGuardsFixTests began checking every literal read against this list.
-            Assert.Equal(21, ChecklistGuards.ProtectedCodes.Count());
+            // Q-TAX-09 / Q-TAX-10 left on 2026-11-25, when Omissions was retired at UAT.
+            Assert.Equal(19, ChecklistGuards.ProtectedCodes.Count());
             Assert.Equal(new[] { "Q-AML" }, ChecklistGuards.ProtectedCodePrefixes.ToArray());
         }
     }

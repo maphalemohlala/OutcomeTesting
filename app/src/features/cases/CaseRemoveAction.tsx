@@ -10,7 +10,12 @@ import { canRemoveCase } from './caseRemoval';
 const NO_CHECK_REQUIRED = 120910592;
 
 interface Props {
-  detail: { id: string; status: CaseStatus | null; rowVersion?: string | null };
+  detail: {
+    id: string;
+    status: CaseStatus | null;
+    rowVersion?: string | null;
+    checklist?: { items: string[] };
+  };
   onRemoved: () => void;
   /** Re-reads the case. Called after a conflict, so the next try carries the fresh row version. */
   onStale?: () => void;
@@ -54,6 +59,14 @@ export function CaseRemoveAction({ detail, onRemoved, onStale }: Props) {
   const intent = useIntentKeys();
 
   if (!canRemoveCase(detail.status)) return null;
+  // The server refuses this too (CaseStatusGuardPlugin); here it only saves a wasted try.
+  if (detail.checklist?.items.some((item) => item.trim().toLowerCase() === 'high risk item 1')) {
+    return (
+      <p className="case-card__note">
+        Tier 1 high-risk case (High Risk Item 1): it is always checked, so it cannot be removed.
+      </p>
+    );
+  }
 
   async function remove() {
     setSaving(true);

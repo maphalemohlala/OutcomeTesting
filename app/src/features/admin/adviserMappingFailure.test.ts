@@ -35,8 +35,8 @@ describe('describeSaveFailure', () => {
     const shown = describeSaveFailure(duplicateBody, true);
 
     expect(shown).toBe(DUPLICATE_ADVISER);
-    expect(shown).toContain('already mapped');
-    expect(shown).toContain('Change');
+    expect(shown).toContain('already has this T&C Manager');
+    expect(shown).toContain('different manager');
   });
 
   it('recognises the duplicate from the error code alone', () => {
@@ -106,20 +106,28 @@ describe('alreadyMappedRefusal', () => {
     },
   ];
 
-  it('refuses an adviser the page can already see mapped', () => {
-    expect(alreadyMappedRefusal('adviser@example.invalid', mappings)).toBe(DUPLICATE_ADVISER);
+  it('refuses the same manager for an adviser twice', () => {
+    expect(alreadyMappedRefusal('adviser@example.invalid', 'c1', mappings)).toBe(DUPLICATE_ADVISER);
+  });
+
+  it('allows a second, different manager for the same adviser', () => {
+    expect(alreadyMappedRefusal('adviser@example.invalid', 'c2', mappings)).toBeNull();
   });
 
   it('ignores case and surrounding space, as the alternate key does', () => {
-    expect(alreadyMappedRefusal('  ADVISER@EXAMPLE.INVALID  ', mappings)).toBe(DUPLICATE_ADVISER);
+    expect(alreadyMappedRefusal('  ADVISER@EXAMPLE.INVALID  ', ' C1 ', mappings)).toBe(DUPLICATE_ADVISER);
+  });
+
+  it('lets a row being changed match itself', () => {
+    expect(alreadyMappedRefusal('adviser@example.invalid', 'c1', mappings, 'm1')).toBeNull();
   });
 
   it('allows an adviser who is not mapped', () => {
-    expect(alreadyMappedRefusal('someone@example.invalid', mappings)).toBeNull();
+    expect(alreadyMappedRefusal('someone@example.invalid', 'c1', mappings)).toBeNull();
   });
 
   it('says nothing about an empty choice, which the form refuses for its own reason', () => {
-    expect(alreadyMappedRefusal('', mappings)).toBeNull();
-    expect(alreadyMappedRefusal('   ', mappings)).toBeNull();
+    expect(alreadyMappedRefusal('', 'c1', mappings)).toBeNull();
+    expect(alreadyMappedRefusal('adviser@example.invalid', '  ', mappings)).toBeNull();
   });
 });

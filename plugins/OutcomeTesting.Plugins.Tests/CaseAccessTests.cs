@@ -39,7 +39,7 @@ namespace OutcomeTesting.Plugins.Tests
                 Reviews = new List<ReviewFact>(reviews),
                 AqsQueueAccount = Queue,
                 ResolvedAdviser = Adviser,
-                ResolvedSupervisor = Supervisor,
+                ResolvedSupervisors = new List<EntityReference> { Supervisor },
                 Now = Now,
             };
         }

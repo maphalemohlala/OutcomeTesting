@@ -76,10 +76,120 @@
 {% assign check_value = 120910540 %}{% assign check_name = 'Pre' %}
 {% if f_check == 'post' %}{% assign check_value = 120910541 %}{% assign check_name = 'Post' %}{% endif %}
 
+{% assign is_aqs_queue = false %}
+{% if reviewtype == 120910201 %}{% assign is_aqs_queue = true %}{% endif %}
+{% assign discipline = 'tax' %}{% if is_aqs_queue %}{% assign discipline = 'AQS' %}{% endif %}
+
+{% comment %}
+  Tabs (project owner, 2026-11-25). AQS: In progress, Allocated to me, New, Tax review
+  completed, Completed. Tax: In progress, Submitted. A tab is a GET parameter, so a tab is a
+  URL, the filters above it keep it, and every tab pages server-side on its own. Anything
+  that is not a tab of this page becomes In progress, so nothing typed into the URL reaches
+  the query.
+{% endcomment %}
+{% if is_aqs_queue %}
+  {% assign tab_keys = 'progress,allocated,new,taxdone,completed' | split: ',' %}
+{% else %}
+  {% assign tab_keys = 'progress,submitted' | split: ',' %}
+{% endif %}
+{% assign f_tab = request.params['tab'] | default: 'progress' %}
+{% unless tab_keys contains f_tab %}{% assign f_tab = 'progress' %}{% endunless %}
+{% assign queue_tab = false %}
+{% if f_tab == 'new' or f_tab == 'taxdone' %}{% assign queue_tab = true %}{% endif %}
+
 {% capture scope_qs %}{% if f_ref != '' %}ref={{ f_ref | url_escape }}&amp;{% endif %}{% if f_route != '' %}route={{ f_route | url_escape }}&amp;{% endif %}{% if f_check != '' %}check={{ f_check }}&amp;{% endif %}{% endcapture %}
 
+{% comment %}
+  The filters every tab shares, written once so the counts in the tabs and the rows under
+  them cannot disagree. Review tabs read the case through the alias "case"; the queue reads
+  the case itself.
+{% endcomment %}
+{% capture review_filters %}
+      <condition attribute="al_reviewtype" operator="eq" value="{{ reviewtype }}" />
+      <condition attribute="al_assignedcontactid" operator="eq" value="{{ user.id | xml_escape }}" />
+      {% comment %}A removed case is out of checking, so its review is nobody's work.{% endcomment %}
+      <condition entityname="case" attribute="al_casestatus" operator="ne" value="120910592" />
+      {% if f_ref != '' %}<filter type="or"><condition entityname="case" attribute="al_casereference" operator="like" value="%{{ f_ref | xml_escape }}%" /><condition entityname="case" attribute="al_servicecaseref" operator="like" value="%{{ f_ref | xml_escape }}%" /></filter>{% endif %}
+      {% if f_route != '' %}<condition entityname="case" attribute="al_reviewrouteid" operator="eq" value="{{ f_route | xml_escape }}" />{% endif %}
+      {% if f_check != '' %}<filter type="or"><condition entityname="chk" attribute="al_name" operator="eq" value="{{ check_name }}" /><filter type="and"><condition entityname="case" attribute="al_preorpostcheckid" operator="null" /><condition entityname="case" attribute="al_preorpostcheck" operator="eq" value="{{ check_value }}" /></filter></filter>{% endif %}
+{% endcapture %}
+{% capture review_links %}
+    <link-entity name="al_outcomecase" from="al_outcomecaseid" to="al_outcomecaseid" link-type="outer" alias="case">
+      <link-entity name="al_listoption" from="al_listoptionid" to="al_preorpostcheckid" link-type="outer" alias="chk" />
+    </link-entity>
+{% endcapture %}
+{% capture queue_filters %}
+        <condition attribute="statecode" operator="eq" value="0" />
+        <condition attribute="al_aqsqueueaccountid" operator="not-null" />
+        {% if f_ref != '' %}<filter type="or"><condition attribute="al_casereference" operator="like" value="%{{ f_ref | xml_escape }}%" /><condition attribute="al_servicecaseref" operator="like" value="%{{ f_ref | xml_escape }}%" /></filter>{% endif %}
+        {% if f_route != '' %}<condition attribute="al_reviewrouteid" operator="eq" value="{{ f_route | xml_escape }}" />{% endif %}
+        {% if f_check != '' %}<filter type="or"><condition entityname="chk" attribute="al_name" operator="eq" value="{{ check_name }}" /><filter type="and"><condition attribute="al_preorpostcheckid" operator="null" /><condition attribute="al_preorpostcheck" operator="eq" value="{{ check_value }}" /></filter></filter>{% endif %}
+{% endcapture %}
+
+{% comment %}
+  A review is submitted at 120910212 and allocated-not-started at 120910210; anything else,
+  a missing status included, is work in progress. Tax has no Allocated tab, so its In
+  progress holds every review not yet submitted. The null branch is spelled out because a
+  FetchXML ne / not-in drops rows whose value is null.
+
+  The queue splits on whether the case's route needs a Tax check: those reach the queue only
+  once their Tax check is in, so they are the Tax review completed tab (AR-03).
+{% endcomment %}
+{% assign tab_count_progress = 0 %}{% assign tab_count_allocated = 0 %}{% assign tab_count_new = 0 %}
+{% assign tab_count_taxdone = 0 %}{% assign tab_count_completed = 0 %}{% assign tab_count_submitted = 0 %}
+{% for t in tab_keys %}
+  {% capture t_condition %}{% case t %}
+    {% when 'allocated' %}<condition attribute="al_reviewstatus" operator="eq" value="120910210" />
+    {% when 'completed' %}<condition attribute="al_reviewstatus" operator="eq" value="120910212" />
+    {% when 'submitted' %}<condition attribute="al_reviewstatus" operator="eq" value="120910212" />
+    {% when 'progress' %}<filter type="or"><condition attribute="al_reviewstatus" operator="null" />{% if is_aqs_queue %}<condition attribute="al_reviewstatus" operator="not-in"><value>120910210</value><value>120910212</value></condition>{% else %}<condition attribute="al_reviewstatus" operator="ne" value="120910212" />{% endif %}</filter>
+    {% when 'taxdone' %}<condition entityname="route" attribute="al_requirestaxreview" operator="eq" value="1" />
+    {% when 'new' %}<filter type="or"><condition entityname="route" attribute="al_requirestaxreview" operator="null" /><condition entityname="route" attribute="al_requirestaxreview" operator="ne" value="1" /></filter>
+  {% endcase %}{% endcapture %}
+  {% if t == 'new' or t == 'taxdone' %}
+    {% fetchxml tab_count %}
+    <fetch count="1" returntotalrecordcount="true">
+      <entity name="al_outcomecase">
+        <attribute name="al_outcomecaseid" />
+        <filter type="and">
+          {{ queue_filters }}
+          {{ t_condition }}
+        </filter>
+        <link-entity name="al_reviewroute" from="al_reviewrouteid" to="al_reviewrouteid" link-type="outer" alias="route" />
+        <link-entity name="al_listoption" from="al_listoptionid" to="al_preorpostcheckid" link-type="outer" alias="chk" />
+      </entity>
+    </fetch>
+    {% endfetchxml %}
+  {% else %}
+    {% fetchxml tab_count %}
+    <fetch count="1" returntotalrecordcount="true">
+      <entity name="al_reviewinstance">
+        <attribute name="al_reviewinstanceid" />
+        <filter type="and">
+          {{ review_filters }}
+          {{ t_condition }}
+        </filter>
+        {{ review_links }}
+      </entity>
+    </fetch>
+    {% endfetchxml %}
+  {% endif %}
+  {% assign t_total = tab_count.results.total_record_count | default: 0 %}
+  {% if t_total < 0 %}{% assign t_total = 0 %}{% endif %}
+  {% case t %}
+    {% when 'progress' %}{% assign tab_count_progress = t_total %}
+    {% when 'allocated' %}{% assign tab_count_allocated = t_total %}
+    {% when 'new' %}{% assign tab_count_new = t_total %}
+    {% when 'taxdone' %}{% assign tab_count_taxdone = t_total %}
+    {% when 'completed' %}{% assign tab_count_completed = t_total %}
+    {% when 'submitted' %}{% assign tab_count_submitted = t_total %}
+  {% endcase %}
+  {% if t == f_tab %}{% assign active_condition = t_condition %}{% assign total = t_total %}{% endif %}
+{% endfor %}
+
+{% unless queue_tab %}
 {% fetchxml reviews %}
-<fetch count="{{ page_size }}" page="{{ page_number }}" returntotalrecordcount="true">
+<fetch count="{{ page_size }}" page="{{ page_number }}">
   <entity name="al_reviewinstance">
     <attribute name="al_reviewinstanceid" />
     <attribute name="al_name" />
@@ -88,26 +198,14 @@
     <attribute name="al_startedon" />
     <attribute name="al_submittedon" />
     <filter type="and">
-      <condition attribute="al_reviewtype" operator="eq" value="{{ reviewtype }}" />
-      <condition attribute="al_assignedcontactid" operator="eq" value="{{ user.id | xml_escape }}" />
-      {% comment %}A removed case is out of checking, so its review is nobody's work.{% endcomment %}
-      <condition entityname="case" attribute="al_casestatus" operator="ne" value="120910592" />
-      {% if f_ref != '' %}<condition entityname="case" attribute="al_casereference" operator="like" value="%{{ f_ref | xml_escape }}%" />{% endif %}
-      {% if f_route != '' %}<condition entityname="case" attribute="al_reviewrouteid" operator="eq" value="{{ f_route | xml_escape }}" />{% endif %}
-      {% if f_check != '' %}
-      <filter type="or">
-        <condition entityname="chk" attribute="al_name" operator="eq" value="{{ check_name }}" />
-        <filter type="and">
-          <condition entityname="case" attribute="al_preorpostcheckid" operator="null" />
-          <condition entityname="case" attribute="al_preorpostcheck" operator="eq" value="{{ check_value }}" />
-        </filter>
-      </filter>
-      {% endif %}
+      {{ review_filters }}
+      {{ active_condition }}
     </filter>
-    <order attribute="al_startedon" descending="true" />
+    {% if f_tab == 'completed' or f_tab == 'submitted' %}<order attribute="al_submittedon" descending="true" />{% else %}<order attribute="al_startedon" descending="true" />{% endif %}
     <link-entity name="al_outcomecase" from="al_outcomecaseid" to="al_outcomecaseid" link-type="outer" alias="case">
       <attribute name="al_outcomecaseid" />
       <attribute name="al_casereference" />
+      <attribute name="al_servicecaseref" />
       <attribute name="al_clientname" />
       <attribute name="al_advisername" />
       <attribute name="al_taxcheckername" />
@@ -129,8 +227,8 @@
   </entity>
 </fetch>
 {% endfetchxml %}
-
 {% assign rows = reviews.results.entities %}
+{% endunless %}
 
 {% comment %}
   The shared queue (AD-076, extending AD-040, BR-003), AQS only (AD-113). An AQS checker
@@ -139,17 +237,12 @@
   The queue is what CaseAccessReconciler put there (AD-218): the case carries the AQS Team
   account while it waits, and the Case - AQS queue permission is how a reviewer reads it.
   Ordered by the time it joined, oldest first (AR-03). No review is joined: the queue
-  permission deliberately has no children, and a queued Tax-then-AQS case is exactly one
-  whose route requires Tax, because the reconciler queues it only once its Tax check is in.
+  permission deliberately has no children.
 
   Nothing here is a permission boundary. ClaimCasePlugin re-reads the status and the route
   server-side and refuses a claim this list should not have offered (NFR-SEC-01).
 {% endcomment %}
-{% assign queued_status = 120910583 %}
-{% assign is_aqs_queue = false %}
-{% if reviewtype == 120910201 %}{% assign is_aqs_queue = true %}{% endif %}
-
-{% if is_aqs_queue and user %}
+{% if is_aqs_queue %}
   {% comment %}
     The queue is readable before it is actionable. Picking a case up depends on
     ClaimCasePlugin being registered; without it the Web API create still succeeds, because
@@ -157,27 +250,25 @@
     required and Dataverse does not enforce that through the API. The page would report
     success while the case stayed in the queue, leaving assignment rows that AD-037 forbids
     deleting. So the button is switched on by a site setting, not by deployment.
+
+    Picking a case up needs the AQS reviewer web role: the claim-request contact permission
+    is bound to the Tax and AQS Reviewer roles, and ClaimCasePlugin checks the same role
+    again. The server stays the boundary (NFR-SEC-01); this only stops the page offering an
+    action it knows will be refused, and says why instead.
   {% endcomment %}
   {% assign claim_enabled = false %}
   {% if settings['OutcomeTesting/Claim/Enabled'] == 'true' %}{% assign claim_enabled = true %}{% endif %}
-
-  {% comment %}
-    Picking a case up needs the AQS reviewer web role: the claim-request contact permission
-    is bound to the Tax and AQS Reviewer roles, and ClaimCasePlugin checks the same role
-    again. A signed-in user without it - a supervisor or an adviser reading the queue, now
-    that page.reviews reaches them - used to be offered "Run checks" and answered with a 403
-    read as "you may not have permission". The server stays the boundary (NFR-SEC-01); this
-    only stops the page offering an action it knows will be refused, and says why instead.
-  {% endcomment %}
   {% assign claim_role = 'AL Portal - AQS Reviewer' %}
   {% assign can_claim = false %}
   {% if claim_enabled and user.roles contains claim_role %}{% assign can_claim = true %}{% endif %}
 
+  {% if queue_tab %}
   {% fetchxml available %}
-  <fetch count="50">
+  <fetch count="{{ page_size }}" page="{{ page_number }}">
     <entity name="al_outcomecase">
       <attribute name="al_outcomecaseid" />
       <attribute name="al_casereference" />
+      <attribute name="al_servicecaseref" />
       <attribute name="al_clientname" />
       <attribute name="al_advisername" />
       <attribute name="al_taxcheckername" />
@@ -188,21 +279,11 @@
       <attribute name="al_preorpostcheck" />
       <attribute name="al_preorpostcheckid" />
       <filter type="and">
-        <condition attribute="statecode" operator="eq" value="0" />
-        <condition attribute="al_aqsqueueaccountid" operator="not-null" />
-        {% if f_check != '' %}
-        <filter type="or">
-          <condition entityname="chk" attribute="al_name" operator="eq" value="{{ check_name }}" />
-          <filter type="and">
-            <condition attribute="al_preorpostcheckid" operator="null" />
-            <condition attribute="al_preorpostcheck" operator="eq" value="{{ check_value }}" />
-          </filter>
-        </filter>
-        {% endif %}
+        {{ queue_filters }}
+        {{ active_condition }}
       </filter>
       <link-entity name="al_reviewroute" from="al_reviewrouteid" to="al_reviewrouteid" link-type="outer" alias="route">
         <attribute name="al_name" />
-        <attribute name="al_requirestaxreview" />
       </link-entity>
       <link-entity name="al_listoption" from="al_listoptionid" to="al_preorpostcheckid" link-type="outer" alias="chk">
         <attribute name="al_name" />
@@ -211,108 +292,245 @@
     </entity>
   </fetch>
   {% endfetchxml %}
+  {% assign rows = available.results.entities %}
+  {% endif %}
+{% endif %}
 
-  {% assign unassigned = available.results.entities %}
+{% comment %}
+  Tabs, then the filters in one row (2026-11-24 redesign), as Cases has them: a select
+  applies as soon as it changes, the search box on Enter, and Apply shows on focus for a
+  keyboard user. A tab keeps the filters, and the form keeps the tab.
+{% endcomment %}
+{% assign has_filter = false %}
+{% if f_ref != '' or f_route != '' or f_check != '' %}{% assign has_filter = true %}{% endif %}
+<div class="ot-page--full"></div>
+<nav class="ot-tabs" aria-label="{{ heading | escape }}">
+  {% for t in tab_keys %}
+    {% case t %}
+      {% when 'progress' %}{% assign t_label = 'In progress' %}{% assign t_n = tab_count_progress %}
+      {% when 'allocated' %}{% assign t_label = 'Allocated to me' %}{% assign t_n = tab_count_allocated %}
+      {% when 'new' %}{% assign t_label = 'New' %}{% assign t_n = tab_count_new %}
+      {% when 'taxdone' %}{% assign t_label = 'Tax review completed' %}{% assign t_n = tab_count_taxdone %}
+      {% when 'completed' %}{% assign t_label = 'Completed' %}{% assign t_n = tab_count_completed %}
+      {% when 'submitted' %}{% assign t_label = 'Submitted' %}{% assign t_n = tab_count_submitted %}
+    {% endcase %}
+    <a class="ot-tab{% if t_n == 0 %} ot-tab--empty{% endif %}" href="?{{ scope_qs }}tab={{ t }}"{% if t == f_tab %} aria-current="page"{% endif %}>{{ t_label }} <span class="ot-tab__count">{{ t_n }}</span></a>
+  {% endfor %}
+</nav>
 
-  {% comment %}
-    Two groups, Tax-reviewed first (AR-03): a case that has already had a Tax check has
-    usually been in OTIS longest, so it is flagged and put ahead of new work. Each group is
-    oldest first because the fetch is. Days in OTIS counts from import; Waiting for AQS from
-    the moment the reconciler queued it. Both are working days, drawn by the script at the
-    end of this template on the same calendar as the remediation clock.
-  {% endcomment %}
-  {% for pass in (1..2) %}
-    {% if pass == 1 %}
-      {% assign want_tax = true %}
-      {% assign q_title = 'Tax review completed – awaiting allocation' %}
-      {% assign q_id = 'ot-queue-tax' %}
-      {% assign q_empty = 'No case whose Tax review is complete is waiting for an AQS checker.' %}
-    {% else %}
-      {% assign want_tax = false %}
-      {% assign q_title = 'New – awaiting allocation' %}
-      {% assign q_id = 'ot-queue-new' %}
-      {% assign q_empty = 'No new case is waiting for an AQS checker.' %}
-    {% endif %}
-    {% assign q_count = 0 %}
-    {% for c in unassigned %}
-      {% assign c_tax = false %}
-      {% if c['route.al_requirestaxreview'] == true %}{% assign c_tax = true %}{% endif %}
-      {% if c_tax == want_tax %}{% assign q_count = q_count | plus: 1 %}{% endif %}
-    {% endfor %}
+<form class="ot-toolbar" method="get" role="search" aria-label="Filter {{ heading | downcase }}" data-ot-autosubmit>
+  <input type="hidden" name="tab" value="{{ f_tab }}">
+  <label class="ot-search">
+    <span class="ot-visually-hidden">Case or service case reference</span>
+    <input type="search" id="f-ref" name="ref" value="{{ f_ref | escape }}" placeholder="Case or service case reference">
+  </label>
+  <label class="ot-chip"><span class="ot-chip__label">Route</span>
+    <select id="f-route" name="route">
+      <option value="">Any</option>
+      {% for r in routes.results.entities %}
+        <option value="{{ r.al_reviewrouteid }}"{% if f_route == r.al_reviewrouteid %} selected{% endif %}>{{ r.al_name | escape }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="ot-chip"><span class="ot-chip__label">Pre or post check</span>
+    <select id="f-check" name="check">
+      <option value="">Any</option>
+      <option value="pre"{% if f_check == 'pre' %} selected{% endif %}>Pre-sale</option>
+      <option value="post"{% if f_check == 'post' %} selected{% endif %}>Post-sale</option>
+    </select>
+  </label>
+  <button type="submit" class="ot-btn ot-toolbar__apply">Apply</button>
+  <span class="ot-toolbar__meta">
+    <span class="ot-count">{% if queue_tab %}{{ total }} case{% if total != 1 %}s{% endif %}, oldest first.{% if can_claim %} Running checks assigns the case to you.{% elsif claim_enabled %} Running checks needs the AQS Reviewer role, which your account does not hold.{% endif %}{% else %}{{ total }} review{% if total != 1 %}s{% endif %} {% case f_tab %}{% when 'progress' %}in progress{% when 'allocated' %}allocated to you, not started{% else %}{% if is_aqs_queue %}completed{% else %}submitted{% endif %}{% endcase %}{% endif %}</span>
+    {% if has_filter %}<a class="ot-toolbar__clear" href="?tab={{ f_tab }}">Clear filters</a>{% endif %}
+  </span>
+</form>
 
-    <section class="ot-card" aria-labelledby="{{ q_id }}">
-      <h2 class="ot-card__title" id="{{ q_id }}">{{ q_title }}</h2>
-
-      {% if q_count > 0 %}
+{% if rows.size > 0 %}
+  {% if queue_tab %}
+    <div class="ot-reviews">
+      <div class="ot-card ot-card--table">
         <div class="ot-table-wrap">
-          <table class="ot-table">
-            <caption>
-              {{ q_count }} case{% if q_count != 1 %}s{% endif %}, oldest first.{% if can_claim %} Running checks assigns the case to you.{% elsif claim_enabled %} Running checks needs the AQS Reviewer role, which your account does not hold.{% endif %}
-            </caption>
+          <table class="ot-table ot-queue">
+            <caption class="ot-visually-hidden">{% if f_tab == 'taxdone' %}Cases whose Tax review is complete, waiting for an AQS checker{% else %}New cases waiting for an AQS checker{% endif %}, oldest first, page {{ page_number }}.</caption>
             <thead>
               <tr>
-                <th scope="col">Case reference</th>
+                <th scope="col">Case</th>
                 <th scope="col">Client</th>
                 <th scope="col">Adviser</th>
-                <th scope="col">Tax checker</th>
-                <th scope="col">AQS checker</th>
-                <th scope="col">Days in OTIS</th>
+                <th scope="col">Route</th>
+                <th scope="col">Checkers</th>
                 <th scope="col">Waiting for AQS</th>
+                <th scope="col">In outcome testing</th>
                 <th scope="col">Due</th>
                 {% if can_claim %}<th scope="col"><span class="ot-visually-hidden">Action</span></th>{% endif %}
               </tr>
             </thead>
             <tbody>
-              {% for c in unassigned %}
-                {% assign c_tax = false %}
-                {% if c['route.al_requirestaxreview'] == true %}{% assign c_tax = true %}{% endif %}
-                {% if c_tax == want_tax %}
-                  <tr>
-                    <td>
-                      <a href="/case-details?id={{ c.al_outcomecaseid }}">
-                        {{ c.al_casereference | default: 'Untitled case' | escape }}
-                      </a>
-                      {% if c_tax %}<span class="ot-badge">Tax reviewed</span>{% endif %}
-                      {% comment %}The list option wins; the legacy choice answers only where there is none.{% endcomment %}
-                      {% assign c_check = c.al_preorpostcheckid.name | default: '' %}
-                      {% if c_check == 'Post' or c_check == '' and c.al_preorpostcheck.value == 120910541 %}<span class="ot-badge">Post-sale</span>{% endif %}
+              {% for c in rows %}
+                {% assign rt_name = c['route.al_name'] %}
+                <tr>
+                  <td>
+                    <a href="/case-details?id={{ c.al_outcomecaseid }}">{{ c.al_casereference | default: 'Untitled case' | escape }}</a>
+                    {% if c.al_servicecaseref %}<span class="ot-service-ref"><span class="ot-visually-hidden">Service case reference </span>{{ c.al_servicecaseref | escape }}</span>{% endif %}
+                    {% comment %}The list option wins; the legacy choice answers only where there is none.{% endcomment %}
+                    {% assign c_check = c['chk.al_name'] | default: '' %}
+                    {% if c_check == 'Post' or c_check == '' and c.al_preorpostcheck.value == 120910541 %}<span class="ot-badge">Post-sale</span>{% endif %}
+                  </td>
+                  <td>{{ c.al_clientname | escape }}</td>
+                  <td>{{ c.al_advisername | escape }}</td>
+                  <td>{% case rt_name %}{% when 'Tax then AQS' %}<span class="ot-route"><span class="ot-route__step">Tax</span><span class="ot-route__arrow" aria-hidden="true"></span><span class="ot-visually-hidden"> then </span><span class="ot-route__step">AQS</span></span>{% when 'Tax only' %}<span class="ot-route"><span class="ot-route__step">Tax</span><span class="ot-visually-hidden"> only</span></span>{% when 'AQS only' %}<span class="ot-route"><span class="ot-route__step">AQS</span><span class="ot-visually-hidden"> only</span></span>{% else %}{{ rt_name | default: 'Not routed' | escape }}{% endcase %}</td>
+                  {% comment %}Who each check is allocated to (project owner, 2026-09-24): every case table says so.{% endcomment %}
+                  {% capture tax_checker %}{{ c.al_taxcheckername }}{% endcapture %}
+                  {% capture aqs_checker %}{{ c.al_aqscheckername }}{% endcapture %}
+                  <td><ul class="ot-people">
+                    <li><span class="ot-people__role">Tax</span>{% if tax_checker != '' %}<span class="ot-avatar" data-ot-initials="{{ tax_checker | escape }}" aria-hidden="true"></span>{{ tax_checker | escape }}{% elsif rt_name == 'AQS only' %}<span class="ot-checker ot-checker--na">No check of this type</span>{% else %}<span class="ot-checker ot-unallocated">Not yet allocated</span>{% endif %}</li>
+                    <li><span class="ot-people__role">AQS</span>{% if aqs_checker != '' %}<span class="ot-avatar" data-ot-initials="{{ aqs_checker | escape }}" aria-hidden="true"></span>{{ aqs_checker | escape }}{% elsif rt_name == 'Tax only' %}<span class="ot-checker ot-checker--na">No check of this type</span>{% else %}<span class="ot-checker ot-unallocated">Not yet allocated</span>{% endif %}</li>
+                  </ul></td>
+                  <td>
+                    <span class="ot-wait" data-ot-wait data-due="{{ c.al_duedate | date: 'yyyy-MM-dd' }}">
+                      <strong data-ot-workdays data-from="{{ c.al_aqsqueuedon | date: 'yyyy-MM-dd' }}">—</strong>
+                      <span class="ot-wait__bar" aria-hidden="true"><span class="ot-wait__fill"></span></span>
+                    </span>
+                  </td>
+                  <td><span data-ot-workdays data-from="{{ c.createdon | date: 'yyyy-MM-dd' }}">—</span></td>
+                  <td class="ot-nowrap">{{ c.al_duedate | date: 'dd MMM yyyy' | default: '—' }}{% if c.al_duedate %}<span class="ot-overdue" data-ot-overdue="{{ c.al_duedate | date: 'yyyy-MM-dd' }}"></span>{% endif %}</td>
+                  {% if can_claim %}
+                    <td class="ot-reviews__action">
+                      <button type="button"
+                              class="ot-btn ot-btn--primary ot-review-card__go"
+                              data-ot-claim
+                              data-case-id="{{ c.al_outcomecaseid }}"
+                              data-case-reference="{{ c.al_casereference | default: 'this case' | escape }}">
+                        Run checks<span class="ot-visually-hidden"> on {{ c.al_casereference | escape }}</span><span class="ot-review-card__arrow" aria-hidden="true"></span>
+                      </button>
                     </td>
-                    <td>{{ c.al_clientname | escape }}</td>
-                    <td>{{ c.al_advisername | escape }}</td>
-                    {% comment %}An absent name reads as OT Case List decides it: from the route name, and an unknown route owes both.{% endcomment %}
-                    {% assign rt_name = c['route.al_name'] %}
-                    {% capture tax_checker %}{{ c.al_taxcheckername }}{% endcapture %}
-                    {% capture aqs_checker %}{{ c.al_aqscheckername }}{% endcapture %}
-                    <td>{% if tax_checker != '' %}{{ tax_checker | escape }}{% elsif rt_name == 'AQS only' %}<span class="ot-checker ot-checker--na">No check of this type</span>{% else %}<span class="ot-checker">Not yet allocated</span>{% endif %}</td>
-                    <td>{% if aqs_checker != '' %}{{ aqs_checker | escape }}{% elsif rt_name == 'Tax only' %}<span class="ot-checker ot-checker--na">No check of this type</span>{% else %}<span class="ot-checker">Not yet allocated</span>{% endif %}</td>
-                    <td><span data-ot-workdays data-from="{{ c.createdon | date: 'yyyy-MM-dd' }}">—</span></td>
-                    <td><span data-ot-workdays data-from="{{ c.al_aqsqueuedon | date: 'yyyy-MM-dd' }}">—</span></td>
-                    <td>{{ c.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
-                    {% if can_claim %}
-                      <td>
-                        <button type="button"
-                                class="ot-btn ot-btn--primary"
-                                data-ot-claim
-                                data-case-id="{{ c.al_outcomecaseid }}"
-                                data-case-reference="{{ c.al_casereference | default: 'this case' | escape }}">
-                          Run checks
-                        </button>
-                      </td>
-                    {% endif %}
-                  </tr>
-                {% endif %}
+                  {% endif %}
+                </tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
-      {% else %}
-        {% include 'OT Empty State' title: 'Nothing waiting' message: q_empty %}
-      {% endif %}
-    </section>
-  {% endfor %}
-  {% if can_claim %}<p class="ot-response__status" data-ot-claim-status aria-live="polite"></p>{% endif %}
+      </div>
+    </div>
+  {% elsif f_tab == 'completed' or f_tab == 'submitted' %}
+    <div class="ot-reviews">
+      <div class="ot-card ot-card--table">
+        <div class="ot-table-wrap">
+          <table class="ot-table">
+            <caption class="ot-visually-hidden">Your {{ discipline }} reviews that are {% if is_aqs_queue %}completed{% else %}submitted{% endif %}, page {{ page_number }}.</caption>
+            <thead>
+              <tr>
+                <th scope="col">Case</th>
+                <th scope="col">Client</th>
+                <th scope="col">Adviser</th>
+                <th scope="col">Route</th>
+                <th scope="col">Checkers</th>
+                <th scope="col">Sequence</th>
+                <th scope="col">Started</th>
+                <th scope="col">Submitted</th>
+                <th scope="col"><span class="ot-visually-hidden">Action</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in rows %}
+                {% assign cid = r['case.al_outcomecaseid'] %}
+                {% capture r_ref %}{{ r['case.al_casereference'] | default: 'Untitled case' | escape }}{% endcapture %}
+                {% capture r_extra %}{% if r['case.al_servicecaseref'] %}<span class="ot-service-ref"><span class="ot-visually-hidden">Service case reference </span>{{ r['case.al_servicecaseref'] | escape }}</span>{% endif %}{% assign r_check = r['chk.al_name'] | default: '' %}{% assign r_legacy = r['case.al_preorpostcheck'] %}{% if r_check == 'Post' or r_check == '' and r_legacy.value == 120910541 %}<span class="ot-badge ot-badge--closed">Post-sale</span>{% endif %}{% endcapture %}
+                {% assign rt_name = r['route.al_name'] %}
+                {% capture r_route %}{% case rt_name %}{% when 'Tax then AQS' %}<span class="ot-route"><span class="ot-route__step">Tax</span><span class="ot-route__arrow" aria-hidden="true"></span><span class="ot-visually-hidden"> then </span><span class="ot-route__step">AQS</span></span>{% when 'Tax only' %}<span class="ot-route"><span class="ot-route__step">Tax</span><span class="ot-visually-hidden"> only</span></span>{% when 'AQS only' %}<span class="ot-route"><span class="ot-route__step">AQS</span><span class="ot-visually-hidden"> only</span></span>{% else %}{{ rt_name | default: 'Not routed' | escape }}{% endcase %}{% endcapture %}
+                {% comment %}Who each check is allocated to (project owner, 2026-09-24), as the case list shows it: an absent name reads from the route name, and an unknown route owes both.{% endcomment %}
+                {% capture tax_checker %}{{ r['case.al_taxcheckername'] }}{% endcapture %}
+                {% capture aqs_checker %}{{ r['case.al_aqscheckername'] }}{% endcapture %}
+                {% capture r_people %}<ul class="ot-people">
+                  <li><span class="ot-people__role">Tax</span>{% if tax_checker != '' %}<span class="ot-avatar" data-ot-initials="{{ tax_checker | escape }}" aria-hidden="true"></span>{{ tax_checker | escape }}{% elsif rt_name == 'AQS only' %}<span class="ot-checker ot-checker--na">No check of this type</span>{% else %}<span class="ot-checker ot-unallocated">Not yet allocated</span>{% endif %}</li>
+                  <li><span class="ot-people__role">AQS</span>{% if aqs_checker != '' %}<span class="ot-avatar" data-ot-initials="{{ aqs_checker | escape }}" aria-hidden="true"></span>{{ aqs_checker | escape }}{% elsif rt_name == 'Tax only' %}<span class="ot-checker ot-checker--na">No check of this type</span>{% else %}<span class="ot-checker ot-unallocated">Not yet allocated</span>{% endif %}</li>
+                </ul>{% endcapture %}
+                <tr>
+                  <td>
+                    {% if cid %}<a href="/case-details?id={{ cid }}">{{ r_ref }}</a>{% else %}{{ r['case.al_casereference'] | default: '—' | escape }}{% endif %}
+                    {{ r_extra }}
+                  </td>
+                  <td>{{ r['case.al_clientname'] | escape }}</td>
+                  <td>{{ r['case.al_advisername'] | escape }}</td>
+                  <td>{{ r_route }}</td>
+                  <td>{{ r_people }}</td>
+                  <td>{{ r.al_sequence | default: '—' }}</td>
+                  <td class="ot-nowrap">{{ r.al_startedon | date: 'dd MMM yyyy' | default: '—' }}</td>
+                  <td class="ot-nowrap">{% if r.al_submittedon %}<span class="ot-submitted">{{ r.al_submittedon | date: 'dd MMM yyyy' }}</span>{% else %}—{% endif %}</td>
+                  <td class="ot-reviews__action"><a class="ot-btn" href="/review?id={{ r.al_reviewinstanceid }}">View {{ discipline }} check<span class="ot-visually-hidden"> on {{ r_ref }}</span></a></td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  {% else %}
+    <ul class="ot-review-cards ot-reviews">
+      {% for r in rows %}
+        {% assign cid = r['case.al_outcomecaseid'] %}
+                {% capture r_ref %}{{ r['case.al_casereference'] | default: 'Untitled case' | escape }}{% endcapture %}
+                {% capture r_extra %}{% if r['case.al_servicecaseref'] %}<span class="ot-service-ref"><span class="ot-visually-hidden">Service case reference </span>{{ r['case.al_servicecaseref'] | escape }}</span>{% endif %}{% assign r_check = r['chk.al_name'] | default: '' %}{% assign r_legacy = r['case.al_preorpostcheck'] %}{% if r_check == 'Post' or r_check == '' and r_legacy.value == 120910541 %}<span class="ot-badge ot-badge--closed">Post-sale</span>{% endif %}{% endcapture %}
+                {% assign rt_name = r['route.al_name'] %}
+                {% capture r_route %}{% case rt_name %}{% when 'Tax then AQS' %}<span class="ot-route"><span class="ot-route__step">Tax</span><span class="ot-route__arrow" aria-hidden="true"></span><span class="ot-visually-hidden"> then </span><span class="ot-route__step">AQS</span></span>{% when 'Tax only' %}<span class="ot-route"><span class="ot-route__step">Tax</span><span class="ot-visually-hidden"> only</span></span>{% when 'AQS only' %}<span class="ot-route"><span class="ot-route__step">AQS</span><span class="ot-visually-hidden"> only</span></span>{% else %}{{ rt_name | default: 'Not routed' | escape }}{% endcase %}{% endcapture %}
+                {% comment %}Who each check is allocated to (project owner, 2026-09-24), as the case list shows it: an absent name reads from the route name, and an unknown route owes both.{% endcomment %}
+                {% capture tax_checker %}{{ r['case.al_taxcheckername'] }}{% endcapture %}
+                {% capture aqs_checker %}{{ r['case.al_aqscheckername'] }}{% endcapture %}
+                {% capture r_people %}<ul class="ot-people">
+                  <li><span class="ot-people__role">Tax</span>{% if tax_checker != '' %}<span class="ot-avatar" data-ot-initials="{{ tax_checker | escape }}" aria-hidden="true"></span>{{ tax_checker | escape }}{% elsif rt_name == 'AQS only' %}<span class="ot-checker ot-checker--na">No check of this type</span>{% else %}<span class="ot-checker ot-unallocated">Not yet allocated</span>{% endif %}</li>
+                  <li><span class="ot-people__role">AQS</span>{% if aqs_checker != '' %}<span class="ot-avatar" data-ot-initials="{{ aqs_checker | escape }}" aria-hidden="true"></span>{{ aqs_checker | escape }}{% elsif rt_name == 'Tax only' %}<span class="ot-checker ot-checker--na">No check of this type</span>{% else %}<span class="ot-checker ot-unallocated">Not yet allocated</span>{% endif %}</li>
+                </ul>{% endcapture %}
+        <li class="ot-review-card">
+          <div class="ot-review-card__case">
+            {% if cid %}<a class="ot-review-card__ref" href="/case-details?id={{ cid }}">{{ r_ref }}</a>{% else %}<span class="ot-review-card__ref">{{ r['case.al_casereference'] | default: '—' | escape }}</span>{% endif %}
+            {{ r_extra }}
+            <span class="ot-muted">Sequence {{ r.al_sequence | default: 1 }}</span>
+          </div>
+          <div class="ot-review-card__field">
+            <span class="ot-review-card__label">Client</span>
+            <span class="ot-review-card__value">{{ r['case.al_clientname'] | default: '—' | escape }}</span>
+            {% if r['case.al_advisername'] %}<span>Adviser {{ r['case.al_advisername'] | escape }}</span>{% endif %}
+          </div>
+          <div class="ot-review-card__field">
+            <span class="ot-review-card__label">Route and checkers</span>
+            {{ r_route }}
+            {{ r_people }}
+          </div>
+          <div class="ot-review-card__field">
+            <span class="ot-review-card__label">Started</span>
+            <span class="ot-review-card__value">{{ r.al_startedon | date: 'dd MMM yyyy' | default: 'Not started' }}</span>
+            <span>{% include 'OT Status Badge' status: r.al_reviewstatus.label %}</span>
+          </div>
+          <a class="ot-btn ot-btn--primary ot-review-card__go" href="/review?id={{ r.al_reviewinstanceid }}">{% if r.al_reviewstatus.value == 120910210 %}Start review{% else %}Continue review{% endif %}<span class="ot-visually-hidden"> on {{ r_ref }}</span><span class="ot-review-card__arrow" aria-hidden="true"></span></a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
 
-  {% if can_claim %}
+  <nav class="ot-pager ot-reviews__pager" aria-label="Pagination">
+    {% assign first_row = page_number | minus: 1 | times: page_size | plus: 1 %}
+    {% assign last_row = first_row | plus: rows.size | minus: 1 %}
+    <span class="ot-pager__pos">Showing {{ first_row }} to {{ last_row }} of {{ total }}</span>
+    <span class="ot-pager__buttons">
+      {% if page_number > 1 %}<a class="ot-btn" href="?{{ scope_qs }}tab={{ f_tab }}&amp;page={{ page_number | minus: 1 }}">Previous</a>{% else %}<a class="ot-btn" aria-disabled="true">Previous</a>{% endif %}
+      {% if last_row < total %}<a class="ot-btn" href="?{{ scope_qs }}tab={{ f_tab }}&amp;page={{ page_number | plus: 1 }}">Next</a>{% else %}<a class="ot-btn" aria-disabled="true">Next</a>{% endif %}
+    </span>
+  </nav>
+{% elsif has_filter %}
+  {% include 'OT Empty State' title: 'Nothing matches' message: 'Nothing on this tab matches these filters. Clear them, or try another tab.' %}
+{% else %}
+  {% case f_tab %}
+    {% when 'progress' %}{% include 'OT Empty State' title: 'Nothing in progress' message: 'Reviews you have started and not yet submitted appear here.' %}
+    {% when 'allocated' %}{% include 'OT Empty State' title: 'Nothing allocated to you' message: 'Reviews appear here once one is allocated to you and before you start it.' %}
+    {% when 'new' %}{% include 'OT Empty State' title: 'Nothing waiting' message: 'No new case is waiting for an AQS checker.' %}
+    {% when 'taxdone' %}{% include 'OT Empty State' title: 'Nothing waiting' message: 'No case whose Tax review is complete is waiting for an AQS checker.' %}
+    {% else %}{% include 'OT Empty State' title: 'Nothing submitted yet' message: 'Reviews you submit appear here.' %}
+  {% endcase %}
+{% endif %}
+
+{% if is_aqs_queue and can_claim %}
+  <p class="ot-response__status" data-ot-claim-status aria-live="polite"></p>
   <dialog class="ot-dialog" data-ot-claim-dialog aria-labelledby="ot-claim-dialog-title">
     <h2 class="ot-dialog__title" id="ot-claim-dialog-title">Start checks on this case?</h2>
     <p>
@@ -325,159 +543,6 @@
       <button type="button" class="ot-btn ot-btn--primary" data-ot-claim-continue>Continue</button>
     </p>
   </dialog>
-  {% endif %}
-{% endif %}
-
-
-{% comment %}
-  Case reference search. A GET form, so a search is a URL a checker can bookmark or send to
-  someone, and so paging keeps it. The scope is carried in a hidden field for the same
-  reason the links above carry the search.
-{% endcomment %}
-<form class="ot-filters" method="get" role="search" aria-label="Search {{ heading | downcase }} by case reference">
-  <div class="ot-filters__grid">
-    <div class="ot-field">
-      <label for="f-ref">Case reference</label>
-      <input type="search" id="f-ref" name="ref" value="{{ f_ref | escape }}" placeholder="Contains">
-    </div>
-    <div class="ot-field">
-      <label for="f-route">Route</label>
-      <select id="f-route" name="route">
-        <option value="">Any</option>
-        {% for r in routes.results.entities %}
-          <option value="{{ r.al_reviewrouteid }}"{% if f_route == r.al_reviewrouteid %} selected{% endif %}>{{ r.al_name | escape }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="ot-field">
-      <label for="f-check">Pre or post check</label>
-      <select id="f-check" name="check">
-        <option value="">Any</option>
-        <option value="pre"{% if f_check == 'pre' %} selected{% endif %}>Pre-sale</option>
-        <option value="post"{% if f_check == 'post' %} selected{% endif %}>Post-sale</option>
-      </select>
-    </div>
-  </div>
-  <div class="ot-filters__actions">
-    <button type="submit" class="ot-btn ot-btn--primary">Search</button>
-    {% if f_ref != '' or f_route != '' or f_check != '' %}
-      <a class="ot-btn" href="?">Clear</a>
-    {% endif %}
-  </div>
-</form>
-
-{% comment %}
-  The reviewer's own reviews (AD-218). On the AQS page they are split into the three states
-  AR-03 asks the portal to tell apart - allocated, in progress, completed - by the review's
-  own status. The Tax page keeps one table. group_value 0 means "every status".
-
-  A range and single-value `when`s rather than a split list: this site's Liquid rejects a
-  multi-character split, and a multi-value `when` has silently never matched here before.
-{% endcomment %}
-{% if rows.size > 0 %}
-  {% if is_aqs_queue %}
-    {% assign group_first = 120910210 %}{% assign group_last = 120910212 %}
-  {% else %}
-    {% assign group_first = 0 %}{% assign group_last = 0 %}
-  {% endif %}
-  {% for group_value in (group_first..group_last) %}
-    {% case group_value %}
-      {% when 120910210 %}{% assign g_title = 'Allocated to me' %}{% assign g_id = 'ot-reviews-allocated' %}
-      {% when 120910211 %}{% assign g_title = 'In progress' %}{% assign g_id = 'ot-reviews-progress' %}
-      {% when 120910212 %}{% assign g_title = 'Completed' %}{% assign g_id = 'ot-reviews-completed' %}
-      {% else %}{% capture g_title %}{{ heading }} allocated to you{% endcapture %}{% assign g_id = 'ot-reviews-heading' %}
-    {% endcase %}
-    {% assign g_count = 0 %}
-    {% for r in rows %}{% if group_value == 0 or r.al_reviewstatus.value == group_value %}{% assign g_count = g_count | plus: 1 %}{% endif %}{% endfor %}
-
-    <section class="ot-card" aria-labelledby="{{ g_id }}">
-      <h2 class="ot-card__title" id="{{ g_id }}">{{ g_title | escape }}</h2>
-      {% if f_ref != '' or f_route != '' %}
-        <p class="ot-filters__summary">
-          Showing {{ heading | downcase }}{% if f_ref != '' %} whose case reference contains
-          &ldquo;{{ f_ref | escape }}&rdquo;{% endif %}{% if f_route != '' %}{% if f_ref != '' %} and{% endif %}
-          on the {% for r in routes.results.entities %}{% if r.al_reviewrouteid == f_route %}{{ r.al_name | escape }}{% endif %}{% endfor %} route{% endif %}.
-        </p>
-      {% endif %}
-
-      {% if g_count > 0 %}
-        <div class="ot-table-wrap">
-          <table class="ot-table">
-            <caption>{{ g_count }} of the {{ reviews.results.total_record_count }} reviews allocated to you, page {{ page_number }}.</caption>
-            <thead>
-              <tr>
-                <th scope="col">Case reference</th>
-                <th scope="col">Client</th>
-                <th scope="col">Adviser</th>
-                <th scope="col">Tax checker</th>
-                <th scope="col">AQS checker</th>
-                <th scope="col">Route</th>
-                <th scope="col">Review</th>
-                <th scope="col">Sequence</th>
-                <th scope="col">Status</th>
-                <th scope="col">Started</th>
-                <th scope="col">Submitted</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {% for r in rows %}
-                {% if group_value == 0 or r.al_reviewstatus.value == group_value %}
-                <tr>
-                  <td>
-                    {% assign cid = r['case.al_outcomecaseid'] %}
-                    {% if cid %}
-                      <a href="/case-details?id={{ cid }}">
-                        {{ r['case.al_casereference'] | default: 'Untitled case' | escape }}
-                      </a>
-                    {% else %}
-                      {{ r['case.al_casereference'] | default: '—' | escape }}
-                    {% endif %}
-                    {% assign r_check = r['chk.al_name'] | default: '' %}
-                    {% assign r_legacy = r['case.al_preorpostcheck'] %}
-                    {% if r_check == 'Post' or r_check == '' and r_legacy.value == 120910541 %}<span class="ot-badge">Post-sale</span>{% endif %}
-                  </td>
-                  <td>{{ r['case.al_clientname'] | escape }}</td>
-                  <td>{{ r['case.al_advisername'] | escape }}</td>
-                  {% comment %}Who each check is allocated to (project owner, 2026-09-24), as the case list shows it.{% endcomment %}
-                  {% comment %}An absent name reads as OT Case List decides it: from the route name, and an unknown route owes both.{% endcomment %}
-                  {% assign rt_name = r['route.al_name'] %}
-                  {% capture tax_checker %}{{ r['case.al_taxcheckername'] }}{% endcapture %}
-                  {% capture aqs_checker %}{{ r['case.al_aqscheckername'] }}{% endcapture %}
-                  <td>{% if tax_checker != '' %}{{ tax_checker | escape }}{% elsif rt_name == 'AQS only' %}<span class="ot-checker ot-checker--na">No check of this type</span>{% else %}<span class="ot-checker">Not yet allocated</span>{% endif %}</td>
-                  <td>{% if aqs_checker != '' %}{{ aqs_checker | escape }}{% elsif rt_name == 'Tax only' %}<span class="ot-checker ot-checker--na">No check of this type</span>{% else %}<span class="ot-checker">Not yet allocated</span>{% endif %}</td>
-                  <td>{{ r['route.al_name'] | default: '—' | escape }}</td>
-                  <td><a href="/review?id={{ r.al_reviewinstanceid }}">{{ r.al_name | default: 'Open review' | escape }}</a></td>
-                  <td>{{ r.al_sequence | default: '—' }}</td>
-                  <td>{% include 'OT Status Badge' status: r.al_reviewstatus.label %}</td>
-                  <td>{{ r.al_startedon | date: 'dd MMM yyyy' | default: '—' }}</td>
-                  <td>{{ r.al_submittedon | date: 'dd MMM yyyy' | default: '—' }}</td>
-                </tr>
-                {% endif %}
-              {% endfor %}
-
-            </tbody>
-          </table>
-        </div>
-      {% else %}
-        {% include 'OT Empty State' title: 'None here' message: 'No review of yours on this page is in this state.' %}
-      {% endif %}
-    </section>
-  {% endfor %}
-
-<nav aria-label="Pagination" style="margin-top: 1rem;">
-  {% if page_number > 1 %}
-    <a href="?{{ scope_qs }}page={{ page_number | minus: 1 }}">&laquo; Previous</a>
-  {% endif %}
-  {% if rows.size == page_size %}
-    <a href="?{{ scope_qs }}page={{ page_number | plus: 1 }}" style="margin-left: 1rem;">Next &raquo;</a>
-  {% endif %}
-</nav>
-
-{% elsif f_ref != '' or f_route != '' %}
-  {% include 'OT Empty State' title: 'No review matches' message: 'No review allocated to you matches this search. Clear it to see all of yours.' %}
-{% else %}
-  {% include 'OT Empty State' title: 'Nothing allocated to you' message: 'Reviews appear here once one is allocated to you, or once you pick a case up from the queue.' %}
 {% endif %}
 
 {% if user and can_claim %}
@@ -632,7 +697,7 @@
 {% endif %}
 
 <script>
-  {% comment %}/* Working-day ages for the AQS queue (AR-03), on the same calendar as the remediation
+  {% comment %}/* Working-day ages and wait bars for the AQS queue (AR-03), on the same calendar as the remediation
      clock: Monday to Friday, the first day counts, bank holidays not deducted. */{% endcomment %}
   (function () {
     'use strict';
@@ -659,6 +724,20 @@
       if (!from) { continue; }
       var age = workingDaysBetween(from, today);
       cells[i].textContent = age + (age === 1 ? ' working day' : ' working days');
+    }
+    var waits = document.querySelectorAll('[data-ot-wait]');
+    var longest = 0;
+    var ages = [];
+    for (var w = 0; w < waits.length; w += 1) {
+      var start = midday(waits[w].querySelector('[data-ot-workdays]').getAttribute('data-from'));
+      ages[w] = start ? workingDaysBetween(start, today) : 0;
+      if (ages[w] > longest) { longest = ages[w]; }
+    }
+    for (var k = 0; k < waits.length; k += 1) {
+      var fill = waits[k].querySelector('.ot-wait__fill');
+      fill.style.width = (longest > 0 ? Math.round(ages[k] / longest * 100) : 0) + '%';
+      var due = midday(waits[k].getAttribute('data-due'));
+      if (due && due.getTime() < today.getTime()) { waits[k].classList.add('ot-wait--late'); }
     }
   })();
 </script>

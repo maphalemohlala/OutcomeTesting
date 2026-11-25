@@ -74,8 +74,16 @@
       "uniquename": "FqAdministratorId",
       "name": "FqAdministratorId",
       "displayname": "FQ administrator at fault",
-      "description": "Id of the administrator contact who carries the File Quality fail (requirements log row 10). Never exported; once set the paraplanner is no longer derived for the File Quality fail. Empty clears it.",
+      "description": "Kept for older callers. Id of a contact named as the administrator at fault before 2026-11-25; sending one counts as FqAdministrator true. Never exported.",
       "type": 10,
+      "isoptional": true
+    },
+    {
+      "uniquename": "FqAdministrator",
+      "name": "FqAdministrator",
+      "displayname": "FQ administrator accountable",
+      "description": "True when an administrator carries the File Quality fail (requirements log row 10; no name since 2026-11-25). Never exported; once true the paraplanner is no longer derived for the File Quality fail. False also clears a name recorded before then.",
+      "type": 0,
       "isoptional": true
     },
     {

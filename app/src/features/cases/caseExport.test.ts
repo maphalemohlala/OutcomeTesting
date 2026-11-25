@@ -13,6 +13,7 @@ function row(overrides: Partial<CaseSummary> = {}): CaseSummary {
   return {
     id: 'c1',
     caseReference: 'IO-300001',
+    serviceCaseRef: null,
     route: 'Tax then AQS',
     status: 'Queued',
     owner: 'Ida Uploader',
@@ -48,6 +49,15 @@ function row(overrides: Partial<CaseSummary> = {}): CaseSummary {
 }
 
 describe('CASE_EXPORT_HEADERS', () => {
+  it('carries the service case reference straight after the TaskID (client, 2026-11-24)', () => {
+    const at = CASE_EXPORT_HEADERS.indexOf('Case reference');
+    expect(CASE_EXPORT_HEADERS[at + 1]).toBe('Service case reference');
+    const cells = caseExportRow(row({ caseReference: '254471517', serviceCaseRef: 'IOA07066846' }));
+    expect(cells.slice(at, at + 2)).toEqual(['254471517', 'IOA07066846']);
+    expect(cells).toHaveLength(CASE_EXPORT_HEADERS.length);
+    expect(caseExportRow(row())[at + 1]).toBe('');
+  });
+
   it('calls the case owner column "Uploaded by" (item 4, 2026-09-19)', () => {
     // A label change and nothing else: the column is the Dataverse record owner, and it reads
     // as the uploader because nothing in the solution ever reassigns it.

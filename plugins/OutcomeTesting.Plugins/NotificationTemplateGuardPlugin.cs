@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -115,6 +116,12 @@ namespace OutcomeTesting.Plugins
                 Merged(service, row, NotificationTemplateRows.RecipientContactIdsAttr);
             var recipients = NotificationTemplateRows.ReadRecipients(merged);
 
+            var gradingRefusal = GradingsRefusal(code, Merged(service, row, NotificationTemplateRows.GradingsAttr));
+            if (gradingRefusal != null)
+            {
+                throw new InvalidPluginExecutionException(gradingRefusal);
+            }
+
             var refusal = Refusal(
                 code,
                 subject,
@@ -126,6 +133,30 @@ namespace OutcomeTesting.Plugins
             {
                 throw new InvalidPluginExecutionException(refusal);
             }
+        }
+
+        /// <summary>
+        /// Why a letter's gradings cannot be saved, or null when they can. A built-in letter
+        /// already picks itself by grading, so a limit there would be stored and never read.
+        /// </summary>
+        public static string GradingsRefusal(string code, string gradings)
+        {
+            var unreadable = new List<string>();
+            var read = NotificationTemplateRows.ReadGradings(gradings, unreadable);
+
+            if (unreadable.Count > 0)
+            {
+                return "\"" + unreadable[0] + "\" is not a grading. Choose from Pass, Pass with issues, "
+                    + "Insufficient evidence and Potential harm.";
+            }
+
+            if (read.Count > 0 && NotificationTemplates.Definition(code) != null)
+            {
+                return "A built-in letter already goes out for its own grading, so it cannot be "
+                    + "limited to others. Create a letter of your own to send one for a grading.";
+            }
+
+            return null;
         }
 
         /// <summary>

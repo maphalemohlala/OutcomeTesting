@@ -11,6 +11,7 @@ import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { PersonCasesPage } from '../features/people/PersonCasesPage';
 import { ReviewDetailPage } from '../features/reviews/ReviewDetailPage';
 import { RemediationPage } from '../features/remediation/RemediationPage';
+import { Skeleton } from '../components/feedback/Skeleton';
 
 /*
  * Administration, reporting and intake are loaded when first opened, not with the app: most
@@ -27,7 +28,6 @@ const SecurityConfigPage = lazy(() => import('../features/admin/SecurityConfigPa
 const RoleDetailPage = lazy(() => import('../features/admin/RoleDetailPage').then((m) => ({ default: m.RoleDetailPage })));
 const ReportsPage = lazy(() => import('../features/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })));
 const ExportsPage = lazy(() => import('../features/reports/ExportsPage').then((m) => ({ default: m.ExportsPage })));
-const ExportBatchPage = lazy(() => import('../features/reports/ExportBatchPage').then((m) => ({ default: m.ExportBatchPage })));
 
 /** Routes follow 09-Application-Screens. Screens without a data source say so explicitly. */
 export function AppRoutes() {
@@ -39,7 +39,7 @@ export function AppRoutes() {
           after a new release - leaves the menu standing. Keyed on the path so choosing
           another screen clears the failure rather than repeating it. */}
       <ErrorBoundary key={pathname}>
-      <Suspense fallback={<p role="status">Loading page…</p>}>
+      <Suspense fallback={<Skeleton page label="Loading page…" />}>
       <Routes>
         {/* Gated like every other screen. It was not until 2026-09-21 (F43), and the
             dashboard is the one screen where that mattered most: it is what a sign-in lands
@@ -131,14 +131,6 @@ export function AppRoutes() {
           element={
             <RequirePermission resource="page.exports">
               <ExportsPage />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/exports/:batchId"
-          element={
-            <RequirePermission resource="page.exports">
-              <ExportBatchPage />
             </RequirePermission>
           }
         />

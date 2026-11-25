@@ -142,6 +142,16 @@ namespace OutcomeTesting.Plugins
                 {
                     changes.Add("Advice grade from " + Label(AdviceGrades, current.Value) + " to " + Label(AdviceGrades, newAdvice.Value));
                     writes.Add(new Entity(outcome.LogicalName, outcome.Id) { [Outcomes.InitialOutcomeAttr] = new OptionSetValue(newAdvice.Value) });
+
+                    // The review page and the completed-check PDF read the grade from the
+                    // checker's Q-GR-01 answer, so it follows, as the File Quality answer does.
+                    var gradeAnswer = FileQuality.ResolveAnswer(service, caseId, GradingRules.GradeQuestionCode);
+                    var answerChoice = AnswerFor(newAdvice.Value);
+                    var stored = gradeAnswer == null ? null : gradeAnswer.GetAttributeValue<OptionSetValue>("al_answerchoice");
+                    if (gradeAnswer != null && answerChoice.HasValue && (stored == null || stored.Value != answerChoice.Value))
+                    {
+                        writes.Add(new Entity(gradeAnswer.LogicalName, gradeAnswer.Id) { ["al_answerchoice"] = new OptionSetValue(answerChoice.Value) });
+                    }
                 }
             }
 
@@ -175,6 +185,21 @@ namespace OutcomeTesting.Plugins
 
             return "Case " + (found.GetAttributeValue<string>("al_casereference") ?? string.Empty).Trim()
                 + ": " + string.Join("; ", changes) + ".";
+        }
+
+        /// <summary>The Q-GR-01 answer that records an outcome: the inverse of OutcomeRules.TryGradeFromAnswer.</summary>
+        private static int? AnswerFor(int outcome)
+        {
+            foreach (var choice in new[] { ResponseRules.ChoicePass, ResponseRules.ChoicePassWithIssues, ResponseRules.ChoiceInsufficient, ResponseRules.ChoicePotentialHarm })
+            {
+                int mapped;
+                if (OutcomeRules.TryGradeFromAnswer(choice, out mapped) && mapped == outcome)
+                {
+                    return choice;
+                }
+            }
+
+            return null;
         }
 
         private static int? Parse(string label, Dictionary<string, int> grades, string refusal)

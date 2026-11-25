@@ -95,6 +95,18 @@ namespace OutcomeTesting.Plugins
 
         public bool Italic { get; set; }
 
+        public bool Underline { get; set; }
+
+        /// <summary>
+        /// Starts a list item's line: <see cref="Text"/> (the marker, "•" or "2.", or null on a
+        /// continuation line) sits one <see cref="PdfCell.ItemIndent"/> left of this many points,
+        /// and every line the item wraps onto starts here, until the next <see cref="Break"/>.
+        /// </summary>
+        public double? Indent { get; set; }
+
+        /// <summary>Follows the run before with no space, as "<b>Un</b>important" is one word.</summary>
+        public bool Join { get; set; }
+
         /// <summary>A tick box rather than text: false draws it empty, true ticked.</summary>
         public bool? Box { get; set; }
 
@@ -153,6 +165,10 @@ namespace OutcomeTesting.Plugins
                     {
                         text.Append('\n');
                     }
+                    else if (run.Indent.HasValue)
+                    {
+                        text.Append(run.Text == null ? string.Empty : run.Text + " ");
+                    }
                     else
                     {
                         text.Append(run.Text);
@@ -204,6 +220,311 @@ namespace OutcomeTesting.Plugins
         public const double HeadFill = 0.85;
         public const double BandFill = 0.9;
         public const double LabelFill = 0.95;
+
+        /// <summary>How far each list level is indented, in points: room for "10." at table size.</summary>
+        public const double ItemIndent = 14;
+
+        /// <summary>
+        /// A checker's remedial action or rich-text answer, with its formatting (project owner,
+        /// 2026-11-23). The storage contract: a value whose trimmed text starts with '&lt;' is
+        /// markup from <c>HtmlSanitiser.Clean</c> (p, br, strong, em, u, ul, ol, li, a); anything
+        /// else is legacy plain text and is drawn exactly as <see cref="Of"/> draws it. Unknown
+        /// tags are dropped and their text kept; the PDF runs no markup, so nothing here is a
+        /// security boundary.
+        /// </summary>
+        public static PdfCell FromMarkup(string value, int span = 1)
+        {
+            if (value == null || !value.TrimStart().StartsWith("<", StringComparison.Ordinal))
+            {
+                return Of(value, span);
+            }
+
+            var cell = new PdfCell { Span = span };
+            var runs = cell.Runs;
+            int bold = 0, italic = 0, underline = 0;
+            var lists = new List<int>();            // per open list: -1 bulleted, else the last number used
+            var items = new List<double>();         // per open item: where its text starts
+            var pending = false;                    // a block boundary, a line break if the line has words
+            var lineStart = true;
+            var markerOnly = false;                 // the line holds an item's marker and nothing yet
+
+            void TrimLast()
+            {
+                var last = runs.Count > 0 ? runs[runs.Count - 1] : null;
+                if (last != null && last.Text != null && !last.Indent.HasValue)
+                {
+                    last.Text = last.Text.TrimEnd();
+                }
+            }
+
+            void Break()
+            {
+                TrimLast();
+                runs.Add(PdfRun.LineBreak());
+                if (items.Count > 0)
+                {
+                    runs.Add(new PdfRun { Indent = items[items.Count - 1] });
+                }
+
+                lineStart = true;
+                markerOnly = false;
+                pending = false;
+            }
+
+            void AddText(string raw)
+            {
+                var text = Collapse(Decode(raw));
+                if (text.Trim().Length == 0 && (pending || lineStart))
+                {
+                    return;
+                }
+
+                if (pending && !lineStart)
+                {
+                    Break();
+                }
+
+                pending = false;
+                if (lineStart)
+                {
+                    text = text.TrimStart();
+                }
+
+                var previous = runs.Count > 0 ? runs[runs.Count - 1] : null;
+                runs.Add(new PdfRun
+                {
+                    Text = text,
+                    Bold = bold > 0,
+                    Italic = italic > 0,
+                    Underline = underline > 0,
+                    Join = !lineStart && previous != null && previous.Text != null && !previous.Indent.HasValue
+                        && !previous.Text.EndsWith(" ", StringComparison.Ordinal) && !text.StartsWith(" ", StringComparison.Ordinal),
+                });
+                lineStart = false;
+            }
+
+            void Tag(string inner)
+            {
+                var closing = inner.TrimStart().StartsWith("/", StringComparison.Ordinal);
+                var name = inner.Trim().TrimStart('/');
+                var end = 0;
+                while (end < name.Length && char.IsLetterOrDigit(name[end]))
+                {
+                    end++;
+                }
+
+                name = name.Substring(0, end).ToLowerInvariant();
+                switch (name)
+                {
+                    case "strong":
+                    case "b":
+                        bold = Math.Max(0, bold + (closing ? -1 : 1));
+                        break;
+                    case "em":
+                    case "i":
+                        italic = Math.Max(0, italic + (closing ? -1 : 1));
+                        break;
+                    case "u":
+                        underline = Math.Max(0, underline + (closing ? -1 : 1));
+                        break;
+                    case "br":
+                        if (pending && !lineStart)
+                        {
+                            Break();
+                        }
+
+                        // A leading empty line is dropped, as PlainText always dropped them.
+                        if (runs.Count > 0)
+                        {
+                            Break();
+                        }
+
+                        break;
+                    case "ul":
+                    case "ol":
+                        if (closing)
+                        {
+                            if (lists.Count > 0)
+                            {
+                                lists.RemoveAt(lists.Count - 1);
+                            }
+                        }
+                        else
+                        {
+                            lists.Add(name == "ul" ? -1 : 0);
+                        }
+
+                        pending = true;
+                        break;
+                    case "li":
+                        if (closing)
+                        {
+                            if (items.Count > 0)
+                            {
+                                items.RemoveAt(items.Count - 1);
+                            }
+
+                            pending = true;
+                            break;
+                        }
+
+                        if ((!lineStart || markerOnly) && runs.Count > 0)
+                        {
+                            Break();
+                        }
+
+                        string marker = "•";
+                        if (lists.Count > 0 && lists[lists.Count - 1] >= 0)
+                        {
+                            lists[lists.Count - 1]++;
+                            marker = lists[lists.Count - 1].ToString(CultureInfo.InvariantCulture) + ".";
+                        }
+
+                        var indent = Math.Max(1, lists.Count) * ItemIndent;
+                        items.Add(indent);
+                        runs.Add(new PdfRun { Indent = indent, Text = marker });
+                        lineStart = true;
+                        markerOnly = true;
+                        pending = false;
+                        break;
+                    case "p":
+                    case "div":
+                    case "blockquote":
+                    case "h1":
+                    case "h2":
+                    case "h3":
+                    case "h4":
+                    case "h5":
+                    case "h6":
+                    case "tr":
+                        pending = true;
+                        break;
+                }
+            }
+
+            var at = 0;
+            while (at < value.Length)
+            {
+                var open = value.IndexOf('<', at);
+                var close = open < 0 ? -1 : value.IndexOf('>', open);
+                if (open < 0 || close < 0)
+                {
+                    AddText(value.Substring(at));
+                    break;
+                }
+
+                if (open > at)
+                {
+                    AddText(value.Substring(at, open - at));
+                }
+
+                Tag(value.Substring(open + 1, close - open - 1));
+                at = close + 1;
+            }
+
+            // Nothing hangs off the end: a closing line break or an empty continuation line.
+            while (runs.Count > 0)
+            {
+                var last = runs[runs.Count - 1];
+                if (last.Break || (last.Indent.HasValue && last.Text == null)
+                    || (!last.Indent.HasValue && string.IsNullOrWhiteSpace(last.Text)))
+                {
+                    runs.RemoveAt(runs.Count - 1);
+                    continue;
+                }
+
+                break;
+            }
+
+            TrimLast();
+            if (runs.Count == 0)
+            {
+                runs.Add(PdfRun.Of(string.Empty));
+            }
+
+            return cell;
+        }
+
+        /// <summary>Runs of whitespace as one space, as a browser shows them.</summary>
+        private static string Collapse(string text)
+        {
+            var collapsed = new StringBuilder(text.Length);
+            var space = false;
+            foreach (var ch in text)
+            {
+                if (char.IsWhiteSpace(ch))
+                {
+                    if (!space)
+                    {
+                        collapsed.Append(' ');
+                    }
+
+                    space = true;
+                    continue;
+                }
+
+                space = false;
+                collapsed.Append(ch);
+            }
+
+            return collapsed.ToString();
+        }
+
+        /// <summary>Character references in one pass, so "&amp;amp;lt;" stays "&amp;lt;". Unknown ones are kept as written.</summary>
+        private static string Decode(string text)
+        {
+            if (text.IndexOf('&') < 0)
+            {
+                return text;
+            }
+
+            var decoded = new StringBuilder(text.Length);
+            for (var i = 0; i < text.Length; i++)
+            {
+                var semi = text[i] == '&' ? text.IndexOf(';', i) : -1;
+                if (semi > i && semi - i <= 10)
+                {
+                    var name = text.Substring(i + 1, semi - i - 1);
+                    string ch = null;
+                    switch (name)
+                    {
+                        case "amp": ch = "&"; break;
+                        case "lt": ch = "<"; break;
+                        case "gt": ch = ">"; break;
+                        case "quot": ch = "\""; break;
+                        case "apos": ch = "'"; break;
+                        case "nbsp": ch = " "; break;
+                        default:
+                            int code;
+                            if (name.StartsWith("#x", StringComparison.OrdinalIgnoreCase)
+                                && int.TryParse(name.Substring(2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out code)
+                                && code > 0 && code < 0xD800)
+                            {
+                                ch = ((char)code).ToString();
+                            }
+                            else if (name.StartsWith("#", StringComparison.Ordinal)
+                                && int.TryParse(name.Substring(1), NumberStyles.None, CultureInfo.InvariantCulture, out code)
+                                && code > 0 && code < 0xD800)
+                            {
+                                ch = ((char)code).ToString();
+                            }
+
+                            break;
+                    }
+
+                    if (ch != null)
+                    {
+                        decoded.Append(ch);
+                        i = semi;
+                        continue;
+                    }
+                }
+
+                decoded.Append(text[i]);
+            }
+
+            return decoded.ToString();
+        }
 
         private static void AddText(PdfCell cell, string text, bool bold)
         {
@@ -370,8 +691,9 @@ namespace OutcomeTesting.Plugins
     /// every net462 PDF library needs for font metrics — is not available. A library would
     /// also have to be ILMerged into this assembly, because the sandbox loads one file. The
     /// documents this solution produces are a page or two of text, so the part of a PDF
-    /// library that is hard (images, colour spaces, embedded font subsetting) is the part
-    /// nothing here uses.
+    /// library that is hard (decoding images, colour spaces, embedded font subsetting) is the
+    /// part nothing here uses. The one image, the logo, is stored already compressed and a
+    /// PDF reader inflates it itself, so its bytes are copied in unchanged.
     /// </para>
     /// <para>
     /// <b>No embedded fonts.</b> Helvetica and Helvetica-Bold are two of the fourteen
@@ -403,6 +725,15 @@ namespace OutcomeTesting.Plugins
         private const double A4Short = 595.28;
         private const double A4Long = 841.89;
         private const double Margin = 42.5;          // 15mm
+
+        /// <summary>
+        /// The Ascot Lloyd logo, top left inside the margin of every page (project owner,
+        /// 2026-11-23), and the space under it before the page's text starts. 80 x 25.9 keeps
+        /// the artwork's 420 x 136 proportions.
+        /// </summary>
+        private const double LogoWidth = 80;
+        private const double LogoHeight = 25.9;
+        private const double LogoGap = 10;
 
         /// <summary>A table's body text, a point under the running text as the page sets it.</summary>
         private const double TableSize = 9;
@@ -515,14 +846,17 @@ namespace OutcomeTesting.Plugins
         {
             var pages = new List<List<Line>>();
             var current = new List<Line>();
-            var y = pageHeight - Margin;
+
+            // Every page's text starts under the logo Assemble draws above it.
+            var pageTop = pageHeight - Margin - LogoHeight - LogoGap;
+            var y = pageTop;
             var ContentWidth = pageWidth - (2 * Margin);
 
             void NewPage()
             {
                 pages.Add(current);
                 current = new List<Line>();
-                y = pageHeight - Margin;
+                y = pageTop;
             }
 
             void DrawRule()
@@ -598,7 +932,7 @@ namespace OutcomeTesting.Plugins
                     // page would otherwise run off the foot of it, so its lines are carried
                     // over a page at a time, the heading repeated above each part.
                     var lineHeight = TableSize * LineGap;
-                    var fresh = pageHeight - (2 * Margin) - (row.Header ? 0 : headerHeight);
+                    var fresh = pageTop - Margin - (row.Header ? 0 : headerHeight);
                     if (height > fresh)
                     {
                         var total = (int)Math.Round((height - (2 * CellPad)) / lineHeight);
@@ -719,6 +1053,20 @@ namespace OutcomeTesting.Plugins
                                     Y = baseline,
                                     Text = piece.Text,
                                 });
+
+                                if (piece.Underline)
+                                {
+                                    // Helvetica's own underline: 0.1em under the baseline, 0.05em thick.
+                                    current.Add(new Line
+                                    {
+                                        IsRect = true,
+                                        X = px,
+                                        Y = baseline - (TableSize * 0.125),
+                                        Span = Width(piece.Text, piece.Font, TableSize),
+                                        Height = TableSize * 0.05,
+                                        Fill = 0,
+                                    });
+                                }
                             }
                         }
                     }
@@ -1036,6 +1384,7 @@ namespace OutcomeTesting.Plugins
             public string Text;
             public string Font;
             public bool? Box;
+            public bool Underline;
         }
 
         private sealed class FlowLine
@@ -1108,6 +1457,7 @@ namespace OutcomeTesting.Plugins
         {
             var lines = new List<FlowLine>();
             var line = new FlowLine();
+            double start = 0;     // where a line begins: 0, or a list item's hanging indent
             double cursor = 0;
             var afterBox = false;
 
@@ -1116,7 +1466,7 @@ namespace OutcomeTesting.Plugins
                 line.Width = cursor;
                 lines.Add(line);
                 line = new FlowLine();
-                cursor = 0;
+                cursor = start;
                 afterBox = false;
             }
 
@@ -1127,21 +1477,40 @@ namespace OutcomeTesting.Plugins
 
                 if (run.Break)
                 {
+                    start = 0;
                     Finish();
+                    continue;
+                }
+
+                if (run.Indent.HasValue)
+                {
+                    if (line.Pieces.Count > 0)
+                    {
+                        Finish();
+                    }
+
+                    // Never more than half the cell, so a deep list in a narrow column still has room.
+                    start = Math.Min(run.Indent.Value, width / 2);
+                    if (!string.IsNullOrEmpty(run.Text))
+                    {
+                        line.Pieces.Add(new Piece { X = Math.Max(0, start - PdfCell.ItemIndent), Text = run.Text, Font = FontFor(run) });
+                    }
+
+                    cursor = start;
                     continue;
                 }
 
                 if (run.Box.HasValue)
                 {
                     // The box and the first word of the label after it are measured together.
-                    var gap = cursor > 0 ? BoxGap * 3 : 0;
+                    var gap = cursor > start ? BoxGap * 3 : 0;
                     var next = r + 1 < runs.Count ? runs[r + 1] : null;
                     var label = next != null && !next.Box.HasValue && !next.Break
                         ? FirstWord(next.Text)
                         : null;
                     var need = gap + BoxSide + (label == null ? 0 : BoxGap + Width(label, FontFor(next), TableSize));
 
-                    if (cursor > 0 && cursor + need > width)
+                    if (cursor > start && cursor + need > width)
                     {
                         Finish();
                         gap = 0;
@@ -1157,6 +1526,7 @@ namespace OutcomeTesting.Plugins
                 var font = FontFor(run);
                 var space = Width(" ", font, TableSize);
                 var words = (run.Text ?? string.Empty).Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                var room = width - start;
 
                 for (var w = 0; w < words.Length; w++)
                 {
@@ -1165,38 +1535,38 @@ namespace OutcomeTesting.Plugins
 
                     // A word wider than the whole cell (a pasted link, say) is broken across
                     // lines: kept whole, it would be drawn over the next column.
-                    if (wordWidth > width && width > 0)
+                    if (wordWidth > room && room > 0)
                     {
-                        if (cursor > 0)
+                        if (cursor > start)
                         {
                             Finish();
                         }
 
-                        while (Width(word, font, TableSize) > width && word.Length > 1)
+                        while (Width(word, font, TableSize) > room && word.Length > 1)
                         {
                             var fits = 1;
-                            while (fits < word.Length && Width(word.Substring(0, fits + 1), font, TableSize) <= width)
+                            while (fits < word.Length && Width(word.Substring(0, fits + 1), font, TableSize) <= room)
                             {
                                 fits++;
                             }
 
-                            line.Pieces.Add(new Piece { X = 0, Text = word.Substring(0, fits), Font = font });
-                            cursor = Width(word.Substring(0, fits), font, TableSize);
+                            line.Pieces.Add(new Piece { X = start, Text = word.Substring(0, fits), Font = font, Underline = run.Underline });
+                            cursor = start + Width(word.Substring(0, fits), font, TableSize);
                             Finish();
                             word = word.Substring(fits);
                         }
 
-                        line.Pieces.Add(new Piece { X = 0, Text = word, Font = font });
-                        cursor = Width(word, font, TableSize);
+                        line.Pieces.Add(new Piece { X = start, Text = word, Font = font, Underline = run.Underline });
+                        cursor = start + Width(word, font, TableSize);
                         afterBox = false;
                         continue;
                     }
 
-                    var lead = cursor <= 0 ? 0 : (afterBox ? BoxGap : space);
+                    var lead = cursor <= start || (w == 0 && run.Join) ? 0 : (afterBox ? BoxGap : space);
 
                     // After a box the first word stays with it, whatever the width: the pair
                     // was measured as one before the box was placed.
-                    if (cursor > 0 && !afterBox && cursor + lead + wordWidth > width)
+                    if (cursor > start && !afterBox && cursor + lead + wordWidth > width)
                     {
                         Finish();
                         lead = 0;
@@ -1209,7 +1579,7 @@ namespace OutcomeTesting.Plugins
                     }
                     else
                     {
-                        line.Pieces.Add(new Piece { X = cursor + lead, Text = word, Font = font });
+                        line.Pieces.Add(new Piece { X = cursor + lead, Text = word, Font = font, Underline = run.Underline });
                     }
 
                     cursor += lead + wordWidth;
@@ -1267,11 +1637,15 @@ namespace OutcomeTesting.Plugins
         private static byte[] Assemble(List<List<Line>> pages, double pageWidth, double pageHeight)
         {
             // Object 1 catalog, 2 pages, 3 to 6 the four faces (regular, bold, italic, bold
-            // italic), then a content stream and a page object per page.
+            // italic), then a content stream and a page object per page, then the logo. The logo
+            // is last so its binary bytes follow every text object rather than sitting among them.
             var objects = new List<string>();
             var pageObjectIds = new List<int>();
 
             var firstPageObject = FirstStreamObject + pages.Count;
+            var logoObject = firstPageObject + pages.Count;
+            var logo = "q " + Num(LogoWidth) + " 0 0 " + Num(LogoHeight) + " " + Num(Margin) + " "
+                + Num(pageHeight - Margin - LogoHeight) + " cm /Im1 Do Q\n";
             for (var i = 0; i < pages.Count; i++)
             {
                 pageObjectIds.Add(firstPageObject + i);
@@ -1294,7 +1668,7 @@ namespace OutcomeTesting.Plugins
             var streams = new List<string>();
             foreach (var page in pages)
             {
-                streams.Add(Content(page));
+                streams.Add(logo + Content(page));
             }
 
             // Content streams occupy objects FirstStreamObject onwards, one per page.
@@ -1308,9 +1682,20 @@ namespace OutcomeTesting.Plugins
             {
                 objects.Add("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 "
                     + Num(pageWidth) + " " + Num(pageHeight) + "] "
-                    + "/Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R /F4 6 0 R >> >> /Contents "
+                    + "/Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R /F4 6 0 R >> /XObject << /Im1 "
+                    + logoObject.ToString(CultureInfo.InvariantCulture) + " 0 R >> >> /Contents "
                     + (FirstStreamObject + i).ToString(CultureInfo.InvariantCulture) + " 0 R >>");
             }
+
+            // Palette indices, zlib-compressed and written as hex so the file stays ASCII: the
+            // reader undoes both filters itself.
+            objects.Add("<< /Type /XObject /Subtype /Image /Width "
+                + AscotLloydLogo.Width.ToString(CultureInfo.InvariantCulture)
+                + " /Height " + AscotLloydLogo.Height.ToString(CultureInfo.InvariantCulture)
+                + " /ColorSpace [/Indexed /DeviceRGB " + ((AscotLloydLogo.Palette.Length / 6) - 1).ToString(CultureInfo.InvariantCulture)
+                + " <" + AscotLloydLogo.Palette + ">] /BitsPerComponent 8 /Filter [/ASCIIHexDecode /FlateDecode] /Length "
+                + LogoHex.Length.ToString(CultureInfo.InvariantCulture)
+                + " >>\nstream\n" + LogoHex + "\nendstream");
 
             var pdf = new StringBuilder();
             pdf.Append("%PDF-1.4\n");
@@ -1345,6 +1730,10 @@ namespace OutcomeTesting.Plugins
 
         /// <summary>The object number of the first page's content stream, after the fonts.</summary>
         private const int FirstStreamObject = 7;
+
+        /// <summary>The logo's stream: its compressed pixels as hex, ending with the filter's '&gt;'.</summary>
+        private static readonly string LogoHex =
+            BitConverter.ToString(Convert.FromBase64String(AscotLloydLogo.Pixels)).Replace("-", string.Empty) + ">";
 
         private static string Content(List<Line> lines)
         {

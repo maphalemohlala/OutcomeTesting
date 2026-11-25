@@ -22,6 +22,12 @@
   --brand-blue: #57e0ea;
   --brand-white: #ffffff;
 
+  /* The header's ink and the gold that marks where you are in it, shared with the Code App's
+     shell (app/src/styles/tokens.css) so the two front ends read as one product. */
+  --brand-ink: #11363a;
+  --brand-ink-raised: #1c4a4f;
+  --brand-gold: #d6a840;
+
   /* Teal tints, from the brand sheet's 10/25/50/75 tint system */
   --teal-tint-10: #eaeeee;
   --teal-tint-25: #d4dcdd;
@@ -29,24 +35,36 @@
 
   /* Surfaces */
   --colour-surface: var(--brand-white);
-  --colour-surface-sunken: #f4f7f7;
+  --colour-surface-sunken: #f2f4f3;
+  --colour-surface-hover: #f6f8f7;
   --colour-surface-header: var(--teal-tint-10);
   --colour-surface-inverse: var(--brand-teal);
-  --colour-border: #d3dcdc;
-  --colour-border-strong: #a8b8b8;
+  --colour-border: #e1e6e5;
+  --colour-border-strong: #c9d2d1;
 
   /* Text */
-  --colour-text: var(--brand-teal-dark);
-  --colour-text-muted: #4f6b6b;
+  --colour-text: #12292b;
+  --colour-text-muted: #5b6e6f;
+  --colour-text-inverse-muted: #a9bdbd;
+
+  /* Tinted fills: a held stage, a stage in progress, one waiting on someone else */
+  --colour-chip: #e4efed;
+  --colour-chip-text: #1d4a4f;
+  --colour-warn-bg: #fbf0d9;
+  --colour-warn-text: #8a5a0b;
+  --colour-danger-bg: #fbe5e2;
+  --colour-danger-text: #b23a2e;
+  --colour-pass-bg: #e3f3e8;
+  --colour-pass-text: #1a7d44;
   --colour-text-inverse: var(--brand-white);
 
   /* Action */
-  --colour-action: var(--brand-teal);
+  --colour-action: var(--brand-ink);
   --colour-action-hover: var(--brand-teal-dark);
   --colour-focus: var(--brand-teal-dark);
 
   /* Outcome and stage */
-  --colour-outcome-pass: var(--brand-green-accessible);
+  --colour-outcome-pass: #1a7d44;
   --colour-outcome-issues: #b87a3d;
   --colour-outcome-insufficient: var(--brand-purple);
   --colour-outcome-harm: #b65a52;
@@ -61,6 +79,8 @@
      one primary font." */
   --font-heading: 'Roundo', 'Segoe UI', Arial, sans-serif;
   --font-body: 'Roundo', 'Segoe UI', Arial, sans-serif;
+  /* Page titles and headline numbers only: the serif the Code App titles with. */
+  --font-display: 'Source Serif 4', Georgia, serif;
 
   --text-xs: 0.75rem;
   --text-sm: 0.8125rem;
@@ -68,6 +88,7 @@
   --text-lg: 1rem;
   --text-xl: 1.125rem;
   --text-2xl: 1.5rem;
+  --text-display: 2.3125rem;
 
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -76,8 +97,13 @@
   --space-5: 1.5rem;
   --space-6: 2rem;
 
-  --radius: 3px;
+  --radius: 6px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
   --edge: 3px;
+  --shadow-card: 0 1px 2px rgb(17 54 58 / 0.04);
+  /* The page's side margin, shared by the header so the logo lines up with the content. */
+  --page-gutter: clamp(1rem, 4vw, 4rem);
 }
 
 /* ------------------------------------------------------------------
@@ -128,72 +154,91 @@ body *:has(> footer.footer) {
 
 footer.footer { margin-top: auto; flex-shrink: 0; }
 
-/* Brand the header. portalbasictheme.css paints .static-top.navbar-dark
-   #2E456B with #FEA002 hover; both are overridden here at matching or
-   higher specificity so the bar reads Ascot Lloyd teal. */
-/* Header sits on white so the Ascot Lloyd logo, which is dark, reads against
-   it. Bootstrap's navbar-dark class assumes a dark bar and paints its text
-   white, so every text colour in the header is restated below. */
+/* The header is the Code App's ink bar (2026-11-24 redesign). The stock theme paints
+   .static-top.navbar-dark navy with orange hover; every rule below matches or beats that
+   specificity so the bar reads ink with a gold rule under the page you are on. */
 html body .navbar,
 html body .navbar-dark,
 html body .static-top.navbar-dark,
 html body .navbar.static-top.navbar-dark,
 html body div.navbar.navbar-dark.static-top {
-  background-color: var(--brand-white) !important;
+  background-color: var(--brand-ink) !important;
   background-image: none !important;
+  border-bottom: 0;
+  box-shadow: none;
+  min-height: 4.125rem;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
-/* The site name sits in an anchor, so the stock underline appears behind
-   "Ascot Lloyd" on hover. Suppress it on the brand link only; navigation
-   links keep their underline affordance. */
+html body .navbar > .container {
+  max-width: none;
+  padding: 0 var(--page-gutter);
+  align-items: center;
+}
+
+/* The logo is dark teal and green, made for a light ground: on ink it sits on a white plate,
+   as in the Code App's header, rather than being recoloured. */
 html body .navbar-brand,
-html body .navbar-brand:hover,
-html body .navbar-brand:focus,
+html body .navbar-header {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+}
+
 html body .navbar-brand a,
-html body .navbar-brand a:hover,
-html body .navbar-brand a:focus,
-html body .navbar-header a,
-html body .navbar-header a:hover,
-html body .navbar-header a:focus {
+html body .navbar-header a {
+  display: inline-flex;
+  padding: 4px var(--space-2);
+  background-color: var(--brand-white) !important;
+  border-radius: var(--radius);
   text-decoration: none !important;
   border-bottom: none !important;
-  background-color: transparent !important;
-}
-
-html body .navbar-brand a:focus-visible,
-html body .navbar-header a:focus-visible {
-  outline: 2px solid var(--brand-green-highlight);
-  outline-offset: 3px;
-}
-
-.navbar {
-  border-bottom: 1px solid var(--colour-border);
-  box-shadow: inset 0 -4px 0 var(--brand-green-highlight);
-  padding-top: var(--space-3);
-  padding-bottom: var(--space-3);
 }
 
 .navbar .navbar-brand img,
 .navbar .navbar-header img {
-  height: 34px !important;
+  height: 30px !important;
   width: auto !important;
+  margin: 0 !important;
 }
 
-/* Navigation. The hovered item is marked by a filled mint chip, not by a
-   rule under the text: the theme already draws its own underline, so a
-   border here produced the double line. Underlines are suppressed on both
-   the link and its inner elements. */
+html body .navbar-brand a:focus-visible,
+html body .navbar-header a:focus-visible {
+  outline: 2px solid var(--brand-gold);
+  outline-offset: 3px;
+}
+
+.ot-header__product {
+  margin-left: var(--space-4);
+  padding-left: var(--space-4);
+  border-left: 1px solid rgb(255 255 255 / 0.22);
+  color: var(--colour-text-inverse-muted);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+/* portalbasictheme.css sets Arial on .static-top.navbar .menu-bar > .navbar-nav > li > a,
+   which outranks the shorter selectors below: the first one here outranks it. */
+html body .static-top.navbar .menu-bar > .navbar-nav > li > a,
 html body .navbar .nav-link,
 html body .navbar .weblink > a,
 html body .navbar-dark .navbar-nav > li > a,
 html body .navbar-dark .navbar-nav > li.dropdown > a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   font-family: var(--font-body);
   font-size: var(--text-base);
-  font-weight: 500;
-  color: var(--colour-text) !important;
-  padding: var(--space-2) var(--space-3);
+  font-weight: 400;
+  color: var(--colour-text-inverse) !important;
+  padding: 0.5rem 0.875rem;
+  margin: 0 3px;
   border: none !important;
-  border-radius: var(--radius);
+  border-bottom: 3px solid transparent !important;
+  /* Top corners only, so the gold rule under the current page runs straight to its ends. */
+  border-radius: var(--radius) var(--radius) 0 0;
   text-decoration: none !important;
   background-color: transparent !important;
 }
@@ -207,29 +252,59 @@ html body .navbar-dark .navbar-nav > li > a:focus,
 html body .navbar-dark .navbar-nav > li.dropdown > a:hover,
 html body .navbar-dark .navbar-nav > li.dropdown > a:focus,
 html body .static-top.navbar .menu-bar > .navbar-nav > li > a:hover {
-  background-color: var(--brand-teal-light) !important;
-  color: var(--brand-teal-dark) !important;
+  background-color: var(--brand-ink-raised) !important;
+  color: var(--colour-text-inverse) !important;
   text-decoration: none !important;
-  border: none !important;
+}
+
+/* Where you are: the raised ink and the gold rule, never colour alone - the link also
+   carries aria-current. */
+html body .static-top.navbar .menu-bar > .navbar-nav > li.ot-nav--here > a,
+html body .navbar .weblink.ot-nav--here > a,
+html body .navbar-dark .navbar-nav > li.ot-nav--here > a {
+  background-color: var(--brand-ink-raised) !important;
+  border-bottom-color: var(--brand-gold) !important;
 }
 
 html body .navbar a:hover span,
-html body .navbar a:focus span,
-html body .navbar a:hover h1,
-html body .navbar a:focus h1 { text-decoration: none !important; }
+html body .navbar a:focus span { text-decoration: none !important; }
 
 html body .navbar a:focus-visible {
-  outline: 2px solid var(--colour-focus);
+  outline: 2px solid var(--brand-gold);
   outline-offset: 2px;
 }
+
+/* The signed-in person, set off from the sections by a hairline. */
+html body .navbar .navbar-nav > li.dropdown:last-child {
+  margin-left: var(--space-3);
+  padding-left: var(--space-3);
+  border-left: 1px solid rgb(255 255 255 / 0.22);
+}
+
+.navbar .dropdown-menu .dropdown-item { color: var(--colour-text) !important; }
 
 .navbar-toggler,
 .navbar-dark .navbar-toggler:hover,
 .navbar-dark .navbar-toggler:focus {
-  background-color: var(--brand-teal) !important;
+  background-color: var(--brand-ink-raised) !important;
 }
 
 .navbar .divider-vertical { display: none; }
+
+html body .navbar .navbar-nav { align-items: center; }
+
+/* The user menu's caret as a drawn chevron, as the rest of the page draws its arrows. */
+html body .navbar .caret {
+  display: inline-block;
+  width: 0.4rem;
+  height: 0.4rem;
+  margin: -0.2rem 0 0 var(--space-2);
+  border: 0;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+html body .navbar .dropdown-toggle::after { display: none; }
 
 /* The footer band is light so the Ascot Lloyd logo can sit in it unaltered.
    The supplied mark is Teal #2b5257 and Highlight Green #b0ed70; against the
@@ -245,8 +320,12 @@ footer[data-component-theme],
   background-color: var(--teal-tint-10) !important;
   background-image: none !important;
   color: var(--colour-text) !important;
+  font-family: var(--font-body);
   font-size: var(--text-sm);
 }
+
+/* Lined up with the header and the page, not centred in a Bootstrap container. */
+footer.footer .container { max-width: none; padding: 0 var(--page-gutter); }
 
 footer.footer {
   padding: var(--space-4) 0;
@@ -296,7 +375,7 @@ footer a:focus-visible, .footer a:focus-visible {
   line-height: 1.5;
   color: var(--colour-text);
   background: var(--colour-surface-sunken);
-  padding: var(--space-5) var(--space-4) var(--space-6);
+  padding: 1.625rem var(--page-gutter) 2.5rem;
 
   /* Two mechanisms, deliberately. The flex rules above push the footer down
      when the footer is reachable as a flex item; this min-height guarantees
@@ -308,6 +387,14 @@ footer a:focus-visible, .footer a:focus-visible {
 }
 
 .ot-page__inner { max-width: 82rem; margin: 0 auto; }
+
+/* portalbasictheme.css sets Arial on bare a, p and h1-h5. These inherit the page's face
+   instead; :where() keeps the rule as weak as the theme's, so a class that names a face
+   (the serif title, a review card's reference) still wins. */
+:where(.ot-page) :is(a, p, h2, h3, h4, h5, label, button, input, select, textarea, summary) { font-family: inherit; }
+
+/* The lists and the remediation page take the full working width, as the header does. */
+.ot-page__inner:has(.ot-page--full) { max-width: none; }
 
 /* A page that asks for the room (project owner, 2026-09-22). 82rem is a READING width -
    right for the review form, the remediation pages and anything mostly prose - and the
@@ -321,36 +408,54 @@ footer a:focus-visible, .footer a:focus-visible {
 .ot-page__inner:has([data-ot-wide]) { max-width: 110rem; }
 
 .ot-breadcrumb {
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  font-size: 0.78rem;
   color: var(--colour-text-muted);
-  margin-bottom: var(--space-3);
+  margin-bottom: 0.25rem;
 }
 
 .ot-breadcrumb a { color: var(--colour-text-muted); text-decoration: none; }
 .ot-breadcrumb a:hover { color: var(--colour-action); text-decoration: underline; }
-.ot-breadcrumb span { margin: 0 var(--space-2); }
+.ot-breadcrumb [aria-current] { color: var(--colour-text); font-weight: 600; }
 
-.ot-page__header {
-  margin-bottom: var(--space-5);
-  padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--colour-border);
+/* A drawn chevron between crumbs: no glyph or icon font to go missing. */
+.ot-breadcrumb__sep {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-top: 1.5px solid currentColor;
+  border-right: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  opacity: 0.7;
 }
 
+.ot-page__header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-5);
+  margin-bottom: 1.625rem;
+}
+
+.ot-page__actions { display: flex; flex: none; align-items: center; gap: var(--space-3); }
+.ot-page__actions:empty { display: none; }
+
 .ot-page__title {
-  font-family: var(--font-heading);
-  font-size: var(--text-2xl);
-  font-weight: 600;
-  letter-spacing: -0.015em;
-  margin: 0 0 var(--space-1);
+  font-family: var(--font-display);
+  font-size: var(--text-display);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  margin: 0;
 }
 
 .ot-page__lede {
-  margin: 0;
+  margin: var(--space-3) 0 0;
   color: var(--colour-text-muted);
-  font-size: var(--text-lg);
-  max-width: 60ch;
+  font-size: var(--text-base);
+  max-width: 68ch;
 }
 
 /* ------------------------------------------------------------------
@@ -360,25 +465,27 @@ footer a:focus-visible, .footer a:focus-visible {
 .ot-card {
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
-  border-radius: var(--radius);
-  margin-bottom: var(--space-4);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  margin-bottom: var(--space-5);
 }
 
+/* A card names itself on white, as the Sign-off and Follow-up cards do (2026-11-24 redesign). */
 .ot-card__title {
   font-family: var(--font-heading);
-  font-size: var(--text-lg);
+  font-size: var(--text-xl);
   font-weight: 600;
   margin: 0;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--colour-border);
-  background: var(--colour-surface-header);
-  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--colour-surface);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   display: flex;
   align-items: center;
   gap: var(--space-3);
 }
 
-.ot-card > *:not(.ot-card__title) { padding: 0 var(--space-4); }
+.ot-card > *:not(.ot-card__title) { padding: 0 var(--space-5); }
 .ot-card > *:not(.ot-card__title):last-child { padding-bottom: var(--space-4); }
 .ot-card > .ot-table-wrap { padding: 0; }
 .ot-card > p:first-of-type { padding-top: var(--space-4); }
@@ -396,7 +503,7 @@ footer a:focus-visible, .footer a:focus-visible {
   list-style: none;
   background: var(--colour-border);
   border: 1px solid var(--colour-border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   overflow: hidden;
 }
 
@@ -410,28 +517,30 @@ footer a:focus-visible, .footer a:focus-visible {
 
 .ot-tile:hover,
 .ot-tile:focus {
-  background: var(--brand-teal-light);
+  background: var(--colour-surface-hover);
   text-decoration: none;
   color: inherit;
 }
 
 .ot-tile__count {
-  font-family: var(--font-heading);
-  font-size: 1.75rem;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 500;
   line-height: 1.1;
   display: block;
   font-variant-numeric: tabular-nums;
 }
 
 .ot-tile__label {
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   color: var(--colour-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
   display: block;
   margin-top: var(--space-1);
 }
+
+/* The theme underlines every link; a tile is a card, so neither its count nor its label is. */
+html body a.ot-tile,
+html body a.ot-tile span { text-decoration: none; }
 
 .ot-tile--alert { --tile-colour: var(--colour-outcome-issues); }
 
@@ -500,7 +609,7 @@ footer a:focus-visible, .footer a:focus-visible {
 .ot-filters {
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   padding: var(--space-4);
   margin-bottom: var(--space-4);
 }
@@ -514,11 +623,9 @@ footer a:focus-visible, .footer a:focus-visible {
 .ot-field { display: flex; flex-direction: column; }
 
 .ot-field label {
-  font-size: var(--text-xs);
+  font-size: var(--text-base);
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--colour-text-muted);
+  color: var(--colour-text);
   margin-bottom: var(--space-1);
 }
 
@@ -571,7 +678,7 @@ footer a:focus-visible, .footer a:focus-visible {
   border: 1px solid var(--colour-border-strong);
   border-radius: var(--radius);
   padding: var(--space-2) var(--space-3);
-  min-height: 2.25rem;
+  min-height: 2.75rem;
   width: 100%;
 }
 
@@ -604,28 +711,15 @@ footer a:focus-visible, .footer a:focus-visible {
   border-top: 1px solid var(--colour-border);
 }
 
-/* ------------------------------------------------------------------
-   Scope switch. "My cases" against "All cases" is two states of one
-   list rather than a filter, so it sits above the results and outside
-   the filter form. Same flex-and-gap row as .ot-filters__actions; the
-   active state is carried by .ot-btn--primary, so no colour is minted
-   here.
-   ------------------------------------------------------------------ */
-
-.ot-scope {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-bottom: var(--space-5);
-}
-
 .ot-btn {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   font-family: var(--font-body);
   font-size: var(--text-base);
   font-weight: 500;
   line-height: 1.4;
-  padding: var(--space-2) var(--space-4);
+  padding: 0.55rem var(--space-4);
   border: 1px solid var(--colour-border-strong);
   border-radius: var(--radius);
   background: var(--colour-surface);
@@ -636,11 +730,22 @@ footer a:focus-visible, .footer a:focus-visible {
 
 .ot-btn:hover,
 .ot-btn:focus {
-  background: var(--brand-teal-light);
+  background: var(--colour-surface-hover);
   border-color: var(--colour-action);
-  color: var(--brand-teal-dark);
+  color: var(--colour-text);
   text-decoration: none;
 }
+
+/* The theme underlines links that are not .btn; ours are controls, not links to read. */
+html body a.ot-btn,
+html body a.ot-tab,
+html body a.ot-scope__item { text-decoration: none; }
+
+/* The theme underlines every hovered link with !important; a button is not a link to read. */
+html body a.ot-btn:hover,
+html body a.ot-btn:focus,
+html body a.ot-tab:hover,
+html body a.ot-scope__item:hover { text-decoration: none !important; }
 
 .ot-btn--primary {
   background: var(--colour-action);
@@ -668,20 +773,29 @@ footer a:focus-visible, .footer a:focus-visible {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-4);
+  padding: var(--space-4) var(--space-5);
   border-top: 1px solid var(--colour-border);
 }
 
+/* "Showing 1 to 25 of 103" on the left, Previous and Next on the right. */
+.ot-card > .ot-pager { padding: 0.8rem var(--space-5); }
+.ot-pager .ot-btn { padding: 0.3rem 0.75rem; font-weight: 600; }
+.ot-pager__buttons { display: flex; gap: var(--space-2); margin-left: auto; }
+.ot-pager .ot-btn[aria-disabled='true'] { opacity: 0.45; pointer-events: none; }
+
 .ot-pager__pos {
   font-size: var(--text-sm);
-  color: var(--colour-text-muted);
+  color: var(--colour-text);
 }
 
 /* ------------------------------------------------------------------
    Tables. Dense, scannable, sticky header for long worklists.
    ------------------------------------------------------------------ */
 
+/* Positioned so a visually hidden span inside a cell stays inside the scrolling table instead
+   of widening the page on a phone. */
 .ot-table-wrap {
+  position: relative;
   overflow-x: auto;
   max-height: 34rem;
   overflow-y: auto;
@@ -691,7 +805,7 @@ footer a:focus-visible, .footer a:focus-visible {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   background: var(--colour-surface);
 }
 
@@ -706,10 +820,13 @@ footer a:focus-visible, .footer a:focus-visible {
 .ot-table th,
 .ot-table td {
   text-align: left;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-4);
   border-bottom: 1px solid var(--colour-border);
-  vertical-align: top;
+  vertical-align: middle;
 }
+
+.ot-table th:first-child,
+.ot-table td:first-child { padding-left: var(--space-5); }
 
 .ot-table thead th {
   position: sticky;
@@ -717,26 +834,34 @@ footer a:focus-visible, .footer a:focus-visible {
   z-index: 1;
   font-family: var(--font-body);
   font-size: var(--text-xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-weight: 400;
   color: var(--colour-text-muted);
-  background: var(--colour-surface-header);
-  border-bottom: 1px solid var(--colour-border-strong);
+  background: var(--colour-surface);
+  border-bottom: 1px solid var(--colour-border);
   white-space: nowrap;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
 }
 
-.ot-table tbody tr:hover { background: var(--colour-surface-sunken); }
+.ot-table tbody tr:hover { background: var(--colour-surface-hover); }
+
+/* A row's own header (the remediation list's case cell) reads as a cell; only its link is bold. */
+.ot-table tbody th { font-weight: 400; color: var(--colour-text); }
+.ot-table tbody th .ot-service-ref { color: var(--colour-text-muted); }
 .ot-table tbody tr:last-child td { border-bottom: none; }
 
 .ot-table a {
-  color: var(--colour-action);
-  font-weight: 500;
+  color: var(--colour-text);
+  font-weight: 600;
   text-decoration: none;
-  border-bottom: 1px solid var(--teal-tint-50);
+  border-bottom: 1px solid var(--colour-border-strong);
 }
 
 .ot-table a:hover { color: var(--colour-action-hover); border-bottom-color: currentColor; }
+
+/* The case reference leads its row, underlined in its own colour. */
+.ot-table :is(td, th):first-child > a:first-child { display: block; width: fit-content; border-bottom-width: 1.5px; border-bottom-color: currentColor; }
+.ot-table .ot-service-ref { display: inline-block; margin-right: var(--space-2); }
 
 /* Dates and references scan better in tabular figures */
 .ot-table td { font-variant-numeric: tabular-nums; }
@@ -746,25 +871,67 @@ footer a:focus-visible, .footer a:focus-visible {
    ------------------------------------------------------------------ */
 
 .ot-badge {
-  display: inline-block;
-  font-size: var(--text-xs);
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 500;
   line-height: 1.4;
-  padding: 2px var(--space-2);
-  border-radius: var(--radius);
-  border: 1px solid currentColor;
+  padding: 0.15rem 0.7rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
   white-space: nowrap;
 }
 
-.ot-badge--pass         { color: #067306; }
-.ot-badge--issues       { color: var(--colour-outcome-issues); }
-.ot-badge--insufficient { color: #6b3fc4; }
-.ot-badge--harm         { color: var(--colour-outcome-harm); }
-.ot-badge--waiting      { color: var(--colour-stage-waiting); }
-.ot-badge--active       { color: var(--colour-stage-active); }
-.ot-badge--blocked      { color: var(--colour-outcome-harm); }
-.ot-badge--closed       { color: var(--colour-stage-closed); }
-.ot-badge--none         { color: var(--colour-text-muted); }
+/* Stages: a filled pill, the fill saying how far along the case is. */
+.ot-badge--waiting  { color: var(--colour-text); background: var(--colour-surface); border-color: var(--colour-border-strong); }
+.ot-badge--active   { color: var(--colour-chip-text); background: var(--colour-chip); }
+.ot-badge--progress { color: var(--colour-warn-text); background: var(--colour-warn-bg); }
+.ot-badge--blocked  { color: var(--colour-danger-text); background: var(--colour-danger-bg); }
+.ot-badge--closed   { color: var(--colour-text-muted); background: #e9edec; }
+.ot-badge--done     { color: var(--colour-pass-text); background: var(--colour-pass-bg); }
+.ot-badge--done::before {
+  content: '';
+  width: 0.55rem;
+  height: 0.3rem;
+  border-left: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg) translate(1px, -1px);
+}
+
+/* Grades: the words with a mark before them in the grade's hue. Pass with issues is a
+   triangle, not a second dot, so it does not rest on telling two colours apart. */
+.ot-badge--pass,
+.ot-badge--issues,
+.ot-badge--insufficient,
+.ot-badge--harm {
+  padding: 0;
+  background: none;
+  color: var(--colour-text);
+  font-size: var(--text-sm);
+}
+
+.ot-badge--pass::before,
+.ot-badge--insufficient::before,
+.ot-badge--harm::before {
+  content: '';
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  background: var(--badge-mark);
+}
+
+.ot-badge--pass         { --badge-mark: var(--colour-outcome-pass); }
+.ot-badge--insufficient { --badge-mark: var(--colour-outcome-insufficient); }
+.ot-badge--harm         { --badge-mark: var(--colour-outcome-harm); }
+.ot-badge--issues::before {
+  content: '';
+  border-left: 0.42rem solid transparent;
+  border-right: 0.42rem solid transparent;
+  border-bottom: 0.72rem solid var(--colour-outcome-issues);
+}
+
+.ot-badge--none { padding: 0; color: var(--colour-text-muted); font-size: var(--text-sm); font-weight: 400; }
 
 /* ------------------------------------------------------------------
    An absent checker on the case list. Not a blank: it says WHICH of
@@ -969,6 +1136,16 @@ footer a:focus-visible, .footer a:focus-visible {
   white-space: nowrap;
 }
 
+/* The service case reference under the TaskID on the case lists: the reference people quote,
+   but two tasks can share one, so it sits beneath the key rather than replacing it
+   (client, 2026-11-24). */
+.ot-service-ref {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-sm);
+  color: var(--ot-muted, #595959);
+}
+
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
@@ -1003,6 +1180,7 @@ footer a:focus-visible, .footer a:focus-visible {
    pairing tags across conditionals. */
 @media (max-width: 40rem) {
   .ot-checklist .meta { display: block; overflow-x: auto; }
+  .ot-checklist { padding: var(--space-4); }
 }
 
 /* Support reference on the access-denied page. Deliberately quiet: it is for
@@ -1064,6 +1242,11 @@ footer a:focus-visible, .footer a:focus-visible {
 .ot-answer__status--saving { color: var(--ot-muted, #595959); }
 .ot-answer__status--saved { color: var(--ot-muted, #595959); }
 .ot-answer__status--error { color: var(--ot-error, #a4262c); font-weight: 500; }
+/* The Ascot Lloyd logo, shown top-left on printed pages only (UAT, 2026-11-23). */
+.ot-print-logo { display: none; }
+/* "x of N characters" under a long-text box, red once the column length is reached. */
+.ot-char-count { margin: 0.25rem 0 0; font-size: 0.8rem; color: var(--ot-muted, #595959); }
+.ot-char-count--full { color: var(--ot-error, #a4262c); font-weight: 600; }
 
 /* Confirmation dialog for picking up a case (AD-076). A native <dialog> so the
    focus trap, the Escape key and the backdrop come from the platform rather
@@ -1130,19 +1313,25 @@ footer a:focus-visible, .footer a:focus-visible {
    The Checker Checklist, drawn as the document
 
    Everything below is scoped to .ot-checklist, which wraps the questionnaire and nothing
-   else. The page around it keeps the site's brand; the form itself is the V8 document -
-   Calibri on white, every cell ruled in black, grey label and header bands, square tick
-   boxes. The site's own table styling (sticky uppercase headers, hover fills, row-only
-   rules) is exactly what made the headers read as deformed here, so none of it applies
-   inside this wrapper: these rules use the document's own class names rather than
-   .ot-table / .ot-questions, so there is nothing to override.
+   else. The form keeps the V8 document's STRUCTURE everywhere - field order, the label and
+   value grid, the numbered tables, square tick boxes - because the client signs it off
+   against the paper form. Its LOOK differs by medium (2026-11-24 redesign): on screen it is
+   a card in the site's design - soft rules, tinted label cells, sentence-case muted labels,
+   headings like card headings, rounded fields - and in print it is the paper record again,
+   Calibri on white with every cell ruled in black (the print rules after this block). The
+   site's own table styling (sticky uppercase headers, hover fills, row-only rules) is
+   exactly what made the headers read as deformed here, so none of it applies inside this
+   wrapper: these rules use the document's own class names rather than .ot-table /
+   .ot-questions, so there is nothing to override.
    ========================================================================================= */
 
 .ot-checklist {
-  --line: #000;
-  --band: #d9d9d9;
-  --subband: #f2f2f2;
-  --ink: #000;
+  /* The four document colours. Soft on screen; the print block sets them back to black,
+     the paper's grey bands and black ink. */
+  --line: var(--colour-border);
+  --band: var(--colour-surface-sunken);
+  --subband: #f7f9f8;
+  --ink: var(--colour-text);
 
   /* The form body is as wide as everything else on the page. .ot-card, .ot-submit and
      .ot-page__header are all block children of .ot-page__inner and so take its 82rem;
@@ -1152,79 +1341,103 @@ footer a:focus-visible, .footer a:focus-visible {
      drops it to the sheet, and .ot-checklist table is already width: 100%. */
   max-width: none;
   margin: 0 0 var(--space-6);
-  background: #fff;
-  padding: 32px 40px 48px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, .25);
-  font-family: Calibri, "Segoe UI", Arial, sans-serif;
-  font-size: 11pt;
+  background: var(--colour-surface);
+  padding: 1.75rem 1.75rem 2rem;
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: 1.45;
   color: var(--ink);
 }
 
 .ot-checklist * { box-sizing: border-box; }
 
+/* The document's running header ("... Case record | V8"): a quiet line above the content. */
 .ot-checklist .doc-footer {
-  font-size: 9pt;
-  color: #444;
-  border-bottom: 1px solid #bbb;
-  padding-bottom: 4px;
-  margin-bottom: 20px;
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+  border-bottom: 1px solid var(--colour-border);
+  padding-bottom: var(--space-3);
+  margin-bottom: var(--space-5);
 }
 
 .ot-checklist h1 {
-  font-family: Calibri, "Segoe UI", Arial, sans-serif;
-  font-size: 16pt;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 500;
+  line-height: 1.25;
   color: var(--ink);
-  margin: 0 0 18px;
+  margin: 0 0 var(--space-5);
   letter-spacing: normal;
   text-transform: none;
 }
 
+/* A section heading reads as a card heading. */
 .ot-checklist h2 {
-  font-family: Calibri, "Segoe UI", Arial, sans-serif;
-  font-size: 12pt;
-  font-weight: 700;
+  font-family: var(--font-heading);
+  font-size: var(--text-xl);
+  font-weight: 600;
   color: var(--ink);
-  margin: 26px 0 8px;
+  margin: var(--space-6) 0 var(--space-3);
   padding: 0;
   letter-spacing: normal;
   text-transform: none;
 }
 
 .ot-checklist .intro {
-  font-size: 10.5pt;
-  color: var(--ink);
+  font-size: var(--text-base);
+  color: var(--colour-text-muted);
   max-width: none;
-  margin: 0 0 8px;
+  margin: 0 0 var(--space-3);
 }
 
 .ot-checklist table {
   width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 6px;
-  background: #fff;
-  font-size: 10.5pt;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-bottom: var(--space-2);
+  background: var(--colour-surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: var(--text-base);
 }
 
 .ot-checklist th,
 .ot-checklist td {
-  border: 1px solid var(--line);
-  padding: 5px 7px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+  padding: 0.55rem 0.8rem;
   vertical-align: top;
-  font-size: 10.5pt;
+  font-size: var(--text-base);
   text-align: left;
   font-variant-numeric: normal;
 }
 
-/* The document's header cells: a grey band, bold, upright. Not sticky, not uppercase, not
+/* The table's frame draws the outer edge, so the first column and the first row draw no rule
+   of their own; the corner cells follow the frame's radius. Screen only: on paper every cell
+   is ruled (print block below). A rowspanned cell never starts a row, so a row's first cell
+   is always the first column. */
+@media not print {
+  .ot-checklist tr > :first-child { border-left: 0; }
+  .ot-checklist :is(thead, caption + tbody, tbody:first-child) > tr:first-child > * { border-top: 0; }
+  .ot-checklist :is(thead, caption + tbody, tbody:first-child) > tr:first-child > :first-child { border-top-left-radius: var(--radius); }
+  .ot-checklist :is(thead, caption + tbody, tbody:first-child) > tr:first-child > :last-child { border-top-right-radius: var(--radius); }
+  .ot-checklist tbody:last-child > tr:last-child > :first-child { border-bottom-left-radius: var(--radius); }
+  .ot-checklist tbody:last-child > tr:last-child > :last-child { border-bottom-right-radius: var(--radius); }
+}
+
+/* The document's header cells: a tinted band, upright. Not sticky, not uppercase, not
    letter-spaced - the three things that deformed them. */
 .ot-checklist th {
   position: static;
   background: var(--band);
   color: var(--ink);
   font-family: inherit;
-  font-weight: 700;
-  font-size: 10.5pt;
+  font-weight: 600;
+  font-size: var(--text-sm);
   text-transform: none;
   letter-spacing: normal;
   white-space: normal;
@@ -1232,71 +1445,97 @@ footer a:focus-visible, .footer a:focus-visible {
 
 .ot-checklist tbody tr:hover { background: transparent; }
 
-/* ---- square boxes: radios and checkboxes both render as squares ---- */
+/* Statuses inside the document are the site's pills, one size down. */
+.ot-checklist .ot-badge { font-size: var(--text-sm); }
+.ot-checklist :is(.ot-badge--pass, .ot-badge--issues, .ot-badge--insufficient, .ot-badge--harm) { font-size: var(--text-base); font-weight: 500; }
+
+/* ---- square boxes: radios and checkboxes both render as squares (rounded a touch on
+   screen, ink-filled with a white tick when chosen; plain ruled squares in print) ---- */
 .ot-checklist .cc-box {
   appearance: none;
   -webkit-appearance: none;
-  width: 13px;
-  height: 13px;
-  border: 1px solid #333;
-  border-radius: 0;
-  background: #fff;
+  width: 1rem;
+  height: 1rem;
+  border: 1.5px solid var(--colour-border-strong);
+  border-radius: 4px;
+  background: var(--colour-surface);
   display: inline-block;
-  vertical-align: -2px;
+  vertical-align: -3px;
   cursor: pointer;
   margin: 0;
   padding: 0;
   flex: none;
 }
 
+.ot-checklist .cc-box:checked { background: var(--colour-action); border-color: var(--colour-action); }
+
 .ot-checklist .cc-box:checked::after {
   content: "\2713";
   display: block;
   font-size: 11px;
-  line-height: 11px;
+  line-height: 13px;
   text-align: center;
-  color: var(--ink);
+  color: var(--colour-text-inverse);
 }
 
 .ot-checklist .cc-box:focus-visible {
-  outline: 2px solid #005a9e;
+  outline: 2px solid var(--colour-focus);
   outline-offset: 1px;
 }
 
-.ot-checklist .cc-box:disabled { cursor: default; border-color: #767676; background: #f6f6f6; }
+.ot-checklist .cc-box:disabled { cursor: default; border-color: var(--colour-border); background: var(--colour-surface-sunken); }
+.ot-checklist .cc-box:disabled:checked { background: var(--colour-text-muted); border-color: var(--colour-text-muted); }
 
 /* The option run. Scoped to where options actually live, because the grid's column headers
    are <th class="opt"> too: an unscoped .opt rule makes inline-flex boxes of them and the
    header row collapses - which is exactly how the headers came to look deformed. The
    reference HTML carries the same collision; it is fixed here rather than reproduced. */
-.ot-checklist .opts { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.ot-checklist .opts { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); }
 .ot-checklist .opts .opt,
-.ot-checklist .rootcause .opt { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.ot-checklist .rootcause .opt { display: inline-flex; align-items: center; gap: var(--space-2); white-space: nowrap; }
 .ot-checklist .rootcause .opt.wrap { white-space: normal; }
 
+/* The document's write-in boxes, drawn as the site's fields on screen: rounded, a soft
+   frame, 2.75rem tall. The print block takes the frame away again, so on paper the answer
+   sits in its ruled cell as written text. .ot-hdr-input (the editable header) is the same
+   field; its own rules below only set what differs. */
 .ot-checklist input[type="text"],
+.ot-checklist input[type="email"],
 .ot-checklist input[type="date"],
+.ot-checklist input[type="number"],
+.ot-checklist select,
 .ot-checklist textarea {
   width: 100%;
-  border: 0;
+  min-height: 2.75rem;
+  border: 1px solid var(--colour-border-strong);
+  border-radius: var(--radius);
   font: inherit;
-  background: transparent;
-  padding: 1px 0;
+  color: var(--colour-text);
+  background: var(--colour-surface);
+  padding: var(--space-2) var(--space-3);
   resize: vertical;
 }
 
-.ot-checklist input[type="text"]:focus,
-.ot-checklist input[type="date"]:focus,
-.ot-checklist textarea:focus {
-  outline: 2px solid #005a9e;
+.ot-checklist input[type="text"]:focus-visible,
+.ot-checklist input[type="email"]:focus-visible,
+.ot-checklist input[type="date"]:focus-visible,
+.ot-checklist input[type="number"]:focus-visible,
+.ot-checklist select:focus-visible,
+.ot-checklist textarea:focus-visible {
+  outline: 2px solid var(--colour-focus);
   outline-offset: 1px;
+  border-color: var(--colour-focus);
 }
 
-.ot-checklist textarea { min-height: 68px; }
+.ot-checklist textarea { min-height: 4.5rem; line-height: 1.45; }
 
-/* ---- header metadata grid ---- */
-.ot-checklist .meta td.lbl { width: 17%; font-weight: 700; background: var(--subband); }
+/* ---- header metadata grid: the label a light tint, sentence case and muted, the value
+   in the text colour, as the summary cards above the document read ---- */
+.ot-checklist .meta td.lbl { width: 17%; font-weight: 400; color: var(--colour-text-muted); background: var(--subband); }
 .ot-checklist .meta td.val { width: 33%; }
+/* A label lines up with the field beside it, which is taller than a line of text. Top-aligned
+   on paper, where every value is text. */
+.ot-checklist .meta td { vertical-align: middle; }
 
 /* ---- assessment grids ---- */
 .ot-checklist .grid td.label,
@@ -1308,9 +1547,9 @@ footer a:focus-visible, .footer a:focus-visible {
 .ot-checklist .grid:has(thead th:nth-of-type(5)) th.opt,
 .ot-checklist .grid:has(thead th:nth-of-type(5)) td.optcell { width: 11.25%; }
 .ot-checklist .grid:has(thead th:nth-of-type(6)) td.optcell { width: 9%; }
-.ot-checklist .grid tr.section td { background: var(--band); font-weight: 700; }
-.ot-checklist .grid tr.lens td { background: var(--subband); font-size: 10pt; }
-.ot-checklist .grid tr.lens em { font-style: italic; font-weight: 700; }
+.ot-checklist .grid tr.section td { background: var(--band); font-weight: 600; }
+.ot-checklist .grid tr.lens td { background: var(--subband); color: var(--colour-text-muted); font-size: var(--text-sm); }
+.ot-checklist .grid tr.lens em { font-style: italic; font-weight: 600; color: var(--ink); }
 
 /* ---- fail points ---- */
 .ot-checklist .fails td.label,
@@ -1352,28 +1591,28 @@ footer a:focus-visible, .footer a:focus-visible {
 .ot-checklist .ot-answer__status {
   display: block;
   min-height: 0;
-  margin: 2px 0 0;
-  font-size: 9pt;
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
   font-weight: 400;
-  color: #595959;
+  color: var(--colour-text-muted);
 }
 .ot-checklist .ot-answer__status:empty { display: none; }
-.ot-checklist .ot-answer__status--error { color: #a4262c; font-weight: 700; }
+.ot-checklist .ot-answer__status--error { color: var(--colour-danger-text); font-weight: 600; }
 
 /* A row the submit refused for (an unanswered required question), marked where it is so
    the checker does not scan the form for it. The autosave clears the mark when the row's
    answer next saves. Cells rather than the row, because the sheet rules every cell and a
    row background does not show through them. */
 .ot-checklist .ot-answer--missing > td,
-.ot-checklist .ot-answer--missing > th { background: #fdecea !important; }
-.ot-checklist .ot-answer--missing:not(tr) { background: #fdecea; }
+.ot-checklist .ot-answer--missing > th { background: var(--colour-danger-bg) !important; }
+.ot-checklist .ot-answer--missing:not(tr) { background: var(--colour-danger-bg); }
 
 .ot-checklist .ot-required {
   display: inline-block;
-  margin-left: 6px;
-  font-size: 8.5pt;
+  margin-left: var(--space-2);
+  font-size: var(--text-xs);
   font-weight: 400;
-  color: #595959;
+  color: var(--colour-text-muted);
   text-transform: none;
   letter-spacing: normal;
   background: none;
@@ -1386,7 +1625,18 @@ footer a:focus-visible, .footer a:focus-visible {
 .ot-required[hidden],
 .ot-checklist .ot-required[hidden] { display: none; }
 
+/* A page that fills its own margin boxes gets no browser print header or footer (date, title,
+   URL, page count) in Edge and Chrome, and keeps a real margin on every page. The empty boxes
+   are there only for that. */
+@page {
+  margin: 12mm 14mm;
+  @top-center { content: ""; }
+  @bottom-center { content: ""; }
+}
+
 @media print {
+  /* The platform's "This site is private" / "Signed in as" strip. */
+  #privateModeText,
   header[role="banner"],
   nav,
   footer,
@@ -1396,21 +1646,76 @@ footer a:focus-visible, .footer a:focus-visible {
   .ot-submit,
   .ot-notice,
   .ot-dialog,
+  .ot-char-count,
   .ot-checklist .ot-answer__status,
   .ot-checklist .ot-required { display: none !important; }
+  .ot-print-logo { display: block; margin: 0 0 12px; }
+  .ot-print-logo svg { display: block; height: 36px; width: auto; }
 
-  body { background: #fff; }
+  body,
+  .ot-page { background: #fff; }
   .ot-page { padding: 0; }
   .ot-page__inner { max-width: none; }
 
+  /* The checklist on paper is the V8 record, whatever the screen draws: Calibri on white,
+     every cell ruled in black, grey header and label bands, bold labels, square boxes, and
+     an answer as written text in its cell. Restated here in full rather than left to the
+     screen rules, so the paper cannot drift with the site's design. */
   .ot-checklist {
+    --line: #000;
+    --band: #d9d9d9;
+    --subband: #f2f2f2;
+    --ink: #000;
     max-width: none;
     padding: 0;
+    border: 0;
+    border-radius: 0;
     box-shadow: none;
     margin: 0;
+    background: #fff;
+    font-family: Calibri, "Segoe UI", Arial, sans-serif;
+    font-size: 11pt;
+    line-height: normal;
+    color: var(--ink);
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+
+  .ot-checklist .doc-footer { font-size: 9pt; color: #444; border-bottom-color: #bbb; padding-bottom: 4px; margin-bottom: 20px; }
+  .ot-checklist h1,
+  .ot-checklist h2 { font-family: inherit; font-weight: 700; color: var(--ink); }
+  .ot-checklist h1 { font-size: 16pt; margin: 0 0 18px; }
+  .ot-checklist h2 { font-size: 12pt; margin: 26px 0 8px; }
+  .ot-checklist .intro { font-size: 10.5pt; color: var(--ink); margin: 0 0 8px; }
+
+  .ot-checklist table { border-collapse: collapse; border: 0; border-radius: 0; margin-bottom: 6px; background: #fff; font-size: 10.5pt; }
+  .ot-checklist th,
+  .ot-checklist td { border: 1px solid var(--line); border-radius: 0; padding: 5px 7px; font-size: 10.5pt; }
+  .ot-checklist th { font-weight: 700; color: var(--ink); }
+  .ot-checklist .meta td { vertical-align: top; }
+  .ot-checklist .meta td.lbl { font-weight: 700; color: var(--ink); }
+  .ot-checklist .grid tr.section td { font-weight: 700; }
+  .ot-checklist .grid tr.lens td { color: var(--ink); font-size: 10pt; }
+  .ot-checklist .grid tr.lens em { font-weight: 700; }
+  .ot-checklist .ot-checklist-overview-items { font-size: 10.5pt; }
+  .ot-checklist .ot-remedial-form__note { color: var(--ink); }
+
+  .ot-checklist .cc-box { width: 13px; height: 13px; border: 1px solid #333; border-radius: 0; background: #fff; vertical-align: -2px; }
+  .ot-checklist .cc-box:checked,
+  .ot-checklist .cc-box:disabled:checked { background: #fff; border-color: #333; }
+  .ot-checklist .cc-box:checked::after { line-height: 11px; color: #000; }
+
+  .ot-checklist input[type="text"],
+  .ot-checklist input[type="email"],
+  .ot-checklist input[type="date"],
+  .ot-checklist input[type="number"],
+  .ot-checklist select,
+  .ot-checklist textarea { min-height: 0; border: 0; border-radius: 0; background: transparent; padding: 1px 0; color: var(--ink); -webkit-appearance: none; appearance: none; }
+
+  /* A status on paper is its words, framed in black: no fills. A grade keeps its mark. */
+  .ot-checklist .ot-badge { padding: 0 4px; border-color: #000; border-radius: 2px; background: none; color: #000; font-size: 9pt; }
+  .ot-checklist .ot-badge--done::before { display: none; }
+  .ot-checklist :is(.ot-badge--pass, .ot-badge--issues, .ot-badge--insufficient, .ot-badge--harm) { padding: 0; border: 0; font-size: 10.5pt; }
 
   .ot-checklist h2 { break-after: avoid; }
   .ot-checklist tr { break-inside: avoid; }
@@ -1448,6 +1753,10 @@ footer a:focus-visible, .footer a:focus-visible {
     padding: 4px 6px;
     border: 1px solid var(--line, #000);
   }
+
+  /* The checklist's boxes are framed on screen, so the script reads them as ruled; on paper
+     they stay unruled, the cell around them being the rule. */
+  .ot-checklist .ot-print-copy--ruled { padding: 1px 0; border: 0; }
 
   /* A worklist scrolls inside its card on screen. Paper cannot scroll: at landscape width
      the 34rem limit cut a long table off, remedial queries with it. */
@@ -1523,8 +1832,12 @@ footer a:focus-visible, .footer a:focus-visible {
   margin-bottom: var(--space-5);
 }
 
+/* A document table is never cut short: a worklist's 34rem scroll box would hide the last rows
+   of a long remediation inside the sheet. It still scrolls sideways on a narrow screen. */
 .ot-checklist .ot-table-wrap {
   margin-top: var(--space-5);
+  max-height: none;
+  overflow-y: visible;
 }
 
 .ot-checklist thead th {
@@ -1592,15 +1905,15 @@ footer a:focus-visible, .footer a:focus-visible {
 
 /* The same list inside the V8 document, where the card's own padding
    does not apply (project owner, 2026-09-19 - bullets there too, not
-   the ruled table this first drew). The sheet is Calibri at 10.5pt and
-   every other block in it is full-bleed, so the list takes no side
+   the ruled table this first drew). The sheet's text size is the body's
+   (10.5pt Calibri in print) and every other block in it is full-bleed, so the list takes no side
    gutter of its own: the padding is only what carries the markers
    clear of the left edge. Out-specifies Bootstrap's `ol,ul` reset,
    which is a single element selector. */
 .ot-checklist .ot-checklist-overview-items {
   margin: 0 0 6px;
   padding-left: 1.4em;
-  font-size: 10.5pt;
+  font-size: var(--text-base);
 }
 
 /* Kept in print: why a case was selected belongs on a printed record
@@ -1613,26 +1926,27 @@ footer a:focus-visible, .footer a:focus-visible {
    meant to hold a label above a control, and putting it on the control
    itself makes a flex container of an input.
 
-   Styled to disappear into the sheet. The header is a ruled table of
-   label and value cells, so an editable value should read as the value
-   it replaced - same face, same size, filling its cell - with just
-   enough of a border to say it can be typed in.
+   On screen the site's field, as every write-in box in the document is
+   (2026-11-24 redesign): same face and size as the value it replaced,
+   filling its cell, rounded and 2.75rem tall. In print it disappears
+   into the sheet again (below).
    ------------------------------------------------------------------ */
 
 .ot-checklist .ot-hdr-input {
   width: 100%;
+  min-height: 2.75rem;
   box-sizing: border-box;
   font-family: inherit;
-  font-size: 10.5pt;
+  font-size: var(--text-base);
   line-height: 1.3;
-  color: var(--ink, #1a1a1a);
-  background: #fff;
-  border: 1px solid var(--line, #b7bcbc);
-  border-radius: 2px;
-  padding: 2px 4px;
+  color: var(--colour-text);
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border-strong);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
 }
 
-.ot-checklist select.ot-hdr-input { padding: 1px 2px; }
+.ot-checklist select.ot-hdr-input { padding: 0 var(--space-2); }
 
 /* The header's status row carries only the autosave message, so it stays
    out of the way until there is one: a permanent "Header" row with an
@@ -1641,17 +1955,21 @@ footer a:focus-visible, .footer a:focus-visible {
 #ot-header-statusrow:has(#ot-header-status:empty) { display: none; }
 
 .ot-checklist .ot-hdr-input:focus-visible {
-  outline: 2px solid #005a9e;
-  outline-offset: -1px;
-  border-color: #005a9e;
+  outline: 2px solid var(--colour-focus);
+  outline-offset: 1px;
+  border-color: var(--colour-focus);
 }
 
 /* Printed, the header is a record rather than a form: the control's own
    frame would read as an empty box around a value that is filled in. */
 @media print {
   .ot-checklist .ot-hdr-input {
+    min-height: 0;
     border: 0;
+    border-radius: 0;
     padding: 0;
+    font-size: 10.5pt;
+    color: #000;
     background: transparent;
     -webkit-appearance: none;
     appearance: none;
@@ -1772,6 +2090,7 @@ footer a:focus-visible, .footer a:focus-visible {
 
 .ot-tax-notes__intro {
   color: var(--colour-text-muted);
+  font-size: var(--text-base);
   margin: 0 0 var(--space-3);
 }
 
@@ -1789,6 +2108,7 @@ footer a:focus-visible, .footer a:focus-visible {
 
 .ot-tax-notes__text {
   margin: 0;
+  font-size: var(--text-base);
   white-space: normal;
 }
 
@@ -2034,3 +2354,1216 @@ footer a:focus-visible, .footer a:focus-visible {
 }
 .ot-remedial__table th:nth-child(2),
 .ot-remedial__table td:nth-child(2) { width: 35%; }
+
+
+/* ------------------------------------------------------------------
+   Worklist components (2026-11-24 redesign). Shared by Cases, the
+   review lists and Remediation, so a list reads the same wherever it is.
+   ------------------------------------------------------------------ */
+
+.ot-muted { color: var(--colour-text-muted); }
+.ot-nowrap { white-space: nowrap; }
+
+/* Status tabs. The count sits in a pill that fills ink on the tab you are on; the tab
+   also carries aria-current, so the colour is never the only signal. */
+.ot-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) 0.25rem;
+  margin: 0 0 1.125rem;
+  border-bottom: 1px solid var(--colour-border);
+}
+
+.ot-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) 0.875rem 0.7rem;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  color: var(--colour-text-muted);
+  font-size: var(--text-base);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.ot-tab:hover { color: var(--colour-text); text-decoration: none; }
+.ot-tab:not(.ot-tab--empty) { color: var(--colour-text); }
+
+.ot-tab[aria-current='page'] {
+  color: var(--colour-text);
+  font-weight: 600;
+  border-bottom-color: var(--colour-action);
+}
+
+.ot-tab__count {
+  min-width: 1.75rem;
+  padding: 0 0.5rem;
+  border-radius: var(--radius-pill);
+  background: #e9edec;
+  color: var(--colour-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.ot-tab[aria-current='page'] .ot-tab__count { background: var(--colour-action); color: var(--colour-text-inverse); }
+
+/* My cases / All cases: two states of one list rather than a filter, so one control with
+   two halves, top right of the page. */
+.ot-scope {
+  display: inline-flex;
+  gap: 2px;
+  margin: 0;
+  padding: 3px;
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
+}
+
+.ot-scope__item {
+  padding: 0.45rem var(--space-4);
+  border-radius: calc(var(--radius-lg) - 3px);
+  color: var(--colour-text);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.ot-scope__item:hover { background: var(--colour-surface-hover); text-decoration: none; color: var(--colour-text); }
+.ot-scope__item[aria-current='page'],
+.ot-scope__item[aria-current='page']:hover { background: var(--colour-action); color: var(--colour-text-inverse); }
+
+/* The filter row: search, then each filter as a chip that names itself inline. */
+.ot-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.625rem;
+  margin-bottom: 1.25rem;
+}
+
+.ot-search {
+  position: relative;
+  flex: 0 1 20.625rem;
+  min-width: 14rem;
+  margin: 0;
+}
+
+/* A drawn magnifier: circle and handle, so no icon font is needed. */
+.ot-search::before,
+.ot-search::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+}
+
+.ot-search::before {
+  left: 0.85rem;
+  top: 50%;
+  width: 0.65rem;
+  height: 0.65rem;
+  margin-top: -0.42rem;
+  border: 1.5px solid var(--colour-text-muted);
+  border-radius: 50%;
+}
+
+.ot-search::after {
+  left: 1.38rem;
+  top: 50%;
+  width: 0.32rem;
+  height: 1.5px;
+  margin-top: 0.22rem;
+  background: var(--colour-text-muted);
+  transform: rotate(45deg);
+}
+
+.ot-search input,
+.ot-chip {
+  height: 2.125rem;
+  border: 1px solid var(--colour-border-strong);
+  border-radius: var(--radius);
+  background: var(--colour-surface);
+  color: var(--colour-text);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+}
+
+.ot-search input {
+  width: 100%;
+  padding: 0 var(--space-3) 0 2.2rem;
+}
+
+.ot-search input::placeholder { color: var(--colour-text-muted); opacity: 1; }
+
+.ot-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0 var(--space-3);
+  cursor: pointer;
+}
+
+.ot-chip, .ot-chip__label { font-weight: 400; }
+.ot-chip__label { color: var(--colour-text-muted); white-space: nowrap; }
+
+/* The select fills the chip, its own arrow replaced by a drawn chevron. */
+.ot-chip select {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--colour-text);
+  font: inherit;
+  padding: 0 1.4rem 0 0;
+  cursor: pointer;
+  max-width: 14rem;
+  field-sizing: content;
+}
+
+.ot-chip:has(select)::after {
+  content: '';
+  position: absolute;
+  right: var(--space-3);
+  top: 50%;
+  width: 0.4rem;
+  height: 0.4rem;
+  margin-top: -0.3rem;
+  border-right: 1.5px solid var(--colour-text-muted);
+  border-bottom: 1.5px solid var(--colour-text-muted);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
+.ot-chip:focus-within,
+.ot-search input:focus-visible {
+  outline: 2px solid var(--colour-focus);
+  outline-offset: 1px;
+}
+
+.ot-chip select:focus { outline: none; }
+
+/* The date range: one chip that opens to its two fields below it. */
+.ot-chip--dates { padding: 0; }
+.ot-chip--dates > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 100%;
+  padding: 0 var(--space-3);
+  list-style: none;
+  cursor: pointer;
+}
+.ot-chip--dates > summary::-webkit-details-marker { display: none; }
+.ot-chip--dates > summary:focus { outline: none; }
+.ot-chip__value { color: var(--colour-text); white-space: nowrap; }
+.ot-chip__panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 5;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+}
+.ot-chip__panel label { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin: 0; color: var(--colour-text-muted); }
+.ot-chip__panel input {
+  height: 2rem;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--colour-border-strong);
+  border-radius: var(--radius);
+  color: var(--colour-text);
+  font: inherit;
+}
+
+/* A small drawn calendar. */
+.ot-chip__icon {
+  width: 0.85rem;
+  height: 0.8rem;
+  border: 1.5px solid var(--colour-text-muted);
+  border-top-width: 3px;
+  border-radius: 2px;
+}
+
+/* Kept for a keyboard user, out of sight until it is focused. */
+.ot-toolbar__apply:not(:focus) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.ot-toolbar__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-left: auto;
+}
+
+.ot-toolbar__meta .ot-count { margin-left: 0; font-weight: 400; font-size: var(--text-sm); }
+.ot-toolbar__clear { color: var(--colour-text); font-weight: 600; text-decoration: none; }
+.ot-toolbar__clear:hover { text-decoration: underline; color: var(--colour-text); }
+
+/* A list in a card: the card draws the frame and the table fills it. */
+.ot-card--table { overflow: hidden; }
+.ot-card--table .ot-table-wrap { max-height: none; }
+
+/* A person's initials in a tinted circle. The tint comes from the name (OT Layout's script)
+   and means nothing; the name is always written beside it. */
+.ot-avatar {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 50%;
+  background: #dfe9e4;
+  color: var(--colour-text);
+  font-size: 0.5625rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.ot-avatar:empty { display: none; }
+.ot-avatar--0 { background: #f4ead3; }
+.ot-avatar--1 { background: #dcead8; }
+.ot-avatar--2 { background: #e3e0f3; }
+
+/* The header's own avatar is larger, on the ink. */
+.navbar .ot-avatar { width: 1.8rem; height: 1.8rem; font-size: var(--text-xs); }
+
+/* Checkers: one line per discipline, its name before the person. */
+.ot-people { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+.ot-people li { display: flex; align-items: center; gap: var(--space-2); white-space: nowrap; }
+.ot-people__role { min-width: 2.25rem; color: var(--colour-text-muted); font-size: var(--text-xs); }
+
+/* Nobody has picked this check up yet: a dashed outline, a place still to be filled. */
+.ot-unallocated {
+  display: inline-block;
+  padding: 0 0.55rem;
+  line-height: 1.2rem;
+  border: 1px dashed var(--colour-border-strong);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-style: normal;
+}
+
+/* The route as its steps: Tax, an arrow, AQS. */
+.ot-route { display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
+.ot-route__step {
+  padding: 0 0.45rem;
+  line-height: 1.25rem;
+  border: 1px solid var(--colour-border-strong);
+  border-radius: var(--radius);
+  background: var(--colour-surface);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.ot-route__arrow {
+  position: relative;
+  width: 0.55rem;
+  height: 1px;
+  background: var(--colour-text-muted);
+}
+
+.ot-route__arrow::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: -0.17rem;
+  width: 0.35rem;
+  height: 0.35rem;
+  border-top: 1.5px solid var(--colour-text-muted);
+  border-right: 1.5px solid var(--colour-text-muted);
+  transform: rotate(45deg);
+}
+
+/* A due date that has passed: "N days overdue" in words under it. */
+.ot-overdue { display: block; color: var(--colour-danger-text); font-weight: 600; font-size: var(--text-sm); }
+.ot-overdue:empty { display: none; }
+
+@media (max-width: 60rem) {
+  .ot-page__header { flex-direction: column; align-items: flex-start; }
+  .ot-toolbar__meta { margin-left: 0; }
+  .ot-header__product { display: none; }
+}
+
+
+/* ------------------------------------------------------------------
+   Review lists (2026-11-24 redesign). OT Review List: the Tax and AQS
+   reviews pages. Work still to do as wide cards, submitted work in a table.
+   ------------------------------------------------------------------ */
+
+.ot-reviews { margin-bottom: var(--space-6); }
+
+.ot-reviews__heading {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-heading);
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.ot-reviews__count { color: var(--colour-text-muted); font-size: var(--text-sm); font-weight: 400; }
+.ot-reviews__summary { margin: calc(var(--space-2) * -1) 0 var(--space-5); color: var(--colour-text-muted); }
+
+.ot-review-cards { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); }
+
+/* A review still to finish: the gold edge marks it as yours to pick up. */
+.ot-review-card {
+  display: grid;
+  grid-template-columns: minmax(11rem, 1.1fr) minmax(11rem, 1fr) minmax(14rem, 1.3fr) minmax(10rem, 0.9fr) auto;
+  align-items: center;
+  gap: var(--space-4) var(--space-5);
+  padding: 1.125rem var(--space-5) 1.125rem 1.375rem;
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-left: 4px solid var(--brand-gold);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.ot-review-card__case .ot-service-ref { margin-top: var(--space-1); }
+.ot-review-card__case .ot-badge { margin-top: var(--space-2); }
+
+/* Element-qualified so it outranks the stock theme's a:not(.btn) underline. */
+.ot-review-card__ref,
+a.ot-review-card__ref {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1.875rem;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--colour-text);
+  text-decoration: none;
+}
+
+a.ot-review-card__ref:hover { text-decoration: underline; color: var(--colour-text); }
+a.ot-review-card__go,
+.ot-reviews__pager a.ot-btn { text-decoration: none; }
+
+.ot-review-card__field { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); min-width: 0; }
+.ot-review-card__field .ot-route { margin-bottom: var(--space-2); }
+.ot-review-card__label { color: var(--colour-text-muted); font-size: var(--text-sm); }
+.ot-review-card__value { font-weight: 600; font-size: 0.9375rem; }
+.ot-review-card__field { font-size: var(--text-sm); }
+
+.ot-review-card__go { display: inline-flex; align-items: center; gap: var(--space-2); justify-self: end; white-space: nowrap; }
+
+/* A drawn arrow, as the route's: a shaft and a head. */
+.ot-review-card__arrow { position: relative; width: 0.75rem; height: 1.5px; background: currentColor; }
+.ot-review-card__arrow::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: -0.19rem;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-top: 1.5px solid currentColor;
+  border-right: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+
+/* Positioned, so the visually hidden spans in the cells scroll with the table instead of
+   escaping it and widening the whole page on a phone. */
+.ot-reviews .ot-table-wrap { position: relative; }
+.ot-reviews .ot-table td { vertical-align: middle; }
+.ot-reviews .ot-table td .ot-badge { margin-top: var(--space-1); }
+.ot-reviews__action { text-align: right; }
+.ot-reviews__action .ot-btn { white-space: nowrap; padding: 0.35rem 0.75rem; font-size: var(--text-base); font-weight: 600; }
+
+/* Submitted on: a green tick before the date. */
+.ot-submitted { display: inline-flex; align-items: center; gap: var(--space-2); font-weight: 500; }
+.ot-submitted::before {
+  content: '';
+  width: 0.6rem;
+  height: 0.32rem;
+  border-left: 1.5px solid var(--colour-pass-text);
+  border-bottom: 1.5px solid var(--colour-pass-text);
+  transform: rotate(-45deg) translate(1px, -2px);
+}
+
+/* Waiting for AQS on the queue tabs: the days, and under them a bar the longest wait on
+   the page fills. A case past its due date draws the bar in the danger colour; the due
+   date beside it says so in words, so colour is never the only signal. */
+.ot-wait { display: inline-flex; flex-direction: column; gap: 0.4rem; }
+.ot-wait strong { font-weight: 600; white-space: nowrap; }
+.ot-wait__bar { display: block; width: 9rem; max-width: 100%; height: 4px; border-radius: var(--radius-pill); background: #e9edec; overflow: hidden; }
+.ot-wait__fill { display: block; width: 0; height: 100%; border-radius: inherit; background: var(--colour-action); }
+.ot-wait--late .ot-wait__fill { background: var(--colour-danger-text); }
+
+/* The pager sits under the lists rather than inside a card. */
+.ot-reviews__pager { padding: 0; border-top: 0; }
+
+@media (max-width: 72rem) {
+  .ot-review-card { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ot-review-card__go { justify-self: start; }
+}
+
+@media (max-width: 40rem) {
+  .ot-review-card { grid-template-columns: minmax(0, 1fr); padding-left: var(--space-5); }
+  .ot-review-card .ot-people li { white-space: normal; }
+}
+
+/* Remediation (2026-11-24 redesign) */
+/* ------------------------------------------------------------------
+   OT Remediation: the list of cases in remediation, and one case's
+   remediation as a summary card over two columns - a card per check on
+   the left, sign-off, follow-up and the regraded outcome on the right.
+   ------------------------------------------------------------------ */
+
+/* The list: how many actions are done, in words, with a bar under an outstanding count. */
+.ot-rem-count { display: inline-flex; align-items: center; gap: var(--space-2); font-weight: 500; white-space: nowrap; }
+.ot-rem-count--open { color: var(--colour-danger-text); }
+.ot-rem-count--done { color: var(--colour-text); }
+.ot-rem-count--done::before {
+  content: '';
+  width: 0.6rem;
+  height: 0.32rem;
+  border-left: 1.5px solid var(--colour-pass-text);
+  border-bottom: 1.5px solid var(--colour-pass-text);
+  transform: rotate(-45deg) translate(1px, -1px);
+}
+
+/* A progress bar: the track, and a fill as wide as the share complete. Decoration - the
+   count beside it always says the same thing in words. */
+.ot-rem-bar {
+  display: block;
+  width: 8.5rem;
+  max-width: 100%;
+  height: 0.375rem;
+  margin-top: var(--space-2);
+  border-radius: var(--radius-pill);
+  background: #e6ebea;
+  overflow: hidden;
+}
+.ot-rem-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--colour-action); }
+
+/* The row's chevron: a drawn arrow, the reference link being the one to reach by keyboard. */
+.ot-rem-table td.ot-rem-go { width: 2.5rem; padding-left: 0; text-align: right; }
+.ot-rem-table .ot-rem-go a { border: 0; display: inline-flex; padding: var(--space-2); color: var(--colour-text-muted); }
+.ot-rem-go__chevron {
+  display: block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-top: 1.5px solid currentColor;
+  border-right: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+.ot-rem-table tbody tr:hover .ot-rem-go a { color: var(--colour-text); }
+
+/* How age is counted, said once under the list or the actions rather than in a banner. */
+.ot-rem-footnote {
+  max-width: 48rem;
+  margin: calc(-1 * var(--space-2)) 0 var(--space-5);
+  color: var(--colour-text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.ot-rem__checks .ot-rem-footnote { margin-top: 0; }
+
+/* Open the full case record: a drawn box with an arrow leaving it. */
+html body a.ot-rem-open { text-decoration: none; }
+.ot-rem-open__icon {
+  position: relative;
+  flex: none;
+  width: 0.95rem;
+  height: 0.95rem;
+}
+.ot-rem-open__icon::before {
+  content: '';
+  position: absolute;
+  inset: 0.2rem 0.2rem 0 0;
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+  clip-path: polygon(0 0, 45% 0, 45% 45%, 100% 45%, 100% 100%, 0 100%);
+}
+.ot-rem-open__icon::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-top: 1.5px solid currentColor;
+  border-right: 1.5px solid currentColor;
+  background: linear-gradient(to bottom left, transparent calc(50% - 0.75px), currentColor calc(50% - 0.75px), currentColor calc(50% + 0.75px), transparent calc(50% + 0.75px));
+}
+
+/* The record's header line on paper only; on screen the page title says it. */
+.ot-rem-print-head { display: none; }
+
+/* The case in one row: Case and its status, Client, Adviser, Initial outcome, Checklist version. */
+.ot-card.ot-rem-summary > .ot-rem-summary__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4) 3.5rem;
+  margin: 0;
+  padding: var(--space-5) 1.75rem;
+}
+.ot-rem-summary__list div { margin: 0; }
+.ot-rem-summary__list dt { margin-bottom: var(--space-1); color: var(--colour-text-muted); font-size: var(--text-sm); font-weight: 400; }
+.ot-rem-summary__list dd { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0; font-size: var(--text-base); font-weight: 600; }
+.ot-rem-summary__list dd .ot-badge { font-size: var(--text-sm); }
+.ot-rem-summary__list dd .ot-badge--pass,
+.ot-rem-summary__list dd .ot-badge--issues,
+.ot-rem-summary__list dd .ot-badge--insufficient,
+.ot-rem-summary__list dd .ot-badge--harm { font-size: var(--text-base); font-weight: 500; }
+
+/* Two columns: the checks, and what is decided about them. */
+.ot-rem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(20rem, 25rem);
+  gap: var(--space-5);
+  align-items: start;
+}
+.ot-rem > :only-child { grid-column: 1 / -1; }
+.ot-rem__main,
+.ot-rem__side { min-width: 0; }
+
+/* A check: its name and issue count, a progress bar, a line of facts, then its actions. */
+.ot-card.ot-rem-check { overflow: hidden; }
+.ot-card.ot-rem-check > * { padding-left: 1.375rem; padding-right: 1.375rem; }
+.ot-card.ot-rem-check > .ot-rem-check__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-5);
+  padding-top: 0.875rem;
+  padding-bottom: 0.875rem;
+  background: var(--colour-surface-sunken);
+  border-bottom: 1px solid var(--colour-border);
+}
+.ot-rem-check__title { margin: 0; font-family: var(--font-heading); font-size: 0.9375rem; font-weight: 600; }
+.ot-rem-check__count { margin-left: var(--space-3); color: var(--colour-text-muted); font-size: var(--text-sm); font-weight: 400; }
+.ot-rem-check--settled .ot-rem-check__head { background: var(--colour-surface); }
+
+.ot-rem-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ot-rem-progress .ot-rem-bar { width: 9.5rem; margin: 0; }
+.ot-rem-progress--done { color: var(--colour-pass-text); }
+.ot-rem-progress--done .ot-rem-bar > span { background: var(--colour-pass-text); }
+
+.ot-card.ot-rem-check > .ot-rem-check__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-6);
+  margin: 0;
+  padding-top: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--colour-border);
+}
+.ot-rem-check__meta div,
+.ot-rem-item__meta div { display: flex; flex-wrap: wrap; gap: 0 var(--space-2); margin: 0; }
+.ot-rem-check__meta dt { color: var(--colour-text-muted); font-weight: 400; }
+.ot-rem-check__meta dd { margin: 0; font-weight: 600; }
+
+/* One remedial action. Its numbered issues in bold, the remedial action under them, the
+   answers and facts in smaller text, and the status and target date on the right. */
+.ot-card.ot-rem-check > .ot-rem-list { margin: 0; padding: 0; list-style: none; }
+.ot-rem-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-1) var(--space-6);
+  padding: 0.75rem 1.375rem;
+  border-bottom: 1px solid var(--colour-border);
+}
+.ot-rem-item:last-child { border-bottom: 0; }
+
+.ot-rem-item__issue {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-base);
+  line-height: 1.45;
+}
+.ot-rem-item__issue strong { font-weight: 600; }
+.ot-rem-item__no {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: #eef1f0;
+  color: var(--colour-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  transform: translateY(-0.1rem);
+}
+
+/* Everything under the issues lines up with their text, past the number. */
+.ot-rem-item__answer,
+.ot-rem-item__meta { margin-left: calc(1.6rem + var(--space-3)); }
+.ot-rem-item__text { color: var(--colour-text-muted); font-size: var(--text-sm); }
+
+/* A finished row with nothing to add: its issue, its remedial action, its status and date. */
+.ot-rem-item--quiet .ot-rem-item__performed,
+.ot-rem-item--quiet .ot-rem-item__meta { display: none; }
+.ot-rem-item__text .ot-rte__read { max-height: none; color: var(--colour-text); }
+.ot-rem-item__performed { margin-top: var(--space-2); font-size: var(--text-sm); }
+.ot-rem-item__label { margin-right: var(--space-1); color: var(--colour-text-muted); font-size: var(--text-sm); font-weight: 400; }
+.ot-rem-item__answer .ot-response-cell { margin-top: var(--space-3); }
+.ot-rem-item__answer .ot-performed legend {
+  float: left;
+  width: auto;
+  margin: 0 var(--space-3) 0 0;
+  padding: 0;
+  border: 0;
+  font-size: var(--text-sm);
+  line-height: inherit;
+}
+.ot-rem-item__answer .ot-response-cell > label.ot-rem-item__label { display: block; margin-bottom: var(--space-1); }
+.ot-rem-item__answer .ot-response-cell > .ot-remedial-form__note {
+  display: block;
+  margin-top: var(--space-2);
+  color: var(--colour-text-muted);
+  font-size: var(--text-sm);
+  font-style: normal;
+}
+.ot-rem-item__answer .ot-response-cell__text {
+  display: block;
+  min-width: 0;
+  margin-top: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--colour-border-strong);
+  border-radius: var(--radius);
+  font-size: var(--text-base);
+}
+.ot-rem-item__answer .ot-response-history { margin-top: var(--space-2); }
+
+.ot-rem-item__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-5);
+  margin-top: var(--space-2);
+  margin-bottom: 0;
+  font-size: var(--text-sm);
+}
+.ot-rem-item__meta dt { color: var(--colour-text-muted); font-weight: 400; }
+.ot-rem-item__meta dd { margin: 0; }
+
+/* Fixed columns, so the status pills and dates line up down the card. */
+.ot-rem-item__aside {
+  display: grid;
+  grid-template-columns: 8.5rem 6rem;
+  align-items: center;
+  justify-items: start;
+  gap: var(--space-3);
+  align-self: start;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.ot-rem-item__aside .ot-badge { font-size: var(--text-sm); }
+.ot-rem-item__aside > :last-child { justify-self: end; }
+.ot-rem__checks > .ot-form-submit .ot-form-submit__hint { font-style: normal; font-size: var(--text-sm); color: var(--colour-text-muted); }
+
+/* The adviser's one button for the whole form, under the checks. */
+.ot-rem__checks > .ot-form-submit {
+  margin: 0 0 var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
+}
+
+/* The right-hand cards. */
+.ot-card.ot-rem-card > * { padding-left: 1.375rem; padding-right: 1.375rem; }
+.ot-card.ot-rem-card > :first-child { padding-top: var(--space-5); }
+.ot-card.ot-rem-card > :last-child { padding-bottom: var(--space-5); }
+.ot-rem-card__title { margin: 0 0 var(--space-4); font-family: var(--font-heading); font-size: var(--text-lg); font-weight: 600; }
+.ot-rem-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-2);
+}
+.ot-rem-card__head .ot-rem-card__title { margin: 0; }
+.ot-rem-card__value { font-weight: 600; text-align: right; }
+.ot-rem-card__value .ot-remedial-form__note { font-style: normal; font-size: var(--text-sm); color: var(--colour-text-muted); }
+.ot-card.ot-rem-card > .ot-rem-card__note { margin: 0 0 var(--space-3); color: var(--colour-text-muted); font-size: var(--text-sm); }
+.ot-card.ot-rem-card > .ot-rem-card__note:last-child { margin-bottom: 0; }
+
+/* Sign-off: each signatory with a tick once signed, an empty circle until then. */
+.ot-rem-sign { display: grid; gap: var(--space-4); margin: 0 0 var(--space-4); }
+.ot-rem-sign__item {
+  display: grid;
+  grid-template-columns: 1.75rem minmax(0, 1fr);
+  column-gap: var(--space-3);
+  margin: 0;
+}
+.ot-rem-sign__item::before {
+  content: '';
+  grid-row: 1 / span 2;
+  width: 1.6rem;
+  height: 1.6rem;
+  margin-top: 0.1rem;
+  border: 1.5px dashed var(--colour-border-strong);
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+.ot-rem-sign__item--done::before {
+  border: 0;
+  background: var(--colour-pass-text);
+}
+.ot-rem-sign__item--done::after {
+  content: '';
+  grid-row: 1;
+  grid-column: 1;
+  justify-self: center;
+  width: 0.6rem;
+  height: 0.32rem;
+  margin-top: 0.62rem;
+  border-left: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  transform: rotate(-45deg);
+}
+.ot-rem-sign__item::before { grid-column: 1; }
+.ot-rem-sign dt { grid-column: 2; grid-row: 1; font-weight: 600; }
+.ot-rem-sign dd { grid-column: 2; grid-row: 2; margin: 0; color: var(--colour-text-muted); }
+.ot-rem-sign .ot-signoff-trail__entry { color: var(--colour-text-muted); }
+
+/* Follow-up: the four answers, question above answer, ruled apart. */
+.ot-rem-qa { margin: 0; }
+.ot-rem-qa > div { margin: 0; padding: var(--space-3) 0; border-bottom: 1px solid var(--colour-border); }
+.ot-rem-qa > div:first-child { padding-top: 0; }
+.ot-rem-qa > div:last-child { border-bottom: 0; padding-bottom: 0; }
+.ot-rem-qa dt { margin-bottom: var(--space-1); color: var(--colour-text-muted); font-size: var(--text-sm); font-weight: 400; }
+.ot-rem-qa dd { margin: 0; font-weight: 600; }
+.ot-rem-qa dd .ot-muted { color: var(--colour-text-muted); font-weight: 400; }
+
+/* Regraded outcome: a warm tint, the card where the case's final grade is set. */
+.ot-card.ot-rem-card--regrade { background: #fdfaf2; border-color: #efe5cf; }
+
+/* The sign-off and regrade forms inside a card: fields stacked, the button at the end. */
+.ot-card.ot-rem-card > .ot-form-submit {
+  display: grid;
+  gap: var(--space-3);
+  margin: var(--space-4) 1.75rem 0;
+  padding: var(--space-4) 0 0;
+  border-top: 1px solid var(--colour-border);
+  justify-content: stretch;
+  text-align: left;
+}
+.ot-card.ot-rem-card > .ot-form-submit:last-child { margin-bottom: var(--space-5); }
+.ot-rem-card .ot-form-submit > .ot-btn { justify-self: end; }
+.ot-rem-card .ot-form-submit__hint { font-style: normal; font-size: var(--text-sm); color: var(--colour-text-muted); }
+.ot-card.ot-rem-card--regrade .ot-form-submit { border-top-color: #efe5cf; }
+.ot-rem-card--regrade .ot-field input,
+.ot-rem-card--regrade .ot-field select,
+.ot-rem-card--regrade .ot-field textarea { background: var(--colour-surface); }
+
+@media (max-width: 75rem) {
+  .ot-rem { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 40rem) {
+  .ot-card.ot-rem-summary > .ot-rem-summary__list { gap: var(--space-4) var(--space-5); padding: var(--space-4); }
+  .ot-card.ot-rem-check > *,
+  .ot-card.ot-rem-card > *,
+  .ot-rem-item { padding-left: var(--space-4); padding-right: var(--space-4); }
+  .ot-rem-item { grid-template-columns: minmax(0, 1fr); }
+  .ot-rem-item__aside { margin-left: calc(1.6rem + var(--space-3)); }
+  .ot-rem-progress .ot-rem-bar { width: 6rem; }
+}
+
+@media print {
+  .ot-rem-print-head {
+    display: block;
+    margin: 0 0 12px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #bbb;
+    color: #444;
+    font-size: 9pt;
+  }
+
+  /* Paper has no buttons, search or status lines; the record is what was decided. */
+  .ot-rem-open,
+  .ot-rem-footnote,
+  .ot-rem-go,
+  .ot-toolbar,
+  .ot-rem .ot-btn,
+  .ot-rem .ot-response__status { display: none !important; }
+
+  .ot-rem { display: block; }
+  .ot-rem-summary,
+  .ot-rem-check,
+  .ot-rem-card,
+  .ot-rem__checks > .ot-form-submit { box-shadow: none; border-color: #999; }
+  .ot-rem-item,
+  .ot-rem-card,
+  .ot-rem-check__head { break-inside: avoid; }
+  .ot-rem-item__text { color: #000; }
+
+  .ot-rem-bar,
+  .ot-rem-item__no,
+  .ot-rem-check__head,
+  .ot-rem-sign__item,
+  .ot-rem-card--regrade {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .ot-rem-table thead th { position: static; }
+}
+
+/* Case detail (2026-11-24 redesign) */
+/* ------------------------------------------------------------------
+   OT Case Detail: the page header (Cases > reference, Save as PDF top
+   right), the Remediation page's summary card, then the case as the V8
+   document (.ot-checklist, styled above). On paper only the document
+   prints: the summary repeats it and the header is the page's chrome.
+   ------------------------------------------------------------------ */
+
+/* Save as PDF: a drawn arrow down onto a line. */
+.ot-case-print__icon { position: relative; flex: none; width: 0.85rem; height: 0.95rem; border-bottom: 1.5px solid currentColor; }
+.ot-case-print__icon::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 1.5px;
+  height: 0.6rem;
+  margin-left: -0.75px;
+  background: currentColor;
+}
+.ot-case-print__icon::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0.22rem;
+  width: 0.4rem;
+  height: 0.4rem;
+  margin-left: -0.2rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+.ot-page__actions .ot-print-action { gap: var(--space-2); }
+
+/* The summary card's checkers and due date read at body size under their labels. */
+.ot-case-summary .ot-people li { font-size: var(--text-base); font-weight: 500; }
+.ot-case-summary .ot-unallocated,
+.ot-case-summary .ot-checker--na { font-weight: 400; }
+.ot-rem-summary__list dd.ot-case-summary__due { flex-direction: column; align-items: flex-start; gap: 0; }
+
+/* The document's own title repeats the page title and the summary card on screen; it is the
+   record's heading on paper, so it prints. */
+@media not print {
+  .ot-case-doc > h1 { display: none; }
+}
+
+/* A table straight under its heading sits under it, not a section's gap below. */
+.ot-checklist h2 + .ot-table-wrap { margin-top: 0; }
+
+/* The remediation's outcome as grade marks, one after another. */
+.ot-case-doc__grades .ot-badge + .ot-badge { margin-left: var(--space-4); }
+
+/* The AQS check's notes sit in the document as one of its sections, not a card inside it. */
+.ot-checklist .ot-aqs-notes { margin: 0; border: 0; border-radius: 0; box-shadow: none; background: none; }
+.ot-checklist .ot-aqs-notes > * { padding-left: 0; padding-right: 0; }
+.ot-checklist .ot-aqs-notes > .ot-card__title { display: block; padding: 0; border: 0; background: none; border-radius: 0; }
+
+@media print {
+  .ot-case-summary,
+  .ot-page__inner:has(.ot-case-doc) .ot-page__header { display: none !important; }
+}
+
+/* Review form (2026-11-24 redesign) */
+/* ------------------------------------------------------------------
+   OT Review Detail: the checker's form at /review. The case page's
+   header and summary card, the V8 document (.ot-checklist, styled
+   above and untouched here), then the cards a checker finishes with -
+   who carries the fail, the remedial actions, submit - in the
+   Remediation page's card, field and button styles. Sentence-case
+   labels throughout. On paper the document prints as the ruled record;
+   the buttons, the notices and the submit card do not.
+   ------------------------------------------------------------------ */
+
+/* The summary carries more facts than the case page's, so it wraps on a slightly tighter gap. */
+.ot-card.ot-review-summary > .ot-rem-summary__list { gap: var(--space-4) 3rem; }
+/* The case page's checkers, at body size under their label. Not .ot-case-summary itself:
+   that card is left off the paper, and this one prints. */
+.ot-review-summary .ot-people li { font-size: var(--text-base); font-weight: 500; }
+.ot-review-summary .ot-unallocated,
+.ot-review-summary .ot-checker--na { font-weight: 400; }
+
+/* The page's notices (submitted, someone else's, no longer checking, the cache lag): a tinted
+   band like the case pages' cards rather than a ruled amber box. [hidden] still hides the
+   cache notice: nothing here sets display. */
+.ot-review-summary ~ .ot-notice {
+  padding: var(--space-3) var(--space-5);
+  border: 1px solid #efe0bd;
+  border-radius: var(--radius-lg);
+  background: var(--colour-warn-bg);
+  color: var(--colour-text);
+  font-size: var(--text-base);
+  line-height: 1.5;
+}
+
+/* Checklist Items: what the paraplanner ticked, as chips. */
+.ot-card.ot-checklist-overview > .ot-checklist-overview-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  list-style: none;
+}
+.ot-card.ot-checklist-overview .ot-checklist-overview-items li {
+  margin: 0;
+  padding: 0.3rem 0.8rem;
+  border-radius: var(--radius-pill);
+  background: var(--colour-chip);
+  color: var(--colour-chip-text);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+/* The finishing cards: an intro in body text, muted, as Remediation's card notes read. */
+.ot-card.ot-accountability > p,
+.ot-card.ot-remedial > p,
+.ot-card.ot-submit > p { margin: 0; }
+.ot-card.ot-accountability > p:not([aria-live]),
+.ot-card.ot-remedial > p:not([aria-live]),
+.ot-card.ot-submit > p:not([aria-live]) {
+  max-width: 52rem;
+  color: var(--colour-text-muted);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: 1.55;
+}
+.ot-card.ot-accountability > p:first-of-type,
+.ot-card.ot-remedial > p:first-of-type,
+.ot-card.ot-submit > p:first-of-type { padding-top: var(--space-4); }
+.ot-card.ot-accountability > :last-child,
+.ot-card.ot-remedial > :last-child,
+.ot-card.ot-submit > :last-child { padding-bottom: var(--space-5); }
+
+/* Saving and saved lines under a card: small, muted, coloured only when they matter. */
+.ot-card > p.ot-accountability__status { margin: var(--space-3) 0 0; font-family: var(--font-body); font-size: var(--text-sm); }
+.ot-card > p.ot-accountability__status:empty { margin-top: 0; }
+.ot-inline-status--info { color: var(--colour-text-muted); }
+.ot-inline-status--success { color: var(--colour-pass-text); font-weight: 600; }
+.ot-inline-status--error { color: var(--colour-danger-text); font-weight: 600; }
+
+/* Who carries this fail: the two disciplines as tinted panels, each a heading over its ticks
+   and its search boxes. */
+.ot-accountability .ot-accountability__grid { gap: var(--space-4); margin-top: var(--space-4); }
+.ot-accountability .ot-accountability__set {
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--colour-surface-sunken);
+}
+.ot-accountability .ot-accountability__set legend {
+  float: left;
+  width: 100%;
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  border: 0;
+  color: var(--colour-text);
+  font-family: var(--font-heading);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  line-height: 1.4;
+}
+.ot-accountability .ot-accountability__set legend + * { clear: both; }
+.ot-accountability .ot-accountability__set .opt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-2) 0;
+  color: var(--colour-text);
+  font-size: var(--text-base);
+  font-weight: 500;
+  cursor: pointer;
+}
+.ot-accountability .ot-accountability__set .opt input {
+  flex: none;
+  width: 1.05rem;
+  height: 1.05rem;
+  margin: 0;
+  accent-color: var(--colour-action);
+}
+.ot-accountability .ot-accountability__person { gap: var(--space-1); margin: var(--space-3) 0 0; font-weight: 400; }
+.ot-accountability .ot-accountability__person > span {
+  color: var(--colour-text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+}
+.ot-accountability .ot-accountability__person .ot-hdr-input {
+  width: 100%;
+  min-height: 2.75rem;
+  box-sizing: border-box;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--colour-border-strong);
+  border-radius: var(--radius);
+  background: var(--colour-surface);
+  color: var(--colour-text);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+}
+.ot-accountability .ot-accountability__person .ot-hdr-input:focus-visible {
+  outline: 2px solid var(--colour-focus);
+  outline-offset: 1px;
+  border-color: var(--colour-focus);
+}
+.ot-accountability .ot-accountability__person .ot-hdr-input:disabled { background: var(--colour-surface-sunken); color: var(--colour-text-muted); }
+.ot-card.ot-accountability > .ot-accountability__note { margin-top: var(--space-4); font-size: var(--text-sm); }
+.ot-card.ot-accountability > .ot-notice { margin: var(--space-4) var(--space-5) 0; padding: var(--space-3) var(--space-4); }
+
+/* Fail points and remedial actions: the table runs the card's width and grows with its rows
+   rather than scrolling inside the card; each remedial action is a rounded field with a quiet
+   toolbar, its further-action button under it. */
+.ot-card.ot-remedial > .ot-table-wrap { max-height: none; overflow-y: visible; margin-top: var(--space-4); border-top: 1px solid var(--colour-border); }
+.ot-remedial .ot-remedial__table tbody tr:hover { background: none; }
+.ot-remedial .ot-remedial__table td { vertical-align: top; }
+.ot-remedial .ot-remedial__table td:first-child { color: var(--colour-text-muted); font-variant-numeric: tabular-nums; }
+.ot-remedial .ot-remedial__table td:nth-child(2) { font-weight: 600; }
+.ot-remedial .ot-rte {
+  overflow: hidden;
+  border: 1px solid var(--colour-border-strong);
+  border-radius: var(--radius);
+  background: var(--colour-surface);
+}
+.ot-remedial .ot-rte:focus-within { border-color: var(--colour-focus); }
+.ot-remedial .ot-rte__bar {
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--colour-border);
+  background: var(--colour-surface-sunken);
+}
+.ot-remedial .ot-rte__btn {
+  min-width: 2rem;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--colour-text);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+}
+.ot-remedial .ot-rte__btn:hover { border-color: var(--colour-border); background: var(--colour-surface); }
+.ot-remedial .ot-rte__btn:focus-visible { outline: 2px solid var(--colour-focus); outline-offset: 1px; }
+.ot-remedial .ot-rte__area {
+  min-height: 6rem;
+  padding: var(--space-3);
+  color: var(--colour-text);
+  font-size: var(--text-base);
+}
+.ot-remedial .ot-rte__area:focus-visible { outline: 0; }
+.ot-remedial .ot-rte__read { font-size: var(--text-base); }
+/* The theme sizes p and li on their own; inside an answer they read at the answer's size. */
+.ot-remedial .ot-rte__area p,
+.ot-remedial .ot-rte__area li,
+.ot-remedial .ot-rte__read p,
+.ot-remedial .ot-rte__read li { font-family: var(--font-body); font-size: inherit; }
+.ot-remedial .ot-char-count { margin: 0; padding: 0 var(--space-3) var(--space-2); color: var(--colour-text-muted); font-family: var(--font-body); font-size: var(--text-xs); }
+.ot-remedial .ot-remedial__table .ot-btn { margin-top: var(--space-3); padding: 0.4rem 0.8rem; font-size: var(--text-sm); }
+.ot-card.ot-remedial > .ot-field { max-width: 26rem; margin-top: var(--space-4); }
+
+/* Submit this review: the card the check ends on, in the warm tint of Remediation's regrade
+   card, its button beside what submitting does. */
+.ot-card.ot-submit[data-ot-submit] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-5);
+  border-color: #efe5cf;
+  background: #fdfaf2;
+}
+.ot-card.ot-submit[data-ot-submit] > .ot-card__title { grid-column: 1 / -1; border-bottom-color: #efe5cf; background: transparent; }
+.ot-card.ot-submit[data-ot-submit] > p { padding-top: var(--space-4); }
+.ot-card.ot-submit[data-ot-submit] > .ot-submit__status { grid-column: 1 / -1; min-height: 0; padding-top: var(--space-3); }
+.ot-card.ot-submit[data-ot-submit] > .ot-submit__status:empty { padding-top: 0; }
+.ot-card.ot-submit .ot-note--blocked { color: var(--colour-danger-text); }
+
+/* Back to your queue, at the foot of the form. */
+.ot-review-summary ~ .ot-page-foot { margin: var(--space-5) 0 0; }
+
+@media (max-width: 40rem) {
+  .ot-review-summary ~ .ot-notice { padding: var(--space-3) var(--space-4); }
+  .ot-card.ot-checklist-overview > .ot-checklist-overview-items,
+  .ot-accountability .ot-accountability__set { padding-left: var(--space-4); padding-right: var(--space-4); }
+  .ot-accountability .ot-accountability__grid { grid-template-columns: minmax(0, 1fr); }
+
+  /* The remedial table as one block per fail point: its number and name, then the box. */
+  [data-ot-remedial] .ot-remedial__table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  [data-ot-remedial] .ot-remedial__table,
+  [data-ot-remedial] .ot-remedial__table tbody { display: block; }
+  [data-ot-remedial] .ot-remedial__table tr {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: var(--space-3);
+    padding: var(--space-4);
+    border-bottom: 1px solid var(--colour-border);
+  }
+  [data-ot-remedial] .ot-remedial__table tr:last-child { border-bottom: 0; }
+  [data-ot-remedial] .ot-remedial__table td,
+  [data-ot-remedial] .ot-remedial__table td:first-child,
+  [data-ot-remedial] .ot-remedial__table td:nth-child(2) { width: auto; padding: 0; border: 0; }
+  [data-ot-remedial] .ot-remedial__table td:nth-child(3) { grid-column: 1 / -1; margin-top: var(--space-3); }
+
+  .ot-card.ot-submit[data-ot-submit] { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media print {
+  /* Paper has no buttons: the actions top right and the way back to the queue. */
+  .ot-page__inner:has(.ot-review-summary) .ot-page__actions,
+  .ot-review-summary ~ .ot-page-foot,
+  .ot-remedial .ot-btn { display: none !important; }
+
+  .ot-review-summary,
+  .ot-accountability,
+  .ot-remedial,
+  .ot-checklist-overview { box-shadow: none; border-color: #999; break-inside: avoid; }
+
+  /* The ticked items as the plain list the paper form has. */
+  .ot-card.ot-checklist-overview > .ot-checklist-overview-items { display: block; padding-left: calc(var(--space-5) + 1.25em); list-style: disc; }
+  .ot-card.ot-checklist-overview .ot-checklist-overview-items li { padding: 0; border-radius: 0; background: none; color: #000; font-size: 10.5pt; font-weight: 400; }
+
+  .ot-accountability .ot-accountability__set { border: 1px solid #999; background: none; }
+  .ot-accountability .ot-accountability__person .ot-hdr-input { border-color: #999; }
+
+  /* An answer on paper is words in the cell, as everywhere else in the record. */
+  .ot-remedial .ot-rte { border: 0; border-radius: 0; }
+  .ot-remedial .ot-rte__area { min-height: 0; padding: 0; }
+  .ot-remedial .ot-remedial__table td { color: #000; }
+}

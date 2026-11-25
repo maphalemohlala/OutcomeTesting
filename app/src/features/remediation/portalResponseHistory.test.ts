@@ -12,8 +12,11 @@ import caseTemplate from '../../../../powerpages/outcome-testing---outcometestin
 const HISTORY =
   "{% assign ot_hist = a.al_responsehistory | default: '' | strip %}{% if ot_hist != '' %}<div class=\"ot-remedial-form__note ot-response-history\"><strong>Earlier responses</strong><br />{{ ot_hist | escape | newline_to_br }}</div>{% endif %}";
 
+// Four cells on each page: the adviser's two editable boxes and the two read-only answers. OT
+// Remediation drew them twice, once per kind of action, until the 2026-11-24 redesign gave both
+// kinds one body.
 const pages = [
-  ['OT Remediation', remediationTemplate.replace(/\r\n/g, '\n'), 8],
+  ['OT Remediation', remediationTemplate.replace(/\r\n/g, '\n'), 4],
   ['OT Case Detail', caseTemplate.replace(/\r\n/g, '\n'), 4],
 ] as const;
 

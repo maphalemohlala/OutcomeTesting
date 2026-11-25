@@ -460,6 +460,14 @@
                   <label description="Multi select (root causes)" languagecode="1033" />
                 </labels>
               </option>
+              <option value="120910014" IsHidden="0">
+                <labels>
+                  <label description="Pass / Pass with issues / Insufficient evidence / Potential harm" languagecode="1033" />
+                </labels>
+                <Descriptions>
+                  <Description description="Exactly the four outcomes, Potential harm stored as itself (Consumer Duty, 2026-11-24). Record-only: it does not feed the grade-consistency rule." languagecode="1033" />
+                </Descriptions>
+              </option>
               <option value="120910002" IsHidden="0">
                 <labels>
                   <label description="Date" languagecode="1033" />

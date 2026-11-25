@@ -6,15 +6,16 @@ using Microsoft.Xrm.Sdk.Query;
 namespace OutcomeTesting.Plugins
 {
     /// <summary>
-    /// When an adviser's T&amp;C Manager changes, their cases follow it. Registered synchronous
+    /// When an adviser's T&amp;C Managers change, their cases follow them. Registered synchronous
     /// post-operation on al_advisermapping Create, Update (al_tcmanagerid, al_adviseremail,
     /// statecode) and Delete. The Update and Delete steps carry a pre-image named
     /// <c>PreImage</c> holding al_adviseremail.
     ///
-    /// The sign-off gate reads the mapping live, but the portal lists a case to the coach held
-    /// in al_tcsupervisorcontactid, and that column was only rewritten by a write to the case.
-    /// So a mapping changed after the adviser completed their actions left the case with the
-    /// old coach, who was refused, while the new coach could not see it (case 259162944).
+    /// The sign-off gate reads the mapping live, but the portal lists a case to the managers
+    /// linked to it (al_outcomecase_tcmanagers), and those links were only rewritten by a write
+    /// to the case. So a mapping changed after the adviser completed their actions left the
+    /// case with the old coach, who was refused, while the new coach could not see it (case
+    /// 259162944). An adviser may have several managers (owner, 2026-11-24): one row each.
     ///
     /// SYSTEM, as AdviserContactPlugin is: the access columns are a consequence of the write.
     /// </summary>
@@ -42,12 +43,15 @@ namespace OutcomeTesting.Plugins
 
         /// <summary>
         /// Brings the cases of every adviser this write touches in line with the mapping, and
-        /// tells the new coach about any case already waiting for them. Returns how many
-        /// cases changed coach.
+        /// tells each manager newly linked to a case already waiting for sign-off. Returns how
+        /// many cases changed managers.
         /// </summary>
         public static int Apply(IPluginExecutionContext context, IOrganizationService system, Action<string> trace = null)
         {
             RefuseSelfManagement(context, system);
+
+            // Before the cases are reconciled, so they read the status this write set.
+            AdviserStatus.SyncMappingRows(context, system);
 
             var moved = 0;
             var lookups = new CaseAccessLookups(system);
@@ -56,25 +60,26 @@ namespace OutcomeTesting.Plugins
                 foreach (var followed in AdviserContactPlugin.CasesFor(system, email))
                 {
                     var change = CaseAccessReconciler.Reconcile(system, followed.CaseId, DateTime.UtcNow, lookups);
-                    if (!change.ChangedColumns.Contains(CaseAccessReconciler.SupervisorAttr))
+                    if (change.NewSupervisors.Count == 0 && change.RemovedSupervisors == 0
+                        && !change.ChangedColumns.Contains(CaseAccessReconciler.SupervisorAttr))
                     {
                         continue;
                     }
 
                     moved++;
-                    TellNewCoach(system, followed.CaseId, context.CorrelationId, trace);
+                    TellNewCoach(system, followed.CaseId, change.NewSupervisors, context.CorrelationId, trace);
                 }
             }
 
-            trace?.Invoke("Cases that changed coach: " + moved);
+            trace?.Invoke("Cases whose T&C Managers changed: " + moved);
             return moved;
         }
 
         /// <summary>
         /// Refuses an active mapping that makes an adviser their own T&amp;C Manager. The
-        /// sign-off gate only asks whether the signer is the mapped manager
+        /// sign-off gate only asks whether the signer is one of the mapped managers
         /// (<see cref="SupervisorMapping"/>), so such a row let an adviser attest to their own
-        /// remediation. Compared by email, as people are identified (AD-228). A withdrawn row
+        /// remediation. Checked per row: each row is one adviser and one manager. Compared by email, as people are identified (AD-228). A withdrawn row
         /// is left alone so a bad one can still be switched off. Runs inside the write's
         /// transaction (synchronous post-operation), so the refusal undoes the save.
         /// </summary>
@@ -109,23 +114,28 @@ namespace OutcomeTesting.Plugins
             }
         }
 
-        public static void TellNewCoach(IOrganizationService system, Guid caseId, Guid correlationId, Action<string> trace)
+        /// <summary>
+        /// Tells <paramref name="newManagers"/>, and only them, that this case is waiting for
+        /// sign-off - the managers already linked were told when it started waiting.
+        /// </summary>
+        public static void TellNewCoach(
+            IOrganizationService system, Guid caseId, IList<EntityReference> newManagers, Guid correlationId, Action<string> trace)
         {
-            var row = system.Retrieve(
-                CaseEntity, caseId, new ColumnSet("al_casestatus", CaseAccessReconciler.SupervisorAttr));
+            var row = system.Retrieve(CaseEntity, caseId, new ColumnSet("al_casestatus"));
             var status = row.GetAttributeValue<OptionSetValue>("al_casestatus");
-            var coach = row.GetAttributeValue<EntityReference>(CaseAccessReconciler.SupervisorAttr);
-            if (status == null || status.Value != CaseLifecycle.AwaitingSignoff || coach == null)
+            if (status == null || status.Value != CaseLifecycle.AwaitingSignoff || newManagers == null || newManagers.Count == 0)
             {
                 return;
             }
 
+            var ids = new HashSet<Guid>();
+            foreach (var manager in newManagers)
+            {
+                ids.Add(manager.Id);
+            }
+
             CompleteRemediationPlugin.NotifySignoffDue(
-                system,
-                new EntityReference(CaseEntity, caseId),
-                correlationId,
-                trace,
-                coach.Id.ToString("N").Substring(0, 8));
+                system, new EntityReference(CaseEntity, caseId), correlationId, trace, ids);
         }
 
         /// <summary>

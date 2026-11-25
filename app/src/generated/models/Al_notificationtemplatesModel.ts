@@ -41,6 +41,7 @@ export interface Al_notificationtemplatesBase {
   al_recipientcontactids?: string;
   al_recipientkind?: Al_notificationtemplatesal_recipientkind;
   al_recipientkinds?: string;
+  al_gradings?: string;
   al_subject: string;
   al_templatecode: string;
   importsequencenumber?: number;

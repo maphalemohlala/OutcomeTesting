@@ -1,0 +1,24 @@
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--colour-border);
+}
+
+.pager__summary {
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
+
+.pager__buttons {
+  display: inline-flex;
+  gap: var(--space-2);
+}
+
+.pager .button-secondary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

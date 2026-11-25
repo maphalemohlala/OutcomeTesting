@@ -1,8 +1,19 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Modal } from '../../components/feedback/Modal';
 import { PageIntro } from '../../components/layout/PageIntro';
 import { usePermissions } from '../../app/permissions/permissionContext';
-import { MIGRATED_LISTS, optionCanBeDeleted, validateDraft, type ListOptionRow, type ManagedList } from './listOptions';
+import { FilterBar, FilterField } from '../../components/form/FilterBar';
+import { Icon } from '../../components/icons/Icon';
+import { date } from '../../lib/format';
+import {
+  MIGRATED_LISTS,
+  offeredOptions,
+  optionCanBeDeleted,
+  validateDraft,
+  type ListOptionRow,
+  type ManagedList,
+} from './listOptions';
+import { reorderedSortOrders } from './listOrder';
 import {
   deleteListOption,
   reinstateListOption,
@@ -11,6 +22,9 @@ import {
   useListOptions,
 } from './useListOptions';
 import './ListOptionsPage.css';
+import { Skeleton } from '../../components/feedback/Skeleton';
+import { Pager } from '../../components/navigation/Pager';
+import { PAGE_SIZE, usePaged } from '../../components/navigation/paging';
 
 /**
  * The options of the case-header dropdowns, managed as data (project owner, 2026-09-21: "for
@@ -70,25 +84,82 @@ export function ListOptionsPage() {
     setProblem(result.reason);
   }
 
+  const [moving, setMoving] = useState(false);
+  const [moved, setMoved] = useState('');
+  const dragFrom = useRef<number | null>(null);
+  // The handle to put focus back on once the list has reloaded in its new order.
+  const focusAfter = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (state.status !== 'ready' || !focusAfter.current) return;
+    document.querySelector<HTMLButtonElement>(`[data-handle="${focusAfter.current}"]`)?.focus();
+    focusAfter.current = null;
+  }, [state]);
+
+  /** Renumbers the offered options in their new order, writing only the ones whose number changes. */
+  async function move(offered: readonly ListOptionRow[], from: number, to: number) {
+    const changes = reorderedSortOrders(offered, from, to);
+    if (changes.length === 0 || moving) return;
+    setMoving(true);
+    setProblem(null);
+    setMoved('');
+    let failed: string | null = null;
+    for (const { row, sortOrder } of changes) {
+      const result = await saveListOption(list, {
+        id: row.id,
+        label: row.label,
+        sortOrder: String(sortOrder),
+        effectiveFrom: row.effectiveFrom,
+        effectiveTo: row.effectiveTo,
+      });
+      if (!result.ok) {
+        failed = result.reason;
+        break;
+      }
+    }
+    setMoving(false);
+    if (failed) setProblem(`The new order was not fully saved, so the list below shows what was. ${failed}`);
+    else setMoved(`${offered[from].label} moved to position ${to + 1}.`);
+    focusAfter.current = offered[from].id;
+    setReloadKey((k) => k + 1);
+  }
+
+  const options = state.status === 'ready' ? state.options : [];
+  const offered = offeredOptions(options);
+  const retired = options.filter((row) => row.retired && !row.startsOn);
+  const upcoming = options.filter((row) => row.startsOn);
+  const offeredPage = usePaged(offered, PAGE_SIZE, list.label);
+  const upcomingPage = usePaged(upcoming, PAGE_SIZE, list.label);
+  const retiredPage = usePaged(retired, PAGE_SIZE, list.label);
+
   return (
     <div className="lists">
       <PageIntro
         title="Dropdown options"
         purpose={
           'The choices offered by the case header’s dropdowns. Adding or renaming one takes ' +
-          'effect straight away — there is nothing to deploy.'
+          'effect straight away; there is nothing to deploy.'
+        }
+        actions={
+          canEdit && state.status === 'ready' ? (
+            <button type="button" className="button-primary" onClick={() => setEditing('new')}>
+              <Icon name="plus" />
+              Add an option
+            </button>
+          ) : undefined
         }
       />
 
-      {MIGRATED_LISTS.length > 1 && (
-        <div className="lists__picker">
-          <label htmlFor="which-list">List</label>
+      <FilterBar
+        summary={
+          state.status === 'ready' ? `${offered.length} offered, ${retired.length} retired` : undefined
+        }
+      >
+        <FilterField label="List" htmlFor="which-list">
           <select
             id="which-list"
             value={list.key}
-            onChange={(e) =>
-              setList(MIGRATED_LISTS.find((l) => l.key === e.target.value) ?? MIGRATED_LISTS[0])
-            }
+            onChange={(e) => setList(MIGRATED_LISTS.find((l) => l.key === e.target.value) ?? MIGRATED_LISTS[0])}
           >
             {MIGRATED_LISTS.map((l) => (
               <option key={l.key} value={l.key}>
@@ -96,102 +167,192 @@ export function ListOptionsPage() {
               </option>
             ))}
           </select>
-        </div>
-      )}
-
-      <h2 className="lists__heading">{list.label}</h2>
+        </FilterField>
+      </FilterBar>
 
       {problem && (
         <p className="lists__problem" role="alert">
           {problem}
         </p>
       )}
+      <p className="lists__sr" role="status">
+        {moving ? 'Saving the new order…' : moved}
+      </p>
 
-      {state.status === 'loading' && <p className="lists__note">Loading…</p>}
+      {state.status === 'loading' && <Skeleton label="Loading list options…" rows={6} />}
 
       {state.status === 'unavailable' && <p className="lists__note">{state.reason}</p>}
 
       {state.status === 'ready' && (
-        <>
-          {canEdit && (
-            <button type="button" className="lists__btn lists__add" onClick={() => setEditing('new')}>
-              Add an option
-            </button>
-          )}
-
-          {state.options.length === 0 ? (
-            <p className="lists__note">
-              This list has no options yet, so the dropdown on a case is empty.
-            </p>
-          ) : (
-            <table className="lists__table">
-              <thead>
-                <tr>
-                  <th scope="col">Option</th>
-                  <th scope="col">Order</th>
-                  <th scope="col">Offered</th>
-                  {canEdit && (
-                    <th scope="col">
-                      <span className="lists__sr">Actions</span>
-                    </th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {state.options.map((row) => (
-                  <tr key={row.id} className={row.retired ? 'lists__row--retired' : undefined}>
-                    <td>{row.label}</td>
-                    <td>{row.sortOrder ?? <span className="lists__missing">—</span>}</td>
-                    <td>
-                      {row.startsOn ? (
-                        <span className="lists__retired">Starts on {row.startsOn}</span>
-                      ) : row.retired ? (
-                        <span className="lists__retired">
-                          Retired{row.effectiveTo ? ` on ${row.effectiveTo}` : ''}
-                        </span>
-                      ) : (
-                        'Yes'
-                      )}
-                    </td>
-                    {canEdit && (
-                      <td className="lists__actions">
+        <div className="lists__layout">
+          <div className="lists__main">
+            <section aria-labelledby="lists-offered">
+              <p className="lists__section-head">
+                <strong id="lists-offered">Offered</strong>
+                {canEdit && offered.length > 1 ? (
+                  <span className="lists__muted">Drag to change the order checkers see.</span>
+                ) : null}
+              </p>
+              {offered.length === 0 ? (
+                <p className="lists__note">This list has no options offered, so the dropdown on a case is empty.</p>
+              ) : (
+                <ol className="lists__rows" aria-busy={moving}>
+                  {offeredPage.rows.map((row, i) => {
+                    // Positions count across the whole list, not this page.
+                    const index = offeredPage.from - 1 + i;
+                    return (
+                    <li
+                      key={row.id}
+                      className="lists__row"
+                      draggable={canEdit && !moving}
+                      onDragStart={(e) => {
+                        dragFrom.current = index;
+                        e.dataTransfer.effectAllowed = 'move';
+                      }}
+                      onDragOver={(e) => {
+                        if (dragFrom.current !== null) e.preventDefault();
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const from = dragFrom.current;
+                        dragFrom.current = null;
+                        if (from !== null) void move(offered, from, index);
+                      }}
+                      onDragEnd={() => {
+                        dragFrom.current = null;
+                      }}
+                    >
+                      {canEdit && offered.length > 1 ? (
                         <button
                           type="button"
-                          className="lists__btn lists__btn--ghost"
-                          onClick={() => setEditing(row)}
+                          className="lists__handle"
+                          data-handle={row.id}
+                          disabled={moving}
+                          aria-label={`Move ${row.label}, position ${index + 1} of ${offered.length}. Press the up or down arrow to move it.`}
+                          onKeyDown={(e) => {
+                            const to = e.key === 'ArrowUp' ? index - 1 : e.key === 'ArrowDown' ? index + 1 : null;
+                            if (to === null) return;
+                            e.preventDefault();
+                            if (to < 0 || to >= offered.length) return;
+                            // Follow the option onto the next page so focus can land back on it.
+                            offeredPage.setPage(Math.floor(to / PAGE_SIZE) + 1);
+                            void move(offered, index, to);
+                          }}
                         >
-                          Change
+                          <Icon name="drag" />
                         </button>
-                        {row.retired && !row.startsOn ? (
+                      ) : (
+                        <span className="lists__handle-space" />
+                      )}
+                      <span className="lists__position">{index + 1}</span>
+                      <span className="lists__label">{row.label}</span>
+                      <span className="lists__row-note">
+                        {row.sortOrder === null ? (
+                          <span className="lists__chip lists__chip--warn">
+                            <Icon name="warning" />
+                            No order set, so it shows last
+                          </span>
+                        ) : null}
+                      </span>
+                      {canEdit ? (
+                        <span className="lists__row-actions">
+                          <button type="button" className="button-secondary" onClick={() => setEditing(row)}>
+                            Rename<span className="lists__sr"> {row.label}</span>
+                          </button>
+                          <button type="button" className="button-quiet" onClick={() => setRemoving(row)}>
+                            Retire<span className="lists__sr"> {row.label}</span>
+                          </button>
+                        </span>
+                      ) : null}
+                    </li>
+                    );
+                  })}
+                </ol>
+              )}
+              {offered.length > 0 && <Pager {...offeredPage} label="options" />}
+            </section>
+
+            {upcoming.length > 0 ? (
+              <section aria-labelledby="lists-upcoming">
+                <p className="lists__section-head">
+                  <strong id="lists-upcoming">Not offered yet</strong>
+                  <span className="lists__muted">Each starts being offered on the day shown.</span>
+                </p>
+                <ul className="lists__rows">
+                  {upcomingPage.rows.map((row) => (
+                    <li key={row.id} className="lists__row">
+                      <span className="lists__handle-space" />
+                      <span className="lists__position" />
+                      <span className="lists__label">{row.label}</span>
+                      <span className="lists__row-note lists__muted">Starts on {date(row.startsOn) ?? row.startsOn}</span>
+                      {canEdit ? (
+                        <span className="lists__row-actions">
+                          <button type="button" className="button-secondary" onClick={() => setEditing(row)}>
+                            Rename<span className="lists__sr"> {row.label}</span>
+                          </button>
+                        </span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+                <Pager {...upcomingPage} label="options" />
+              </section>
+            ) : null}
+
+            {retired.length > 0 ? (
+              <section aria-labelledby="lists-retired">
+                <p className="lists__section-head">
+                  <strong id="lists-retired">Retired</strong>
+                  <span className="lists__muted">
+                    Kept here so a removed option isn’t added again by someone who never saw it. Cases already using it
+                    are unchanged.
+                  </span>
+                </p>
+                <ul className="lists__rows">
+                  {retiredPage.rows.map((row) => (
+                    <li key={row.id} className="lists__row lists__row--retired">
+                      <span className="lists__handle-space" />
+                      <span className="lists__position" />
+                      <span className="lists__label">
+                        <s>{row.label}</s>
+                        <span className="lists__sr"> (retired)</span>
+                      </span>
+                      <span className="lists__row-note lists__muted">
+                        {row.effectiveTo ? `Retired on ${date(row.effectiveTo) ?? row.effectiveTo}` : null}
+                      </span>
+                      {canEdit ? (
+                        <span className="lists__row-actions">
                           <button
                             type="button"
-                            className="lists__btn lists__btn--ghost"
+                            className="button-secondary"
                             onClick={() => reinstate(row, state.options)}
                           >
-                            Reinstate
+                            <Icon name="restore" />
+                            Reinstate<span className="lists__sr"> {row.label}</span>
                           </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className="lists__btn lists__btn--ghost"
-                            onClick={() => setRemoving(row)}
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+                        </span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+                <Pager {...retiredPage} label="options" />
+              </section>
+            ) : null}
+          </div>
 
-          <p className="lists__hint">
-            Retired options stay on this page so an option that was removed last week is not
-            added again by somebody who cannot see that it ever existed. Cases that already
-            use a retired option are not changed by retiring it.
-          </p>
+          <aside className="lists__preview" aria-labelledby="lists-preview">
+            <h2 id="lists-preview">On the case header</h2>
+            <label htmlFor="lists-preview-select">{list.label}</label>
+            <select id="lists-preview-select" defaultValue="">
+              <option value="">Not set</option>
+              {offered.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.label}
+                </option>
+              ))}
+            </select>
+            <p className="lists__muted">This is what a checker sees right now.</p>
+          </aside>
 
           {editing && (
             <OptionForm
@@ -212,7 +373,7 @@ export function ListOptionsPage() {
               onDelete={() => act(deleteListOption, removing)}
             />
           )}
-        </>
+        </div>
       )}
     </div>
   );

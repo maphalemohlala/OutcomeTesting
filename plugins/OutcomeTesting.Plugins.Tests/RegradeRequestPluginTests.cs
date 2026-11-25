@@ -313,8 +313,8 @@ namespace OutcomeTesting.Plugins.Tests
                 () => RegradeRequestPlugin.Apply(
                     svc, ContactId, Request("Pass", "Evidence supplied on recheck."), Context()));
 
-            Assert.Contains("Recording the final outcome is the T&C Manager mapped to its adviser", error.Message);
-            Assert.Contains("not this case's T&C Manager", error.Message);
+            Assert.Contains("Recording the final outcome is for a T&C Manager mapped to its adviser", error.Message);
+            Assert.Contains("not one of this case's T&C Managers", error.Message);
         }
 
         /// <summary>

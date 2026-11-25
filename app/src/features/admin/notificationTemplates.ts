@@ -62,11 +62,19 @@ const TEMPLATES: Record<string, TemplateHint> = {
     body:
       '<p>Dear {{adviser}},</p><p>{{client}} has been subject to an AQS file check and a need for remedial work has been identified due to the case receiving {{grading}}.{{dueText}}</p><p>The case summary in the portal details the remedial actions.</p><p>Please follow the link to confirm that the remedial action has been taken.</p>{{caseButton}}<p>Many thanks</p>',
   },
-  'REMEDIATION-HARM': {
-    name: 'Remedial needed - insufficient evidence or potential harm',
+  'REMEDIATION-INSUFFICIENT': {
+    name: 'Remedial needed - insufficient evidence',
     tokens: ['reference', 'adviser', 'client', 'grading', 'dueText', 'caseButton'],
     isHtml: true,
-    subject: 'Remedial needed - insufficient evidence/ potential harm: {{reference}} - {{client}}',
+    subject: 'Remedial needed - Insufficient evidence: {{reference}} - {{client}}',
+    body:
+      '<p>Dear {{adviser}},</p><p>{{client}} has been subject to an AQS file check and a need for remedial work has been identified due to the case receiving {{grading}}.{{dueText}}</p><p>The case summary in the portal details the remedial actions. Please liaise with your T&amp;C Manager to move this case forward.</p><p>Please follow the link to confirm that the required remedial action has been taken.</p>{{caseButton}}<p>Many thanks</p>',
+  },
+  'REMEDIATION-HARM': {
+    name: 'Remedial needed - potential harm',
+    tokens: ['reference', 'adviser', 'client', 'grading', 'dueText', 'caseButton'],
+    isHtml: true,
+    subject: 'Remedial needed - Potential harm: {{reference}} - {{client}}',
     body:
       '<p>Dear {{adviser}},</p><p>{{client}} has been subject to an AQS file check and a need for remedial work has been identified due to the case receiving {{grading}}.{{dueText}}</p><p>The case summary in the portal details the remedial actions. Please liaise with your T&amp;C Manager to move this case forward.</p><p>Please follow the link to confirm that the required remedial action has been taken.</p>{{caseButton}}<p>Many thanks</p>',
   },

@@ -58,8 +58,8 @@ namespace OutcomeTesting.Plugins.Tests
             var routing = TcManagerRouting.ForCase(svc, new EntityReference("al_outcomecase", CaseId));
 
             Assert.True(routing.IsRouted);
-            Assert.Equal(Cover, routing.Manager.Id);
-            Assert.Equal("cora@example.com", routing.Email);
+            Assert.Equal(Cover, Assert.Single(routing.Managers).Id);
+            Assert.Equal("cora@example.com", Assert.Single(routing.Recipients).Email);
         }
 
         [Fact]
@@ -67,7 +67,7 @@ namespace OutcomeTesting.Plugins.Tests
         {
             var routing = TcManagerRouting.ForCase(Seeded(), new EntityReference("al_outcomecase", CaseId));
 
-            Assert.Equal(Mapped, routing.Manager.Id);
+            Assert.Equal(Mapped, Assert.Single(routing.Managers).Id);
         }
 
         [Fact]
@@ -79,7 +79,7 @@ namespace OutcomeTesting.Plugins.Tests
             var summary = ReassignTcManagerPlugin.Reassign(svc, CaseId, Cover, "Pat is on leave");
 
             Assert.Equal(Cover, Chosen(svc).Id);
-            Assert.Equal("Case 259162944 handed from the adviser's mapped T&C Manager to Cora Cover.", summary);
+            Assert.Equal("Case 259162944 handed from the adviser's mapped T&C Managers to Cora Cover.", summary);
         }
 
         [Fact]
@@ -90,7 +90,7 @@ namespace OutcomeTesting.Plugins.Tests
             var summary = ReassignTcManagerPlugin.Reassign(svc, CaseId, null, "Pat is back");
 
             Assert.Null(Chosen(svc));
-            Assert.Equal("Case 259162944 handed from Cora Cover to the adviser's mapped T&C Manager.", summary);
+            Assert.Equal("Case 259162944 handed from Cora Cover to the adviser's mapped T&C Managers.", summary);
         }
 
         [Fact]

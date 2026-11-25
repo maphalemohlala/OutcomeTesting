@@ -98,13 +98,78 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Contains(GenerateExportPlugin.FqAdministratorContactAttr, OutcomeGuardPlugin.AccountabilityColumns);
         }
 
+        // --- "An administrator", no name (project owner, 2026-11-25) -----------------------
+
         [Fact]
-        public void The_audit_line_names_the_administrator_or_says_none()
+        public void The_administrator_tick_alone_stops_the_paraplanner_being_derived()
         {
-            Assert.Equal("(none)", SetFailAccountabilityPlugin.DescribeAdministrator(null, null));
-            Assert.Equal(
-                "Ann Admin (" + AdminId.ToString("D") + ")",
-                SetFailAccountabilityPlugin.DescribeAdministrator(new EntityReference("contact", AdminId), "Ann Admin"));
+            var row = OutcomeNaming(null);
+            row[GenerateExportPlugin.FqAdministratorFlag] = true;
+
+            Assert.False(GenerateExportPlugin.IsAccountable(
+                row, GenerateExportPlugin.FqParaplannerFlag, ResponseRules.ChoiceFail, OutcomeRules.OutcomePass));
+            Assert.True(GenerateExportPlugin.AdministratorCarriesFile(row));
+        }
+
+        [Fact]
+        public void A_name_recorded_before_the_tick_still_counts()
+        {
+            Assert.True(GenerateExportPlugin.AdministratorCarriesFile(OutcomeNaming(AdminId)));
+            Assert.False(GenerateExportPlugin.AdministratorCarriesFile(OutcomeNaming(null)));
+        }
+
+        [Fact]
+        public void A_parked_tick_sets_the_flag_and_names_nobody()
+        {
+            var review = new Entity("al_reviewinstance", Guid.NewGuid())
+            {
+                ["al_pendingaccountability"] = "{\"fqAdviser\":false,\"fqParaplanner\":false,\"aqAdviser\":false,"
+                    + "\"aqParaplanner\":false,\"fqAdministrator\":true}",
+            };
+            var outcome = new Entity("al_outcome");
+
+            AccountabilityRequestPlugin.ApplyParked(new FakeOrganizationService(), review, outcome);
+
+            Assert.True(outcome.GetAttributeValue<bool>(GenerateExportPlugin.FqAdministratorFlag));
+            Assert.Null(outcome.GetAttributeValue<EntityReference>(GenerateExportPlugin.FqAdministratorContactAttr));
+        }
+
+        [Fact]
+        public void A_parked_name_from_before_the_tick_sets_the_flag_too()
+        {
+            var review = new Entity("al_reviewinstance", Guid.NewGuid())
+            {
+                ["al_pendingaccountability"] = "{\"fqAdviser\":false,\"fqParaplanner\":false,\"aqAdviser\":false,"
+                    + "\"aqParaplanner\":false,\"fqAdministratorId\":\"" + AdminId.ToString("D") + "\"}",
+            };
+            var outcome = new Entity("al_outcome");
+
+            AccountabilityRequestPlugin.ApplyParked(new FakeOrganizationService(), review, outcome);
+
+            Assert.True(outcome.GetAttributeValue<bool>(GenerateExportPlugin.FqAdministratorFlag));
+        }
+
+        [Fact]
+        public void Unticking_clears_a_kept_name_and_ticking_leaves_it()
+        {
+            var unticked = new Entity("al_outcome");
+            SetFailAccountabilityPlugin.ApplyAdministratorContact(unticked, false, null);
+            Assert.True(unticked.Contains(GenerateExportPlugin.FqAdministratorContactAttr));
+            Assert.Null(unticked[GenerateExportPlugin.FqAdministratorContactAttr]);
+
+            var ticked = new Entity("al_outcome");
+            SetFailAccountabilityPlugin.ApplyAdministratorContact(ticked, true, null);
+            Assert.False(ticked.Contains(GenerateExportPlugin.FqAdministratorContactAttr));
+
+            var olderCaller = new Entity("al_outcome");
+            SetFailAccountabilityPlugin.ApplyAdministratorContact(olderCaller, true, new EntityReference("contact", AdminId));
+            Assert.Equal(AdminId, olderCaller.GetAttributeValue<EntityReference>(GenerateExportPlugin.FqAdministratorContactAttr).Id);
+        }
+
+        [Fact]
+        public void A_direct_write_of_the_administrator_tick_is_guarded()
+        {
+            Assert.Contains(GenerateExportPlugin.FqAdministratorFlag, OutcomeGuardPlugin.AccountabilityColumns);
         }
     }
 }

@@ -70,6 +70,7 @@ namespace OutcomeTesting.Plugins.Tests
         [InlineData(unchecked((int)0x80044151), "UNEXPECTED: ", "it took too long")]
         [InlineData(unchecked((int)0x80044172), "UNEXPECTED: ", "it took too long")]
         [InlineData(unchecked((int)0x80041222), "UNEXPECTED: ", "it took too long")]
+        [InlineData(unchecked((int)0x80044331), "VALIDATION: ", "some text in it is longer than the box allows")]
         [InlineData(0, "UNEXPECTED: ", "of a problem on the server")]
         [InlineData(unchecked((int)0x80040265), "UNEXPECTED: ", "of a problem on the server")]
         public void Maps_a_platform_fault_to_a_plain_reason(int code, string prefix, string reason)

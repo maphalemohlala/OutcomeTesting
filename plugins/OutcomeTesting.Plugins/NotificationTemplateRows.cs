@@ -78,6 +78,93 @@ namespace OutcomeTesting.Plugins
 
             /// <summary>True when the body carries the completed-check marker.</summary>
             public bool WantsCompletedCheck { get; set; }
+
+            /// <summary>The AQS gradings it goes out for; empty means whatever the grading.</summary>
+            public List<int> Gradings { get; set; } = new List<int>();
+        }
+
+        /// <summary>
+        /// The AQS gradings a letter of your own is limited to, as comma-separated
+        /// al_initialoutcome values (client, 2026-11-25). Empty sends it whatever the grading.
+        /// </summary>
+        public const string GradingsAttr = "al_gradings";
+
+        /// <summary>
+        /// The gradings a stored value names, and every part that is not one of the four.
+        /// </summary>
+        public static List<int> ReadGradings(string stored, List<string> unreadable = null)
+        {
+            var gradings = new List<int>();
+            foreach (var part in Split(stored))
+            {
+                int value;
+                if (int.TryParse(part, System.Globalization.NumberStyles.Integer,
+                        System.Globalization.CultureInfo.InvariantCulture, out value)
+                    && IsGrading(value))
+                {
+                    if (!gradings.Contains(value))
+                    {
+                        gradings.Add(value);
+                    }
+                }
+                else if (unreadable != null)
+                {
+                    unreadable.Add(part);
+                }
+            }
+
+            return gradings;
+        }
+
+        private static bool IsGrading(int value)
+        {
+            return value == OutcomeRules.OutcomePass
+                || value == OutcomeRules.OutcomePassWithIssues
+                || value == OutcomeRules.OutcomeInsufficient
+                || value == OutcomeRules.OutcomePotentialHarm;
+        }
+
+        /// <summary>
+        /// Whether a letter limited to <paramref name="gradings"/> goes out on a case graded
+        /// <paramref name="grade"/>. A limited letter never goes on a case with no AQS grading
+        /// yet: nothing says it earned that letter.
+        /// </summary>
+        public static bool SendsFor(IList<int> gradings, int? grade)
+        {
+            return gradings == null || gradings.Count == 0
+                || (grade.HasValue && gradings.Contains(grade.Value));
+        }
+
+        /// <summary>
+        /// The case's AQS grading: the newest outcome row's initial grade, the row an amendment
+        /// rewrites and the export reads. The AQS check decides, even on a case Tax checked too
+        /// (client, 2026-11-25). Null when no AQS check has graded the case.
+        /// </summary>
+        public static int? AqsGrading(IOrganizationService service, EntityReference caseRef)
+        {
+            if (caseRef == null)
+            {
+                return null;
+            }
+
+            var query = new QueryExpression("al_outcome")
+            {
+                ColumnSet = new ColumnSet(Outcomes.InitialOutcomeAttr),
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseRef.Id);
+            query.AddOrder("createdon", OrderType.Descending);
+
+            foreach (var row in service.RetrieveMultiple(query).Entities)
+            {
+                var grade = row.GetAttributeValue<OptionSetValue>(Outcomes.InitialOutcomeAttr);
+                if (grade != null)
+                {
+                    return grade.Value;
+                }
+            }
+
+            return null;
         }
 
         /// <summary>What a stored row says about a letter, beyond its wording.</summary>
@@ -234,7 +321,8 @@ namespace OutcomeTesting.Plugins
                         RecipientKindAttr,
                         RecipientContactAttr,
                         RecipientKindsAttr,
-                        RecipientContactIdsAttr),
+                        RecipientContactIdsAttr,
+                        GradingsAttr),
                     Criteria = new FilterExpression(),
                 };
                 query.Criteria.AddCondition(EventAttr, ConditionOperator.Equal, eventValue);
@@ -277,6 +365,7 @@ namespace OutcomeTesting.Plugins
                         Recipients = recipients,
                         WantsCompletedCheck = NotificationTemplates.Mentions(
                             body, NotificationTemplates.TokenCompletedCheck),
+                        Gradings = ReadGradings(row.GetAttributeValue<string>(GradingsAttr)),
                     });
                 }
             }

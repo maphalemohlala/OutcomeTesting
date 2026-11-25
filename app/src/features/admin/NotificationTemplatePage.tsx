@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Modal } from '../../components/feedback/Modal';
 import {
   RichTextEditor,
@@ -11,6 +11,7 @@ import { dateTime } from '../../lib/format';
 import {
   CUSTOM_TOKENS,
   ROLE_KINDS,
+  GRADINGS,
   TRIGGER_EVENTS,
   eventLabel,
   tokensFor,
@@ -31,7 +32,14 @@ import {
 } from './useNotificationTemplates';
 import { removalPrompt } from './notificationTemplateRemoval';
 import { TokenPicker } from './TokenPicker';
+import { FilterBar, FilterField } from '../../components/form/FilterBar';
+import { Icon } from '../../components/icons/Icon';
+import { groupLetters, stageNameOf } from './letterGroups';
+import { previewBody, previewSubject, splitTokens, tokensInUse } from './templatePreview';
 import './NotificationTemplatePage.css';
+import { Skeleton } from '../../components/feedback/Skeleton';
+import { Pager } from '../../components/navigation/Pager';
+import { PAGE_SIZE, usePaged } from '../../components/navigation/paging';
 
 /**
  * The wording of every letter the solution sends, who it goes to, and what sends it
@@ -63,109 +71,154 @@ export function NotificationTemplatePage() {
     setReloadKey((k) => k + 1);
   };
 
+  const [search, setSearch] = useState('');
+  const [wording, setWording] = useState<'all' | 'edited' | 'builtin'>('all');
+
+  const templates = state.status === 'ready' ? state.templates : [];
+  const edited = templates.filter((row) => row.stored).length;
+  const needle = search.trim().toLowerCase();
+  const shown = templates.filter(
+    (row) =>
+      (wording === 'all' || (wording === 'edited') === row.stored) &&
+      (needle === '' || row.name.toLowerCase().includes(needle) || row.code.toLowerCase().includes(needle)),
+  );
+  // Paged before grouping, so a page holds fifteen letters whichever stages they fall in.
+  const paged = usePaged(shown, PAGE_SIZE, `${wording}|${needle}`);
+
   return (
     <div className="templates">
       <PageIntro
-        title="Email Templates"
-        purpose={
-          'The subject and body of every email this system sends, and who receives it. A ' +
-          'letter you have not edited uses the built-in wording, and changing one takes ' +
-          'effect on the next send.'
+        title="Email templates"
+        purpose="The letters the system sends as a case moves along. Edit the wording, or go back to the built-in version at any time."
+        actions={
+          canEdit && state.status === 'ready' ? (
+            <button type="button" className="button-primary" onClick={() => setEditing('new')}>
+              <Icon name="plus" />
+              Add a letter
+            </button>
+          ) : undefined
         }
       />
 
-      {state.status === 'loading' && <p className="templates__note">Loading…</p>}
+      {state.status === 'loading' && <Skeleton label="Loading templates…" rows={6} />}
       {state.status === 'unavailable' && <p className="templates__note">{state.reason}</p>}
 
       {state.status === 'ready' && (
         <>
-          {canEdit && (
-            <button
-              type="button"
-              className="templates__btn templates__add"
-              onClick={() => setEditing('new')}
-            >
-              Add a letter
-            </button>
-          )}
+          <FilterBar summary={`${edited} edited, ${templates.length - edited} using built-in wording`}>
+            <FilterField label="Search letters" htmlFor="templates-search" search>
+              <input
+                id="templates-search"
+                type="search"
+                placeholder="Letter name or code"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </FilterField>
+            <FilterField label="Wording" htmlFor="templates-wording">
+              <select
+                id="templates-wording"
+                value={wording}
+                onChange={(e) => setWording(e.target.value as typeof wording)}
+              >
+                <option value="all">All</option>
+                <option value="edited">Edited</option>
+                <option value="builtin">Built-in</option>
+              </select>
+            </FilterField>
+          </FilterBar>
 
-          <table className="templates__table">
-            <thead>
-              <tr>
-                <th scope="col">Letter</th>
-                <th scope="col">Sent at</th>
-                <th scope="col">Goes to</th>
-                <th scope="col">Wording</th>
-                {canEdit && (
-                  <th scope="col">
-                    <span className="templates__sr">Actions</span>
-                  </th>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {state.templates.map((row) => (
-                <tr key={row.code}>
-                  <td>
-                    {row.name}
-                    <span className="templates__code">{row.code}</span>
-                  </td>
-                  <td>
-                    {row.custom ? (
-                      (eventLabel(row.eventValue) ?? (
-                        <span className="templates__problem-cell">Nothing sends this</span>
-                      ))
-                    ) : (
-                      <span className="templates__builtin">When the system raises it</span>
-                    )}
-                  </td>
-                  <td>
-                    {recipientNames(row.recipients, state.contacts, state.contactsKnown).length > 0 ? (
-                      recipientNames(row.recipients, state.contacts, state.contactsKnown).map((name) => (
-                        <span key={name} className="templates__recipient">
-                          {name}
+          <p className="templates__info">
+            <Icon name="info" />
+            <span>
+              Every letter here is sent when the system raises it, to whoever the letter is about. Letters with a
+              different trigger or recipient say so on their row.
+            </span>
+          </p>
+
+          {shown.length === 0 && <p className="templates__note">No letter matches these filters.</p>}
+
+          {groupLetters(paged.rows).map((group) => (
+            <section key={group.key} className="templates__group" aria-labelledby={`letters-${group.key}`}>
+              <div className="templates__group-head">
+                <h2 id={`letters-${group.key}`}>{group.name}</h2>
+                <p>{group.description}</p>
+                <p className="templates__group-count">
+                  {group.letters.length} {group.letters.length === 1 ? 'letter' : 'letters'}
+                </p>
+              </div>
+              <ul className="templates__letters">
+                {group.letters.map((row) => {
+                  const names = recipientNames(row.recipients, state.contacts, state.contactsKnown);
+                  return (
+                    <li key={row.code} className="templates__letter">
+                      <span className="templates__letter-icon">
+                        <Icon name="mail" />
+                      </span>
+                      <div className="templates__letter-text">
+                        <span className="templates__name">{row.name}</span>
+                        <span className="templates__code">{row.code}</span>
+                        {row.custom && (
+                          <span className="templates__routing">
+                            Sent at:{' '}
+                            {eventLabel(row.eventValue) ?? (
+                              <span className="templates__problem-cell">Nothing sends this</span>
+                            )}
+                          </span>
+                        )}
+                        {names.length > 0 && (
+                          <span className="templates__routing">Goes to: {names.join(', ')}</span>
+                        )}
+                        {row.gradings.length > 0 && (
+                          <span className="templates__routing">Only for: {gradingNames(row.gradings)}</span>
+                        )}
+                      </div>
+                      <span className="templates__state">
+                        {row.custom ? (
+                          <span className="templates__chip">Your own letter</span>
+                        ) : row.stored ? (
+                          <span className="templates__chip">
+                            <Icon name="pencil" />
+                            Edited
+                          </span>
+                        ) : (
+                          <span className="templates__chip templates__chip--builtin">Built-in wording</span>
+                        )}
+                      </span>
+                      {canEdit && (
+                        <span className="templates__row-actions">
+                          {/*
+                            Only where there is a row to take away. One of the twelve that nobody
+                            has edited is already on its built-in wording, so the action would do
+                            nothing and saying so is worse than not offering it.
+                          */}
+                          {removalPrompt(row) && (
+                            <button
+                              type="button"
+                              className="button-quiet"
+                              onClick={() => {
+                                setProblem(null);
+                                setRemoving(row);
+                              }}
+                            >
+                              {row.custom ? <Icon name="trash" /> : <Icon name="restore" />}
+                              {row.custom ? 'Remove' : 'Restore built-in'}
+                              <span className="templates__sr"> wording for {row.name}</span>
+                            </button>
+                          )}
+                          <button type="button" className="button-secondary" onClick={() => setEditing(row)}>
+                            Edit<span className="templates__sr"> {row.name}</span>
+                          </button>
                         </span>
-                      ))
-                    ) : (
-                      <span className="templates__builtin">Whoever the letter is about</span>
-                    )}
-                  </td>
-                  <td>
-                    {row.stored ? 'Edited' : <span className="templates__builtin">Built-in</span>}
-                  </td>
-                  {canEdit && (
-                    <td>
-                      <button
-                        type="button"
-                        className="templates__btn templates__btn--ghost"
-                        onClick={() => setEditing(row)}
-                      >
-                        Edit
-                      </button>
-                      {/*
-                        Only where there is a row to take away. One of the twelve that nobody
-                        has edited is already on its built-in wording, so the action would do
-                        nothing and saying so is worse than not offering it.
-                      */}
-                      {removalPrompt(row) && (
-                        <button
-                          type="button"
-                          className="templates__btn templates__btn--ghost"
-                          onClick={() => {
-                            setProblem(null);
-                            setRemoving(row);
-                          }}
-                        >
-                          {row.custom ? 'Remove' : 'Use built-in'}
-                          <span className="templates__sr"> wording for {row.name}</span>
-                        </button>
                       )}
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
+
+          {shown.length > 0 && <Pager {...paged} label="letters" />}
 
           {editing === 'new' && (
             <NewTemplateForm
@@ -184,6 +237,11 @@ export function NotificationTemplatePage() {
               contactsKnown={state.contactsKnown}
               onClose={() => setEditing(null)}
               onSaved={reload}
+              onRestore={() => {
+                setEditing(null);
+                setProblem(null);
+                setRemoving(editing);
+              }}
             />
           )}
 
@@ -210,6 +268,50 @@ export function NotificationTemplatePage() {
 
 const UNREACHABLE = 'A contact who cannot be reached';
 
+/** The gradings a letter is limited to, in words. */
+function gradingNames(gradings: number[]): string {
+  return GRADINGS.filter((g) => gradings.includes(g.value))
+    .map((g) => g.label)
+    .join(', ');
+}
+
+/** Which AQS gradings a letter of your own goes out for. None ticked: whatever the grading. */
+export function GradingFields({
+  gradings,
+  setGradings,
+  disabled,
+}: {
+  gradings: number[];
+  setGradings: (value: number[]) => void;
+  disabled: boolean;
+}) {
+  return (
+    <fieldset className="recipients">
+      <legend className="recipients__heading">Only for these gradings</legend>
+      <div className="recipients__kinds">
+        {GRADINGS.map((g) => (
+          <label key={g.value} className="recipients__kind">
+            <input
+              type="checkbox"
+              checked={gradings.includes(g.value)}
+              disabled={disabled}
+              onChange={(e) =>
+                setGradings(e.target.checked ? [...gradings, g.value] : gradings.filter((v) => v !== g.value))
+              }
+            />
+            {g.label}
+          </label>
+        ))}
+      </div>
+      <p className="templates__hint">
+        The AQS check&rsquo;s grading decides, even when Tax checked the case too. Leave all unticked to send the
+        letter whatever the grading. A letter limited to gradings is not sent before the AQS check has graded the
+        case.
+      </p>
+    </fieldset>
+  );
+}
+
 /**
  * Who a row goes to, in words: the roles ticked, then the contacts by name. A contact the page
  * cannot name is no longer listed as reachable (inactive, or no work email), and says so.
@@ -232,13 +334,14 @@ function recipientNames(recipients: Recipients, contacts: ContactOption[], conta
  * itself knows went wrong.
  */
 function NotSent({ state }: { state: ReturnType<typeof useFailedLetters> }) {
+  const page = usePaged(state.status === 'ready' ? state.letters : []);
   return (
     <section className="templates__failed" aria-labelledby="templates-failed-heading">
       <h2 id="templates-failed-heading" className="templates__failed-heading">
         Not sent
       </h2>
 
-      {state.status === 'loading' && <p className="templates__note">Loading…</p>}
+      {state.status === 'loading' && <Skeleton label="Loading the letters that were not sent…" />}
 
       {state.status === 'unavailable' && (
         <p className="templates__problem">
@@ -270,7 +373,7 @@ function NotSent({ state }: { state: ReturnType<typeof useFailedLetters> }) {
               </tr>
             </thead>
             <tbody>
-              {state.letters.map((letter) => (
+              {page.rows.map((letter) => (
                 <tr key={letter.id}>
                   <td>{dateTime(letter.queuedOn)}</td>
                   <td>{letter.subject}</td>
@@ -280,6 +383,7 @@ function NotSent({ state }: { state: ReturnType<typeof useFailedLetters> }) {
               ))}
             </tbody>
           </table>
+          <Pager {...page} label="letters" />
         </>
       )}
     </section>
@@ -374,6 +478,140 @@ function spliceAtCaret(el: HTMLInputElement | HTMLTextAreaElement, text: string)
 }
 
 /**
+ * The subject line with its tokens drawn as chips. The chips are a copy of the text laid
+ * behind a transparent input, so the field stays a plain input (caret, selection, undo and
+ * spliceAtCaret all behave as before) and only the painting changes. The chips use a shadow
+ * rather than padding so the copy's text sits exactly under the input's.
+ */
+function SubjectField({
+  value,
+  onChange,
+  onFocus,
+  inputRef,
+  disabled,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onFocus: () => void;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  disabled: boolean;
+}) {
+  const mirrorRef = useRef<HTMLDivElement>(null);
+  const sync = () => {
+    if (mirrorRef.current && inputRef.current) mirrorRef.current.scrollLeft = inputRef.current.scrollLeft;
+  };
+  useEffect(sync);
+
+  return (
+    <div className="subject-field">
+      <div ref={mirrorRef} className="subject-field__mirror" aria-hidden="true">
+        {splitTokens(value).map((part, i) =>
+          part.token ? (
+            <mark key={i} className="subject-field__token">
+              {part.text}
+            </mark>
+          ) : (
+            <span key={i}>{part.text}</span>
+          ),
+        )}
+      </div>
+      <input
+        id="template-subject"
+        ref={inputRef}
+        type="text"
+        className="subject-field__input"
+        value={value}
+        disabled={disabled}
+        spellCheck={false}
+        onFocus={onFocus}
+        onChange={(e) => onChange(e.target.value)}
+        onScroll={sync}
+        onKeyUp={sync}
+        onSelect={sync}
+      />
+    </div>
+  );
+}
+
+/** The letter filled with sample values, as a reader would get it. */
+function LetterPreview({ subject, body }: { subject: string; body: string }) {
+  const headingId = useId();
+  return (
+    <section className="preview" aria-labelledby={headingId}>
+      <div className="preview__head">
+        <h3 id={headingId} className="preview__heading">
+          <Icon name="eye" />
+          Preview
+        </h3>
+        <span className="preview__note">Filled with sample values</span>
+      </div>
+      <div className="preview__letter">
+        <p className="preview__subject">{previewSubject(subject) || 'No subject yet'}</p>
+        {/* Rebuilt from the server's allow-list with every attribute dropped: see previewBody. */}
+        <div className="preview__body" dangerouslySetInnerHTML={{ __html: previewBody(body) }} />
+      </div>
+    </section>
+  );
+}
+
+/** The body editor, its toolbar's jump to the field list, and the note on what is kept. */
+function BodyField({
+  editorRef,
+  value,
+  onChange,
+  onFocus,
+  disabled,
+}: {
+  editorRef: React.RefObject<RichTextEditorHandle | null>;
+  value: string;
+  onChange: (html: string) => void;
+  onFocus: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="tedit__field">
+      <label htmlFor="template-body">Body</label>
+      {/*
+        Every letter, not only the ones the catalogue calls HTML (AD-170). The body reaches
+        the reader through email.description, which renders as markup whatever the letter is
+        called - so there was never a plain-text letter in the sense the flag implied.
+      */}
+      {/* Focus bubbles, so one handler covers the editor's editable area. */}
+      <div onFocus={onFocus}>
+        <RichTextEditor
+          id="template-body"
+          ref={editorRef}
+          value={value}
+          onChange={onChange}
+          label="Body"
+          disabled={disabled}
+          toolbarEnd={
+            <button
+              type="button"
+              className="rte__btn"
+              title="Insert a field"
+              aria-label="Insert a field"
+              disabled={disabled}
+              // The caret stays in the body, so the field chosen next lands where it was.
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => document.querySelector<HTMLButtonElement>(`#${FIELDS_ID} .tokens__add`)?.focus()}
+            >
+              <Icon name="braces" />
+            </button>
+          }
+        />
+      </div>
+      <p className="templates__hint">
+        Formatting is kept as you set it here. Anything beyond the toolbar’s formatting and links is removed when
+        you save.
+      </p>
+    </div>
+  );
+}
+
+const FIELDS_ID = 'template-fields';
+
+/**
  * Who a letter goes to, shared by both forms: any of the roles, and any number of named
  * contacts. Each person gets their own copy.
  *
@@ -406,35 +644,47 @@ function RecipientFields({
   }
 
   return (
-    <fieldset className="templates__recipients">
-      <legend>Goes to</legend>
+    <fieldset className="recipients">
+      <legend className="recipients__heading">Goes to</legend>
 
-      {ROLE_KINDS.map((r) => (
-        <label key={r.value} className="templates__check">
-          <input
-            type="checkbox"
-            checked={kinds.includes(r.value)}
-            onChange={(e) => toggleKind(r.value, e.target.checked)}
-          />
-          {r.label}
-        </label>
-      ))}
+      {allowDefault && kinds.length === 0 && contactIds.length === 0 && (
+        <p className="recipients__default">
+          <Icon name="info" />
+          <span>
+            Nobody chosen, so this letter goes to whoever it is about: the adviser on the case, the checker who
+            submitted it, and so on. Choose people only to replace that.
+          </span>
+        </p>
+      )}
+
+      <div className="recipients__kinds">
+        {ROLE_KINDS.map((r) => (
+          <label key={r.value} className="recipients__kind">
+            <input
+              type="checkbox"
+              checked={kinds.includes(r.value)}
+              onChange={(e) => toggleKind(r.value, e.target.checked)}
+            />
+            {r.label}
+          </label>
+        ))}
+      </div>
 
       {contactIds.length > 0 && (
-        <ul className="templates__chosen" aria-label="Named contacts">
+        <ul className="recipients__chosen" aria-label="Named contacts">
           {contactIds.map((id) => {
             const contact = contacts.find((c) => c.id === id);
             return (
               <li key={id}>
-                {contact ? `${contact.name} (${contact.email})` : (
+                {contact ? (
+                  `${contact.name} (${contact.email})`
+                ) : (
                   <span className="templates__problem-cell">{contactsKnown ? UNREACHABLE : 'A named contact'}</span>
                 )}
                 <button
                   type="button"
-                  className="templates__btn templates__btn--ghost"
-                  onClick={() =>
-                    setRecipients({ kinds, contactIds: contactIds.filter((c) => c !== id) })
-                  }
+                  className="button-quiet"
+                  onClick={() => setRecipients({ kinds, contactIds: contactIds.filter((c) => c !== id) })}
                 >
                   Remove
                   <span className="templates__sr"> {contact?.name ?? 'this contact'}</span>
@@ -445,7 +695,9 @@ function RecipientFields({
         </ul>
       )}
 
-      <label htmlFor="template-contact">Add a named contact</label>
+      <label htmlFor="template-contact" className="recipients__label">
+        Add a named contact
+      </label>
       <select
         id="template-contact"
         value=""
@@ -455,24 +707,14 @@ function RecipientFields({
           }
         }}
       >
-        <option value="">{available.length > 0 ? 'Choose…' : noContacts}</option>
+        <option value="">{available.length > 0 ? 'Choose a contact' : noContacts}</option>
         {available.map((c) => (
           <option key={c.id} value={c.id}>
             {c.name} ({c.email})
           </option>
         ))}
       </select>
-      <p className="templates__hint">
-        The same person for every case. Only contacts with a work email are listed — somebody
-        without one would be chosen here but never written to.
-      </p>
-
-      {allowDefault && kinds.length === 0 && contactIds.length === 0 && (
-        <p className="templates__hint">
-          Nobody chosen, so this letter goes to whoever it is about — the adviser on the case,
-          the checker who submitted it, and so on. Choose people here only to replace that.
-        </p>
-      )}
+      <p className="templates__hint">The same person for every case. Only contacts with a work email are listed.</p>
     </fieldset>
   );
 }
@@ -482,49 +724,16 @@ function hasUnreachableContact(recipients: Recipients, contacts: ContactOption[]
   return contactsKnown && recipients.contactIds.some((id) => !contacts.some((c) => c.id === id));
 }
 
-function TemplateForm({
-  row,
-  contacts,
-  contactsKnown,
-  onClose,
-  onSaved,
-}: {
-  row: TemplateRow;
-  contacts: ContactOption[];
-  contactsKnown: boolean;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  /*
-   * A letter with no stored row opens on the wording it is actually being sent with (F28).
-   *
-   * It used to open empty, so the page whose stated purpose is "the subject and body of
-   * every email this system sends" showed neither, for exactly the letters running on the
-   * built-in copy. Anyone wanting to change one sentence of the standard wording had to
-   * retype the whole letter, because they could not see it.
-   *
-   * Nothing is written until Save, so opening and closing still leaves the letter on its
-   * built-in copy - the hint above says so, and "Use built-in" puts it back.
-   */
-  const builtIn = row.custom ? null : builtInWording(row.code);
-  const [subject, setSubject] = useState(row.stored ? row.subject : (builtIn?.subject ?? ''));
-  const [body, setBody] = useState(row.stored ? row.body : (builtIn?.body ?? ''));
-  const [recipients, setRecipients] = useState<Recipients>(row.recipients);
+/** Subject, body and token handling shared by both forms. */
+function useLetterWording(initialSubject: string, initialBody: string) {
+  const [subject, setSubject] = useState(initialSubject);
+  const [body, setBody] = useState(initialBody);
   // Which field a token goes into. Tracked rather than assumed, and named on the picker:
   // dropping one into the body when the person had just clicked into the subject is the kind
   // of mistake that is only noticed after the letter has gone.
   const [focused, setFocused] = useState<'subject' | 'body'>('body');
   const subjectRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<RichTextEditorHandle>(null);
-  const [problem, setProblem] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  const offenders = row.custom
-    ? unknownCustomTokens(subject, body)
-    : unknownTokens(row.code, subject, body);
-  const empty = letterWordingMissing(subject, body);
-  const unreachable = hasUnreachableContact(recipients, contacts, contactsKnown);
-  const nobody = row.custom && recipients.kinds.length === 0 && recipients.contactIds.length === 0;
 
   function insertToken(token: string) {
     const text = `{{${token}}}`;
@@ -538,12 +747,61 @@ function TemplateForm({
     editorRef.current?.insertText(text);
   }
 
+  return { subject, setSubject, body, setBody, focused, setFocused, subjectRef, editorRef, insertToken };
+}
+
+function TemplateForm({
+  row,
+  contacts,
+  contactsKnown,
+  onClose,
+  onSaved,
+  onRestore,
+}: {
+  row: TemplateRow;
+  contacts: ContactOption[];
+  contactsKnown: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+  /** Hands the letter to the page's restore confirmation. */
+  onRestore: () => void;
+}) {
+  /*
+   * A letter with no stored row opens on the wording it is actually being sent with (F28).
+   *
+   * It used to open empty, so the page whose stated purpose is "the subject and body of
+   * every email this system sends" showed neither, for exactly the letters running on the
+   * built-in copy. Anyone wanting to change one sentence of the standard wording had to
+   * retype the whole letter, because they could not see it.
+   *
+   * Nothing is written until Save, so opening and closing still leaves the letter on its
+   * built-in copy, and the hint above the subject says so.
+   */
+  const builtIn = row.custom ? null : builtInWording(row.code);
+  const wording = useLetterWording(
+    row.stored ? row.subject : (builtIn?.subject ?? ''),
+    row.stored ? row.body : (builtIn?.body ?? ''),
+  );
+  const { subject, body } = wording;
+  const [recipients, setRecipients] = useState<Recipients>(row.recipients);
+  const [gradings, setGradings] = useState<number[]>(row.gradings);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const formId = useId();
+
+  const offenders = row.custom
+    ? unknownCustomTokens(subject, body)
+    : unknownTokens(row.code, subject, body);
+  const empty = letterWordingMissing(subject, body);
+  const unreachable = hasUnreachableContact(recipients, contacts, contactsKnown);
+  const nobody = row.custom && recipients.kinds.length === 0 && recipients.contactIds.length === 0;
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setSaving(true);
     setProblem(null);
 
-    const result = await saveTemplate(row, subject, body, recipients);
+    const result = await saveTemplate(row, subject, body, recipients, gradings);
     setSaving(false);
 
     if (result.ok) {
@@ -559,124 +817,139 @@ function TemplateForm({
   // form's subject out from under a half-typed one with nothing said. Modal brings Escape,
   // the backdrop and the focus move with it.
   return (
-    <Modal title={row.name} onClose={onClose}>
-      <form className="templates__form" onSubmit={submit}>
-        {!row.stored && (
-          <p className="templates__hint">
-            This letter has no saved wording yet, so it is currently sent using the built-in
-            copy — which is what is shown below. Saving here replaces it; closing without
-            saving leaves the letter on the built-in copy.
-          </p>
-        )}
+    <Modal
+      size="editor"
+      title={row.name}
+      onClose={onClose}
+      meta={
+        <span className="tedit__meta">
+          <span className="tedit__stage">{stageNameOf(row)}</span>
+          {row.custom ? (
+            <span className="templates__chip">Your own letter</span>
+          ) : row.stored ? (
+            <span className="templates__chip">
+              <Icon name="pencil" />
+              Edited
+            </span>
+          ) : (
+            <span className="templates__chip templates__chip--builtin">Built-in wording</span>
+          )}
+        </span>
+      }
+      footer={
+        <>
+          <span>
+            {/* Only where there is saved wording to take away; the restore itself is confirmed. */}
+            {!row.custom && row.stored ? (
+              <button type="button" className="button-quiet" onClick={onRestore} disabled={saving}>
+                <Icon name="restore" />
+                Restore built-in wording
+              </button>
+            ) : null}
+          </span>
+          <span className="tedit__actions">
+            <button type="button" className="button-secondary" onClick={onClose} disabled={saving}>
+              Cancel
+            </button>
+            {/*
+              Disabled on what this page can see, not as the authority. The plug-in refuses the
+              same things and its sentence is what appears above on a failed save.
+            */}
+            <button
+              type="submit"
+              form={formId}
+              className="button-primary"
+              disabled={saving || offenders.length > 0 || empty || unreachable || nobody}
+            >
+              {saving ? 'Saving…' : 'Save letter'}
+            </button>
+          </span>
+        </>
+      }
+    >
+      <form id={formId} className="tedit" onSubmit={submit}>
+        <div className="tedit__main">
+          {!row.stored && (
+            <p className="templates__hint">
+              This letter has no saved wording yet, so it is currently sent using the built-in copy, which is what
+              is shown below. Saving here replaces it; closing without saving leaves the letter on the built-in
+              copy.
+            </p>
+          )}
 
-        {row.custom && (
-          <p className="templates__hint">
-            Sent at: <strong>{eventLabel(row.eventValue) ?? 'nothing sends this yet'}</strong>.
-          </p>
-        )}
+          {row.custom && (
+            <p className="templates__hint">
+              Sent at: <strong>{eventLabel(row.eventValue) ?? 'nothing sends this yet'}</strong>.
+            </p>
+          )}
 
-        <label htmlFor="template-subject">Subject</label>
-        <input
-          id="template-subject"
-          ref={subjectRef}
-          type="text"
-          value={subject}
-          onFocus={() => setFocused('subject')}
-          onChange={(e) => setSubject(e.target.value)}
-        />
+          <div className="tedit__field">
+            <label htmlFor="template-subject">Subject</label>
+            <SubjectField
+              value={subject}
+              onChange={wording.setSubject}
+              onFocus={() => wording.setFocused('subject')}
+              inputRef={wording.subjectRef}
+              disabled={saving}
+            />
+          </div>
 
-        <label htmlFor="template-body">Body</label>
-        {/*
-          A rich-text editor for an HTML letter and a plain box for a plain-text one. Putting
-          the editor on both would quietly inject tags into a letter that is sent as plain
-          text, and the reader would see the markup rather than the formatting.
-        */}
-        {/*
-          Every letter, not only the ones the catalogue calls HTML (AD-170). The body reaches
-          the reader through email.description, which renders as markup whatever the letter is
-          called - so there was never a plain-text letter in the sense the flag implied, and
-          nine of the twelve were getting a bare textarea for no reason a reader could see.
-        */}
-        {/* Focus bubbles, so one handler covers the editor's editable area. */}
-        <div onFocus={() => setFocused('body')}>
-          <RichTextEditor
-            id="template-body"
-            ref={editorRef}
+          <BodyField
+            editorRef={wording.editorRef}
             value={body}
-            onChange={setBody}
-            label="Body"
+            onChange={wording.setBody}
+            onFocus={() => wording.setFocused('body')}
             disabled={saving}
           />
+
+          {offenders.length > 0 && (
+            <p className="templates__problem">
+              This letter does not supply {offenders.map((t) => `{{${t}}}`).join(', ')}
+              {offenders.length === 1 ? ', so it would render as a gap.' : ', so they would render as gaps.'}
+            </p>
+          )}
+
+          {empty && (
+            <p className="templates__problem">
+              A subject and a body are both needed. Saving one empty would quietly fall back to the built-in
+              wording instead of sending what you wrote.
+            </p>
+          )}
+
+          {unreachable && (
+            <p className="templates__problem">
+              A chosen contact is inactive or has no work email, so this letter could never reach them. Remove
+              them, or fix their contact record.
+            </p>
+          )}
+
+          {nobody && <p className="templates__problem">Choose who should receive this letter.</p>}
+
+          {problem && <p className="templates__problem">{problem}</p>}
+
+          <LetterPreview subject={subject} body={body} />
         </div>
-        <p className="templates__hint">
-          Formatting is kept as you set it here. Anything beyond the toolbar’s formatting and
-          links is removed when you save.
-        </p>
 
-        <RecipientFields
-          recipients={recipients}
-          setRecipients={setRecipients}
-          contacts={contacts}
-          contactsKnown={contactsKnown}
-          allowDefault={!row.custom}
-        />
+        <aside className="tedit__side" aria-label="Recipients and fields">
+          <RecipientFields
+            recipients={recipients}
+            setRecipients={setRecipients}
+            contacts={contacts}
+            contactsKnown={contactsKnown}
+            allowDefault={!row.custom}
+          />
 
-        <TokenPicker
-          tokens={tokensFor(row.tokens)}
-          onInsert={insertToken}
-          targetLabel={focused === 'subject' ? 'Subject' : 'Body'}
-          disabled={saving}
-        />
+          {row.custom && <GradingFields gradings={gradings} setGradings={setGradings} disabled={saving} />}
 
-        {offenders.length > 0 && (
-          <p className="templates__problem">
-            This letter does not supply{' '}
-            {offenders.map((t) => `{{${t}}}`).join(', ')}
-            {offenders.length === 1
-              ? ' — it would render as a gap.'
-              : ' — they would render as gaps.'}
-          </p>
-        )}
-
-        {empty && (
-          <p className="templates__problem">
-            A subject and a body are both needed. Saving one empty would quietly fall back to
-            the built-in wording instead of sending what you wrote.
-          </p>
-        )}
-
-        {unreachable && (
-          <p className="templates__problem">
-            A chosen contact is inactive or has no work email, so this letter could never reach
-            them. Remove them, or fix their contact record.
-          </p>
-        )}
-
-        {nobody && <p className="templates__problem">Choose who should receive this letter.</p>}
-
-        {problem && <p className="templates__problem">{problem}</p>}
-
-        <div className="templates__actions">
-          {/*
-            Disabled on what this page can see, not as the authority. The plug-in refuses the
-            same things and its sentence is what appears above on a failed save.
-          */}
-          <button
-            type="submit"
-            className="templates__btn"
-            disabled={saving || offenders.length > 0 || empty || unreachable || nobody}
-          >
-            {saving ? 'Saving…' : 'Save'}
-          </button>
-          <button
-            type="button"
-            className="templates__btn templates__btn--ghost"
-            onClick={onClose}
+          <TokenPicker
+            id={FIELDS_ID}
+            tokens={tokensFor(row.tokens)}
+            used={tokensInUse(subject, body)}
+            onInsert={wording.insertToken}
+            targetLabel={wording.focused === 'subject' ? 'Subject' : 'Body'}
             disabled={saving}
-          >
-            Cancel
-          </button>
-        </div>
+          />
+        </aside>
       </form>
     </Modal>
   );
@@ -707,25 +980,12 @@ function NewTemplateForm({
   const [code, setCode] = useState('');
   const [eventValue, setEventValue] = useState<number | null>(null);
   const [recipients, setRecipients] = useState<Recipients>({ kinds: [], contactIds: [] });
-  const [subject, setSubject] = useState('');
-  const [body, setBody] = useState('');
+  const [gradings, setGradings] = useState<number[]>([]);
+  const wording = useLetterWording('', '');
+  const { subject, body } = wording;
   const [problem, setProblem] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [focused, setFocused] = useState<'subject' | 'body'>('body');
-  const subjectRef = useRef<HTMLInputElement>(null);
-  const editorRef = useRef<RichTextEditorHandle>(null);
-
-  function insertToken(token: string) {
-    const text = `{{${token}}}`;
-
-    if (focused === 'subject') {
-      const el = subjectRef.current;
-      if (el) setSubject(spliceAtCaret(el, text));
-      return;
-    }
-
-    editorRef.current?.insertText(text);
-  }
+  const formId = useId();
 
   // The code is the table's alternate key, so it is normalised as it is typed rather than
   // saved as written: "tell the manager" and "TELL-THE-MANAGER" must not become two rows.
@@ -753,6 +1013,7 @@ function NewTemplateForm({
       body,
       eventValue,
       recipients,
+      gradings,
     });
     setSaving(false);
 
@@ -765,131 +1026,138 @@ function NewTemplateForm({
   }
 
   return (
-    <Modal title="Add a letter" onClose={onClose}>
-      <form className="templates__form" onSubmit={submit}>
-        <p className="templates__hint">
-          This letter is sent in addition to whatever the system already sends at that moment —
-          it does not replace it.
-        </p>
+    <Modal
+      size="editor"
+      title="Add a letter"
+      onClose={onClose}
+      meta={<span className="templates__chip">Your own letter</span>}
+      footer={
+        <>
+          <span />
+          <span className="tedit__actions">
+            <button type="button" className="button-secondary" onClick={onClose} disabled={saving}>
+              Cancel
+            </button>
+            <button
+              type="submit"
+              form={formId}
+              className="button-primary"
+              disabled={saving || incomplete || clashes || offenders.length > 0 || unreachable}
+            >
+              {saving ? 'Saving…' : 'Add the letter'}
+            </button>
+          </span>
+        </>
+      }
+    >
+      <form id={formId} className="tedit" onSubmit={submit}>
+        <div className="tedit__main">
+          <p className="templates__hint">
+            This letter is sent in addition to whatever the system already sends at that moment. It does not
+            replace it.
+          </p>
 
-        <label htmlFor="template-name">Name</label>
-        <input
-          id="template-name"
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
+          <div className="tedit__row">
+            <div className="tedit__field">
+              <label htmlFor="template-name">Name</label>
+              <input id="template-name" type="text" value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
 
-        <label htmlFor="template-code">Code</label>
-        <input
-          id="template-code"
-          type="text"
-          value={code}
-          placeholder={normaliseCode(name)}
-          onChange={(e) => setCode(e.target.value)}
-        />
-        <p className="templates__hint">
-          Saved as <code className="templates__token">{normalised || '—'}</code>. Taken from the
-          name unless you set one.
-        </p>
+            <div className="tedit__field">
+              <label htmlFor="template-code">Code</label>
+              <input
+                id="template-code"
+                type="text"
+                value={code}
+                placeholder={normaliseCode(name)}
+                onChange={(e) => setCode(e.target.value)}
+              />
+              <p className="templates__hint">
+                Saved as <code className="templates__token">{normalised || '—'}</code>. Taken from the name unless
+                you set one.
+              </p>
+            </div>
 
-        <label htmlFor="template-event">Sent at</label>
-        <select
-          id="template-event"
-          value={eventValue === null ? '' : String(eventValue)}
-          onChange={(e) => setEventValue(e.target.value === '' ? null : Number(e.target.value))}
-        >
-          <option value="">Choose…</option>
-          {TRIGGER_EVENTS.map((t) => (
-            <option key={t.value} value={t.value}>
-              {t.label}
-            </option>
-          ))}
-        </select>
+            <div className="tedit__field">
+              <label htmlFor="template-event">Sent at</label>
+              <select
+                id="template-event"
+                value={eventValue === null ? '' : String(eventValue)}
+                onChange={(e) => setEventValue(e.target.value === '' ? null : Number(e.target.value))}
+              >
+                <option value="">Choose…</option>
+                {TRIGGER_EVENTS.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
 
-        <RecipientFields
-          recipients={recipients}
-          setRecipients={setRecipients}
-          contacts={contacts}
-          contactsKnown={contactsKnown}
-          allowDefault={false}
-        />
+          <div className="tedit__field">
+            <label htmlFor="template-subject">Subject</label>
+            <SubjectField
+              value={subject}
+              onChange={wording.setSubject}
+              onFocus={() => wording.setFocused('subject')}
+              inputRef={wording.subjectRef}
+              disabled={saving}
+            />
+          </div>
 
-        <label htmlFor="template-subject">Subject</label>
-        <input
-          id="template-subject"
-          ref={subjectRef}
-          type="text"
-          value={subject}
-          onFocus={() => setFocused('subject')}
-          onChange={(e) => setSubject(e.target.value)}
-        />
-
-        <label htmlFor="template-body">Body</label>
-        <div onFocus={() => setFocused('body')}>
-          <RichTextEditor
-            id="template-body"
-            ref={editorRef}
+          <BodyField
+            editorRef={wording.editorRef}
             value={body}
-            onChange={setBody}
-            label="Body"
+            onChange={wording.setBody}
+            onFocus={() => wording.setFocused('body')}
             disabled={saving}
           />
+
+          {clashes && (
+            <p className="templates__problem">
+              A letter with the code {normalised} already exists. Give this one a different name or code.
+            </p>
+          )}
+
+          {offenders.length > 0 && (
+            <p className="templates__problem">
+              A letter of your own cannot use {offenders.map((t) => `{{${t}}}`).join(', ')}
+              {offenders.length === 1 ? ', so it would render as a gap.' : ', so they would render as gaps.'}
+            </p>
+          )}
+
+          {unreachable && (
+            <p className="templates__problem">
+              A chosen contact has no work email, so this letter could never reach them.
+            </p>
+          )}
+
+          {problem && <p className="templates__problem">{problem}</p>}
+
+          <LetterPreview subject={subject} body={body} />
         </div>
-        <p className="templates__hint">
-          Formatting is kept as you set it here. Anything beyond the toolbar’s formatting and
-          links is removed when you save.
-        </p>
 
-        <TokenPicker
-          tokens={tokensFor(CUSTOM_TOKENS)}
-          onInsert={insertToken}
-          targetLabel={focused === 'subject' ? 'Subject' : 'Body'}
-          disabled={saving}
-        />
+        <aside className="tedit__side" aria-label="Recipients and fields">
+          <RecipientFields
+            recipients={recipients}
+            setRecipients={setRecipients}
+            contacts={contacts}
+            contactsKnown={contactsKnown}
+            allowDefault={false}
+          />
 
-        {clashes && (
-          <p className="templates__problem">
-            A letter with the code {normalised} already exists. Give this one a different name
-            or code.
-          </p>
-        )}
+          <GradingFields gradings={gradings} setGradings={setGradings} disabled={saving} />
 
-        {offenders.length > 0 && (
-          <p className="templates__problem">
-            A letter of your own cannot use{' '}
-            {offenders.map((t) => `{{${t}}}`).join(', ')}
-            {offenders.length === 1
-              ? ' — it would render as a gap.'
-              : ' — they would render as gaps.'}
-          </p>
-        )}
-
-        {unreachable && (
-          <p className="templates__problem">
-            A chosen contact has no work email, so this letter could never reach them.
-          </p>
-        )}
-
-        {problem && <p className="templates__problem">{problem}</p>}
-
-        <div className="templates__actions">
-          <button
-            type="submit"
-            className="templates__btn"
-            disabled={saving || incomplete || clashes || offenders.length > 0 || unreachable}
-          >
-            {saving ? 'Saving…' : 'Add the letter'}
-          </button>
-          <button
-            type="button"
-            className="templates__btn templates__btn--ghost"
-            onClick={onClose}
+          <TokenPicker
+            id={FIELDS_ID}
+            tokens={tokensFor(CUSTOM_TOKENS)}
+            used={tokensInUse(subject, body)}
+            onInsert={wording.insertToken}
+            targetLabel={wording.focused === 'subject' ? 'Subject' : 'Body'}
             disabled={saving}
-          >
-            Cancel
-          </button>
-        </div>
+          />
+        </aside>
       </form>
     </Modal>
   );

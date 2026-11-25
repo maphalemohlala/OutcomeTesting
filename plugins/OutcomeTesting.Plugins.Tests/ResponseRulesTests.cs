@@ -39,6 +39,21 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
+        public void The_consumer_duty_outcome_scale_permits_exactly_the_four_and_nothing_else()
+        {
+            Assert.Equal(ResponseRules.AnswerColumn.Choice, ResponseRules.ColumnFor(ResponseRules.TypeOutcomeScale));
+            Assert.Equal(
+                new[] { 120910300, 120910303, 120910302, 120910304 },
+                ResponseRules.PermittedChoices(ResponseRules.TypeOutcomeScale).ToArray());
+            foreach (var refused in new[] { ResponseRules.ChoiceYes, ResponseRules.ChoiceNo, ResponseRules.ChoiceFail, ResponseRules.ChoiceNa })
+            {
+                Assert.NotNull(ResponseRules.ValidateAnswer(ResponseRules.TypeOutcomeScale, false, false, refused, null));
+            }
+
+            Assert.Null(ResponseRules.ValidateAnswer(ResponseRules.TypeOutcomeScale, false, false, ResponseRules.ChoicePotentialHarm, null));
+        }
+
+        [Fact]
         public void PermittedChoices_for_yes_no_na_excludes_insufficient_evidence()
         {
             var permitted = ResponseRules.PermittedChoices(120910008);

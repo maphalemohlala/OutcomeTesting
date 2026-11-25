@@ -5,10 +5,13 @@ import { DEFAULT_PERMISSIONS, can, resolvePermissions } from '../../types/permis
 
 const reassignTcManager = vi.fn();
 vi.mock('../../services/commands/reassignTcManager', () => ({ reassignTcManager }));
-vi.mock('../../generated', () => ({ Al_outcomecasesService: { get: vi.fn() } }));
+vi.mock('../../generated', () => ({
+  Al_outcomecasesService: { get: vi.fn() },
+  Al_advisermappingsService: { getAll: vi.fn() },
+}));
 vi.mock('../admin/useSecurityConfig', () => ({ useSecurityConfig: () => ({ status: 'loading' }) }));
 
-const { supervisorEmails, runReassignment } = await import('./CaseTcManagerPanel');
+const { supervisorEmails, runReassignment, mappingFilter } = await import('./CaseTcManagerPanel');
 
 const intent = { keyFor: (token: string) => 'key:' + token, release: vi.fn() };
 
@@ -49,5 +52,11 @@ describe('handing a case to another T&C Manager', () => {
 
     reassignTcManager.mockResolvedValueOnce({ ok: false, kind: 'precondition', message: 'Cora does not hold the role.' });
     expect((await runReassignment('c1', 'm2', 'x', intent)).kind).toBe('refused');
+  });
+
+  it('reads every active mapping of the adviser, with a quote in the email escaped', () => {
+    expect(mappingFilter(" o'neil@example.com ")).toBe(
+      "al_adviseremail eq 'o''neil@example.com' and statecode eq 0",
+    );
   });
 });

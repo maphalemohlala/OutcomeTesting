@@ -25,8 +25,8 @@ describe('the review page after the 2026-09-24 feedback', () => {
   });
 
   it('draws the N/A scale as a four-column grid, leaving N/A empty on a plain suitability row', () => {
-    expect(reviewTemplate).toContain("{% assign gvalues = '120910300,120910303,120910301,120910302,120910307' | split: ',' %}");
-    expect(reviewTemplate).toContain("{% assign glabels = 'Pass,Pass with issues,Potential harm,Insufficient evidence,N/A' | split: ',' %}");
+    expect(reviewTemplate).toContain("{% assign gvalues = '120910300,120910303,120910302,120910301,120910307' | split: ',' %}");
+    expect(reviewTemplate).toContain("{% assign glabels = 'Pass,Pass with issues,Insufficient evidence,Potential harm,N/A' | split: ',' %}");
     expect(reviewTemplate).toContain("{% if blk_rt == 120910012 and rt == 120910006 %}{% assign on_scale = true %}{% endif %}");
     expect(reviewTemplate).toContain("{% if rt == 120910006 %}{% if v == '120910307' or v == '120910303' %}{% assign cell_off = true %}{% endif %}{% endif %}");
     expect(reviewTemplate).toContain('{% if suit_na %}{% assign grid_rt = 120910012 %}{% endif %}');
@@ -63,10 +63,24 @@ describe('every case table says who the case is assigned to', () => {
     template.includes('<th scope="col">Tax checker</th>') && template.includes('<th scope="col">AQS checker</th>');
 
   it('on My Work, both review lists and the remediation list', () => {
-    expect(checkerColumns(myWork)).toBe(true);
-    expect(reviewList.match(/<th scope="col">Tax checker<\/th>/g)).toHaveLength(2);
-    expect(checkerColumns(reviewList)).toBe(true);
-    expect(checkerColumns(remediation)).toBe(true);
+    // My work names both checkers in one Checkers column since the 2026-11-24 redesign, each
+    // on its own line under its discipline, as Cases does.
+    expect(myWork).toContain('<th scope="col">Checkers</th>');
+    expect(myWork).toContain('<li><span class="ot-people__role">Tax</span>{% if tax_checker != \'\' %}');
+    expect(myWork).toContain('<li><span class="ot-people__role">AQS</span>{% if aqs_checker != \'\' %}');
+    expect(checkerColumns(myWork)).toBe(false);
+    // The AQS queue tabs and the reviewer's own submitted table both name the checkers in
+    // one Checkers column (2026-11-25 tabs), as Cases does, and the in-progress cards draw
+    // the same list.
+    expect(checkerColumns(reviewList)).toBe(false);
+    expect(reviewList.match(/<th scope="col">Checkers<\/th>/g)).toHaveLength(2);
+    expect(reviewList).toContain('<li><span class="ot-people__role">Tax</span>{% if tax_checker != \'\' %}');
+    expect(reviewList).toContain('<li><span class="ot-people__role">AQS</span>{% if aqs_checker != \'\' %}');
+    expect(reviewList).toContain('<td>{{ r_people }}</td>');
+    // The remediation list names both checkers in one Checkers column too (2026-11-24 redesign).
+    expect(remediation).toContain('<th scope="col">Checkers</th>');
+    expect(remediation).toContain('<li><span class="ot-people__role">Tax</span>{% if tax_checker != \'\' %}');
+    expect(remediation).toContain('<li><span class="ot-people__role">AQS</span>{% if aqs_checker != \'\' %}');
     for (const template of [myWork, reviewList, remediation]) {
       expect(template).toContain('<attribute name="al_taxcheckername" />');
       expect(template).toContain('<attribute name="al_aqscheckername" />');

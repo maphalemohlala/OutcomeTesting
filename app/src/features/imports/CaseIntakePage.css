@@ -35,12 +35,13 @@
 
 .intake__btn--ghost {
   color: var(--colour-action);
-  background: transparent;
+  background: var(--colour-surface);
 }
 
 .intake__btn--ghost:hover:not(:disabled) {
-  color: var(--colour-action-text);
-  background: var(--colour-action-hover);
+  color: var(--colour-action);
+  background: var(--colour-surface-hover);
+  border-color: var(--colour-action);
 }
 
 .intake__notice {
@@ -52,6 +53,7 @@
   padding: var(--space-3) var(--space-4);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
 }
 
 .intake__notice--success {
@@ -71,6 +73,7 @@
   overflow-x: auto;
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
 }
 
 .intake {
@@ -89,11 +92,10 @@
 .intake thead th {
   position: sticky;
   top: 0;
-  background: var(--colour-surface-sunken);
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  background: var(--colour-surface);
+  font-size: var(--text-sm);
   color: var(--colour-text-muted);
+  font-weight: 500;
 }
 
 .intake tbody th {
@@ -119,6 +121,7 @@
   padding: var(--space-4);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
 }
 
 .intake__unavailable h2 {

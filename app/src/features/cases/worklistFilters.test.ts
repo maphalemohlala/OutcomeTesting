@@ -132,3 +132,22 @@ describe('the pre or post check filter (requirements log row 2)', () => {
     expect(filtered(cases, {})).toEqual(['pre', 'post', 'unknown']);
   });
 });
+
+describe('the worklist search', () => {
+  // TaskID stays the case key; the service case reference is what people quote, so the search
+  // finds a case by either (client, 2026-11-24). Two tasks can share one service case.
+  const cases = [
+    row('254471517', { serviceCaseRef: 'IOA07066846' }),
+    row('254471891', { serviceCaseRef: 'IOA07066846' }),
+    row('259071273', { serviceCaseRef: 'IOA07300176' }),
+    row('920930001', { serviceCaseRef: null }),
+  ];
+
+  it('finds every task on a service case by its reference, in any case', () => {
+    expect(filtered(cases, { q: 'ioa07066846' })).toEqual(['254471517', '254471891']);
+  });
+
+  it('still finds a case by its TaskID', () => {
+    expect(filtered(cases, { q: '259071273' })).toEqual(['259071273']);
+  });
+});

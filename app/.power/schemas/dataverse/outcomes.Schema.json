@@ -166,6 +166,62 @@
           "x-ms-read-only": true,
           "maxLength": 450
         },
+        "al_fqadministratoraccountable": {
+          "type": "string",
+          "title": "FQ administrator accountable",
+          "x-ms-dataverse-attribute": "al_fqadministratoraccountable",
+          "x-ms-dataverse-type": "BooleanType",
+          "x-ms-schema-name": "al_FqAdministratorAccountable",
+          "enum": [
+            "No",
+            "Yes"
+          ],
+          "x-ms-enum-values": [
+            0,
+            1
+          ],
+          "Color": [
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "61b01b6b-e8e8-f111-84e9-70a8a5b3561e",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "FQ administrator accountable",
+          "x-ms-optionSetType": "Boolean"
+        },
+        "al_fqadministratoraccountablename": {
+          "type": "string",
+          "title": "al_fqadministratoraccountablename",
+          "x-ms-dataverse-attribute": "al_fqadministratoraccountablename",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "al_fqadministratoraccountableName",
+          "x-ms-read-only": true
+        },
+        "al_fqadministratorcontactid": {
+          "type": "string",
+          "title": "FQ administrator at fault",
+          "x-ms-dataverse-attribute": "al_fqadministratorcontactid",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "al_FqAdministratorContactId"
+        },
+        "al_fqadministratorcontactidname": {
+          "type": "string",
+          "title": "al_fqadministratorcontactidname",
+          "x-ms-dataverse-attribute": "al_fqadministratorcontactidname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_FqAdministratorContactIdName",
+          "x-ms-read-only": true,
+          "maxLength": 160
+        },
+        "al_fqadministratorcontactidyominame": {
+          "type": "string",
+          "title": "al_fqadministratorcontactidyominame",
+          "x-ms-dataverse-attribute": "al_fqadministratorcontactidyominame",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_FqAdministratorContactIdYomiName",
+          "x-ms-read-only": true,
+          "maxLength": 450
+        },
         "al_fqadviseraccountable": {
           "type": "string",
           "title": "FQ adviser accountable",

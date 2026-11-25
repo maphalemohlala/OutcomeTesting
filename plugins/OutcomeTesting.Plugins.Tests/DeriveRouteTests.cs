@@ -83,8 +83,8 @@ namespace OutcomeTesting.Plugins.Tests
         [Fact]
         public void An_unrelated_edit_does_not_revert_a_deliberate_reassignment()
         {
-            // Tax only is only reachable through the AD-036 wrong-route reassignment.
-            // Re-deriving here would undo it and send the case back through AQS.
+            // Tax only was put there deliberately (a reassignment or the Tax team's
+            // disposition). Re-deriving here would undo it and send the case back through AQS.
             var update = new Entity("al_outcomecase") { ["al_clientname"] = "Changed" };
             var changes = new List<string>();
 
@@ -265,6 +265,74 @@ namespace OutcomeTesting.Plugins.Tests
                 code => UpdateCaseDetailsPlugin.FindRouteByCode(Routes(), code));
 
             Assert.Null(RouteOn(update));
+        }
+        // --- Tax check as the only checklist item (project owner, 2026-11-25) ------------
+
+        private static Entity Imported(string checklistItems)
+        {
+            var e = Case(Yes, null);
+            e["al_checklistitems"] = checklistItems;
+            return e;
+        }
+
+        [Fact]
+        public void An_import_whose_only_item_is_the_tax_check_is_tax_only()
+        {
+            var record = Imported("Tax Check");
+
+            UpdateCaseDetailsPlugin.DeriveRoute(Routes(), new Entity("al_outcomecase"), record, new List<string>());
+
+            Assert.Equal(TaxOnly, RouteOn(record));
+        }
+
+        [Fact]
+        public void An_import_with_the_tax_check_and_another_item_is_tax_then_aqs()
+        {
+            var record = Imported("Tax Check\nPre-CAS Adviser");
+
+            UpdateCaseDetailsPlugin.DeriveRoute(Routes(), new Entity("al_outcomecase"), record, new List<string>());
+
+            Assert.Equal(TaxThenAqs, RouteOn(record));
+        }
+
+        [Fact]
+        public void Trust_documentation_alone_is_not_the_tax_check()
+        {
+            // It also calls for a Tax check, but the owner's rule names the Tax check item.
+            var record = Imported("Trust Documentation Check");
+
+            UpdateCaseDetailsPlugin.DeriveRoute(Routes(), new Entity("al_outcomecase"), record, new List<string>());
+
+            Assert.Equal(TaxThenAqs, RouteOn(record));
+        }
+
+        [Fact]
+        public void Submitting_a_tax_only_import_to_aqs_adds_the_aqs_leg()
+        {
+            var before = Imported("Tax Check");
+            before["al_reviewrouteid"] = new EntityReference("al_reviewroute", TaxOnly);
+            var update = new Entity("al_outcomecase")
+            {
+                ["al_taxteamdisposition"] = new OptionSetValue(SubmitToAqs),
+            };
+
+            UpdateCaseDetailsPlugin.DeriveRoute(before, update, new List<string>(),
+                code => UpdateCaseDetailsPlugin.FindRouteByCode(Routes(), code));
+
+            Assert.Equal(TaxThenAqs, RouteOn(update));
+        }
+
+        [Theory]
+        [InlineData("Tax Check", true)]
+        [InlineData(" tax check \r\n", true)]
+        [InlineData("Tax Check\nTax Check", true)]
+        [InlineData("Tax Check\nLeaver", false)]
+        [InlineData("Leaver", false)]
+        [InlineData("", false)]
+        [InlineData(null, false)]
+        public void Reads_whether_the_tax_check_is_the_only_item(string items, bool expected)
+        {
+            Assert.Equal(expected, UpdateCaseDetailsPlugin.IsTaxCheckOnly(items));
         }
     }
 }

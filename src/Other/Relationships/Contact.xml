@@ -18,7 +18,7 @@
     <ReferencingAttributeName>al_TcManagerId</ReferencingAttributeName>
     <RelationshipDescription>
       <Descriptions>
-        <Description description="The contact who is notified about this adviser's cases and owns the remediation sign-off. A Contact rather than a system user, so a T&amp;C Manager is reachable by email without a Dataverse licence (BR-009, as AD-081 has it for the para-planner)." languagecode="1033" />
+        <Description description="A contact who is notified about this adviser's cases and may sign off their remediation. A Contact rather than a system user, so a T&amp;C Manager is reachable by email without a Dataverse licence (BR-009, as AD-081 has it for the para-planner)." languagecode="1033" />
       </Descriptions>
     </RelationshipDescription>
     <EntityRelationshipRoles>

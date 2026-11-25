@@ -25,6 +25,7 @@
   overflow-x: auto;
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
 }
 
 .completed__table {
@@ -42,11 +43,10 @@
 }
 
 .completed__table thead th {
-  background: var(--colour-surface-sunken);
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  background: var(--colour-surface);
+  font-size: var(--text-sm);
   color: var(--colour-text-muted);
+  font-weight: 500;
 }
 
 .completed__table tbody th {

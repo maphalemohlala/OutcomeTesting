@@ -412,6 +412,15 @@ namespace OutcomeTesting.Plugins
         public static Guid Save(IOrganizationService service, Guid reviewId, AnswerRequestPayload payload)
         {
             var questionVersionId = AnswerRequest.RequireQuestionVersion(payload);
+
+            // Checked here because the platform refuses an over-long column before any
+            // pre-operation guard runs, with no plain reason (Case Notes, TEST, 2026-11-22).
+            var tooLong = ResponseRules.AnswerTextRefusal(payload.AnswerText);
+            if (tooLong != null)
+            {
+                throw new InvalidPluginExecutionException(CommandHelpers.ValidationPrefix + tooLong);
+            }
+
             var existing = FindExisting(service, reviewId, questionVersionId);
 
             var row = new Entity(ResponseEntity);

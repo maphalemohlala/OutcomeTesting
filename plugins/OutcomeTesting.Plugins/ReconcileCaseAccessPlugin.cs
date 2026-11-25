@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -40,7 +41,15 @@ namespace OutcomeTesting.Plugins
 
             var change = CaseAccessReconciler.Reconcile(system, caseId, DateTime.UtcNow);
 
-            context.OutputParameters["Changed"] = string.Join(",", change.ChangedColumns);
+            // The managers' links are not columns, but a backfill has to be able to see them move.
+            var changed = new List<string>(change.ChangedColumns);
+            if (change.AddedSupervisors.Count > 0 || change.RemovedSupervisors > 0)
+            {
+                changed.Add(CaseAccessReconciler.SupervisorsRelationship
+                    + " +" + change.AddedSupervisors.Count + "/-" + change.RemovedSupervisors);
+            }
+
+            context.OutputParameters["Changed"] = string.Join(",", changed);
             context.OutputParameters["Released"] = change.Released;
             context.OutputParameters["AdviserUnmatched"] = change.AdviserUnmatched;
             context.OutputParameters["SupervisorUnmatched"] = change.SupervisorUnmatched;

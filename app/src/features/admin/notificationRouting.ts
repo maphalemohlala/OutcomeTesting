@@ -103,6 +103,28 @@ export function recipientColumns({ kinds, contactIds }: Recipients): Record<stri
 }
 
 /**
+ * The AQS gradings a letter of your own can be limited to (client, 2026-11-25). None ticked
+ * sends it whatever the grading. Mirrors `NotificationTemplateRows.ReadGradings`.
+ */
+export const GRADINGS: readonly Choice[] = [
+  { value: 120910700, label: 'Pass' },
+  { value: 120910701, label: 'Pass with issues' },
+  { value: 120910702, label: 'Insufficient evidence' },
+  { value: 120910703, label: 'Potential harm' },
+];
+
+/** The gradings a stored row is limited to, in the order GRADINGS lists them. */
+export function readGradings(stored: string | null | undefined): number[] {
+  const parts = split(stored).map(Number);
+  return GRADINGS.map((g) => g.value).filter((v) => parts.includes(v));
+}
+
+/** The gradings column for a write; null when the letter goes whatever the grading. */
+export function gradingColumns(gradings: number[]): Record<string, unknown> {
+  return { al_gradings: gradings.length > 0 ? readGradings(gradings.join(',')).join(',') : null };
+}
+
+/**
  * The marker that attaches the completed check, allowed in every letter (AD-171).
  *
  * Not in any letter's own token list, because it says what the letter CARRIES rather than what
@@ -150,25 +172,24 @@ export const CUSTOM_TOKENS: readonly string[] = [
  * legitimately come out as nothing at all.
  */
 export const TOKEN_HELP: Record<string, string> = {
-  reference: 'The case reference, e.g. OT-2026-0417.',
+  reference: 'The case reference, for example OT-2026-0417.',
   adviser: 'The adviser’s name, or “Adviser” where the case does not name one.',
-  client: 'The client’s name, or “This case” — it opens a sentence either way.',
+  client: 'The client’s name, or “This case”. It opens a sentence either way.',
   caseLink: 'The web address of the case in the portal, as plain text.',
   caseButton:
-    'A styled button linking to the case — to its remediation, in the remedial and sign-off letters. Comes out as nothing where there is no portal.',
-  dueText: 'A sentence naming the due date, e.g. “ It is due by 3 March 2026.”, or nothing.',
+    'A styled button linking to the case, or to its remediation in the remedial and sign-off letters. Comes out as nothing where there is no portal.',
+  dueText: 'A sentence naming the due date, for example “It is due by 3 March 2026.”, or nothing.',
   grading:
-    'The grading the case received, e.g. “Pass with issues” — in the two remedial letters, “a pass with issues grading”. Comes out as nothing before the case is graded.',
+    'The grading the case received, for example “Pass with issues”. In the two remedial letters it reads “a pass with issues grading”. Empty before the case is graded.',
   finalOutcome:
-    'The final outcome recorded at sign-off, e.g. “Pass”. Comes out as nothing until one is recorded.',
-  notes:
-    'The latest sign-off notes, e.g. “ Notes: …”, or nothing where there are none.',
+    'The final outcome recorded at sign-off, for example “Pass”. Empty until one is recorded.',
+  notes: 'The latest sign-off notes, or nothing where there are none.',
   check: 'Which check the letter is about: “Tax check” or “AQS check”, or “review” where it cannot be told.',
   recipient: 'The name of the T&C Manager the letter is addressed to, or “T&C Manager” where it cannot be found.',
   notesPanel:
     'The signatory’s notes in a shaded panel under a heading. Comes out as nothing where they left none.',
   completedCheck:
-    'Attaches the completed check as a PDF. Puts nothing in the text — say what you like about it yourself.',
+    'Attaches the completed check as a PDF. Puts nothing in the text, so say what you like about it yourself.',
 };
 
 /** The one-line description for a token, or a plain fallback. */

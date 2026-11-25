@@ -9,20 +9,29 @@ const executeCommand = vi.fn(async () => ({ ok: true, data: { Status: 'Recorded'
 vi.mock('../../services/commands/commandClient', () => ({ executeCommand }));
 
 describe('the File Quality administrator', () => {
-  it('is read off the outcome with its name', () => {
+  it('is read off the outcome as a tick, with no name (2026-11-25)', () => {
+    const outcome = toOutcome({
+      al_outcomeid: 'o1',
+      al_outcomecode: 'OUT-1',
+      al_initialoutcome: 120910701,
+      al_fqadministratoraccountable: true,
+    } as Al_outcomes);
+    expect(outcome.fqAdministrator).toBe(true);
+  });
+
+  it('reads a name recorded before the tick as ticked', () => {
     const outcome = toOutcome({
       al_outcomeid: 'o1',
       al_outcomecode: 'OUT-1',
       al_initialoutcome: 120910701,
       _al_fqadministratorcontactid_value: 'admin-1',
-      '_al_fqadministratorcontactid_value@OData.Community.Display.V1.FormattedValue': 'Ann Admin',
-    } as unknown as Al_outcomes);
-    expect(outcome.fqAdministrator).toEqual({ id: 'admin-1', name: 'Ann Admin' });
+    } as Al_outcomes);
+    expect(outcome.fqAdministrator).toBe(true);
   });
 
-  it('is absent where nobody was named', () => {
+  it('is unticked where nobody was recorded', () => {
     const outcome = toOutcome({ al_outcomeid: 'o1', al_outcomecode: 'OUT-1', al_initialoutcome: 120910701 } as Al_outcomes);
-    expect(outcome.fqAdministrator).toBeNull();
+    expect(outcome.fqAdministrator).toBe(false);
   });
 
   it('stops the paraplanner being derived for the file, as the export does', () => {
@@ -39,7 +48,7 @@ describe('the File Quality administrator', () => {
     expect(effectiveAccountability(NOBODY, true, true, true).flags.aqAdviser).toBe(true);
   });
 
-  it('is sent to the command, and sent empty to clear it', async () => {
+  it('is sent to the command as a tick, and sent false to clear it', async () => {
     const { setFailAccountability } = await import('../../services/commands/setFailAccountability');
     const base = {
       outcomeId: 'o',
@@ -50,16 +59,20 @@ describe('the File Quality administrator', () => {
       idempotencyKey: 'k',
     };
 
-    await setFailAccountability({ ...base, fqAdministratorId: 'admin-1' });
+    await setFailAccountability({ ...base, fqAdministrator: true });
     expect(executeCommand).toHaveBeenLastCalledWith(
       'al_SetFailAccountability',
-      expect.objectContaining({ FqAdministratorId: 'admin-1' }),
+      expect.objectContaining({ FqAdministrator: true }),
     );
 
     await setFailAccountability(base);
     expect(executeCommand).toHaveBeenLastCalledWith(
       'al_SetFailAccountability',
-      expect.objectContaining({ FqAdministratorId: '' }),
+      expect.objectContaining({ FqAdministrator: false }),
+    );
+    expect(executeCommand).toHaveBeenLastCalledWith(
+      'al_SetFailAccountability',
+      expect.not.objectContaining({ FqAdministratorId: expect.anything() }),
     );
   });
 });

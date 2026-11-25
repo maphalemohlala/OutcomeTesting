@@ -137,3 +137,10 @@ export type ReviewType = (typeof REVIEW_TYPES)[number];
  * show the action's owner (the adviser). Renaming those would be a lie rather than a fix.
  */
 export const UPLOADED_BY_LABEL = 'Uploaded by';
+
+/**
+ * ServiceCaseSequentialRef from the upload: the reference people quote. Two tasks can share one
+ * service case, so it is shown beside the TaskID (the case key), never instead of it
+ * (client, 2026-11-24).
+ */
+export const SERVICE_CASE_REF_LABEL = 'Service case reference';

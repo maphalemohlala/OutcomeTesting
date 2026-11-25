@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Text;
 using Xunit;
 
@@ -24,6 +24,7 @@ namespace OutcomeTesting.Plugins.Tests
             var service = new FakeOrganizationService();
             service.Seed("al_reviewroute", Guid.NewGuid(), "al_routecode", "ROUTE-AQS");
             service.Seed("al_reviewroute", Guid.NewGuid(), "al_routecode", "ROUTE-TAX-AQS");
+            service.Seed("al_reviewroute", Guid.NewGuid(), "al_routecode", "ROUTE-TAX");
 
             var provider = new FakeServiceProvider(service);
             provider.Context.MessageName = "al_ImportCases";

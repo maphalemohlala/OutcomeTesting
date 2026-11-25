@@ -196,6 +196,7 @@ erDiagram
     al_exportrecord      }o--|| al_exportbatch       : "al_exportbatchid"
     al_exportrecord      }o--|| al_outcomecase       : "al_outcomecaseid"
     al_advisermapping    }o--|| contact              : "al_tcmanagerid"
+    al_outcomecase       }o--o{ contact              : "al_outcomecase_tcmanagers"
     al_notificationtemplate }o--o| contact           : "al_recipientcontactid"
 
     %% ---------------- Many-to-many ----------------
@@ -246,6 +247,7 @@ erDiagram
 | `al_exportrecord` | `al_exportbatchid` | `al_exportbatch` | Yes | Restrict |
 | `al_exportrecord` | `al_outcomecaseid` | `al_outcomecase` | Yes | Restrict |
 | `al_advisermapping` | `al_tcmanagerid` | `contact` | Yes | Restrict |
+| `al_outcomecase` | `al_outcomecase_tcmanagers` (many-to-many) | `contact` | No | Link removed |
 | `al_notificationtemplate` | `al_recipientcontactid` | `contact` | No | Remove link |
 
 "Restrict" means the parent row cannot be deleted while a child points at it. "Remove link"
@@ -266,7 +268,7 @@ email or a deleted row leaves them dangling.
 | Table | Column | Refers to |
 |---|---|---|
 | `al_outcomecase` | `al_adviseremail`, `al_paraplanneremail` | The adviser's and paraplanner's `contact.emailaddress1`. People are matched by email, never by name. |
-| `al_advisermapping` | `al_adviseremail` | The adviser's `contact.emailaddress1`. Its T&C Manager is a real lookup. |
+| `al_advisermapping` | `al_adviseremail` | The adviser's `contact.emailaddress1`. Its T&C Manager is a real lookup. One row per adviser and manager: an adviser may have several managers, all equal, and the alternate key `al_advisermanagerkey` (email + manager) refuses the same pair twice (owner, 2026-11-24). CaseAccessReconciler links every active row's manager to the adviser's released cases through `al_outcomecase_tcmanagers`, which is what the portal reads a case by; `al_tcsupervisorcontactid` holds the manager only when there is exactly one. |
 | `al_userrolemapping` | `al_useremail` | The person's work email. |
 | `al_userrolemapping` | `al_rolecode` | `al_role.al_rolecode` |
 | `al_pagepermission` | `al_rolecode` | `al_role.al_rolecode` |

@@ -14,6 +14,8 @@ import {
   CUSTOM_TOKENS,
   readRecipients,
   recipientColumns,
+  readGradings,
+  gradingColumns,
   type Recipients,
 } from './notificationRouting';
 import { describeRemoveFailure } from './notificationTemplateRemoval';
@@ -40,6 +42,8 @@ export interface TemplateRow {
   eventValue: number | null;
   /** Who receives it, where somebody has chosen. None leaves the built-in routing alone. */
   recipients: Recipients;
+  /** The AQS gradings a letter of your own goes out for. Empty: whatever the grading. */
+  gradings: number[];
 }
 
 export interface ContactOption {
@@ -60,6 +64,7 @@ export interface TemplateDraft {
   body: string;
   eventValue: number | null;
   recipients: Recipients;
+  gradings: number[];
 }
 
 /**
@@ -128,6 +133,8 @@ export function loadNotificationTemplates(): Promise<TemplatesState> {
           custom: false,
           eventValue: row?.al_event != null ? Number(row.al_event) : null,
           recipients: readRecipients(row ?? {}),
+          // A built-in letter already picks itself by grading.
+          gradings: [],
         };
       });
 
@@ -147,6 +154,7 @@ export function loadNotificationTemplates(): Promise<TemplatesState> {
           custom: true,
           eventValue: r.al_event != null ? Number(r.al_event) : null,
           recipients: readRecipients(r),
+          gradings: readGradings(r.al_gradings),
         }));
 
       // Contacts are for the "a named contact" recipient. A failure here is not fatal: the
@@ -197,12 +205,15 @@ export async function saveTemplate(
   subject: string,
   body: string,
   recipients: Recipients = row.recipients,
+  gradings: number[] = row.gradings,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   try {
     const fields = {
       al_subject: subject,
       al_body: body,
       ...recipientColumns(recipients),
+      // Only a letter of your own carries a limit; the plug-in refuses one on a built-in.
+      ...(row.custom ? gradingColumns(gradings) : {}),
     };
 
     const result = row.id
@@ -273,6 +284,7 @@ export async function createTemplate(
         ? {}
         : { al_event: draft.eventValue as Al_notificationtemplatesal_event }),
       ...recipientColumns(draft.recipients),
+      ...gradingColumns(draft.gradings),
     });
 
     if (!result.success) {

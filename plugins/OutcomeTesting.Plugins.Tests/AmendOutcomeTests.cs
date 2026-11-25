@@ -70,6 +70,29 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
+        public void An_advice_amendment_also_rewrites_the_checkers_grade_answer()
+        {
+            // The review page and the completed-check PDF read the grade from Q-GR-01.
+            var svc = Seeded();
+            var question = Guid.NewGuid();
+            var version = Guid.NewGuid();
+            var review = Guid.NewGuid();
+            var grade = Guid.NewGuid();
+            svc.Seed("al_question", question, "al_questioncode", GradingRules.GradeQuestionCode);
+            svc.Seed("al_questionversion", version, "al_questionid", new EntityReference("al_question", question));
+            svc.Seed("al_reviewinstance", review, "al_outcomecaseid", new EntityReference("al_outcomecase", CaseId));
+            svc.Seed("al_response", grade, "al_answerchoice", new OptionSetValue(ResponseRules.ChoiceInsufficient),
+                "al_reviewinstanceid", new EntityReference("al_reviewinstance", review),
+                "al_questionversionid", new EntityReference("al_questionversion", version),
+                "modifiedon", DateTime.UtcNow);
+
+            AmendOutcomePlugin.Amend(svc, CaseId, null, "Potential harm", "Appeal");
+
+            Assert.Equal(OutcomeRules.OutcomePotentialHarm, Value(svc, "al_outcome", NewOutcome, "al_initialoutcome"));
+            Assert.Equal(ResponseRules.ChoicePotentialHarm, Value(svc, "al_response", grade, "al_answerchoice"));
+        }
+
+        [Fact]
         public void A_grade_left_empty_is_not_touched()
         {
             var svc = Seeded();

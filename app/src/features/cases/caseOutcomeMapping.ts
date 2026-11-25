@@ -32,8 +32,11 @@ export interface CaseOutcome {
    */
   fqAccountable: { id: string; name: string } | null;
   aqAccountable: { id: string; name: string } | null;
-  /** The administrator carrying the File Quality fail (requirements log row 10); never exported. */
-  fqAdministrator?: { id: string; name: string } | null;
+  /**
+   * Whether an administrator carries the File Quality fail (requirements log row 10); never
+   * exported. No name since 2026-11-25 (project owner); a name recorded before then still counts.
+   */
+  fqAdministrator?: boolean;
   /**
    * Optimistic-concurrency token passed back as ExpectedRowVersion, so a regrade based on
    * a stale read is refused rather than silently overwriting someone else's correction.
@@ -79,10 +82,7 @@ export function toOutcome(record: Al_outcomes): CaseOutcome {
       record._al_aqaccountablecontactid_value,
       lookupLabel(record, 'al_aqaccountablecontactid', record.al_aqaccountablecontactidname),
     ),
-    fqAdministrator: namedContact(
-      record._al_fqadministratorcontactid_value,
-      lookupLabel(record, 'al_fqadministratorcontactid', record.al_fqadministratorcontactidname),
-    ),
+    fqAdministrator: Boolean(record.al_fqadministratoraccountable) || Boolean(record._al_fqadministratorcontactid_value),
     rowVersion: record.versionnumber != null ? String(record.versionnumber) : null,
   };
 }

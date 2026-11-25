@@ -65,19 +65,55 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Theory]
-        // A fail regraded to a pass: the daily file reports the initial fail, so it still names someone.
-        [InlineData(OutcomeRules.OutcomePass, OutcomeRules.OutcomePotentialHarm, true)]
-        [InlineData(OutcomeRules.OutcomePassWithIssues, OutcomeRules.OutcomeInsufficient, true)]
-        // A pass with issues regraded to a fail: the quarterly file reports the final fail.
-        [InlineData(OutcomeRules.OutcomeInsufficient, OutcomeRules.OutcomePassWithIssues, true)]
+        // A fail regraded to a pass: the daily file reports the initial fail and names someone;
+        // the quarterly file reports the pass and names nobody.
+        [InlineData(OutcomeRules.OutcomePass, OutcomeRules.OutcomePotentialHarm, true, false)]
+        [InlineData(OutcomeRules.OutcomePassWithIssues, OutcomeRules.OutcomeInsufficient, true, false)]
+        // A pass with issues regraded to a fail: only the quarterly file reports the fail.
+        [InlineData(OutcomeRules.OutcomeInsufficient, OutcomeRules.OutcomePassWithIssues, false, true)]
         // Neither grade failed: nobody, in either file.
-        [InlineData(OutcomeRules.OutcomePass, OutcomeRules.OutcomePassWithIssues, false)]
-        [InlineData(OutcomeRules.OutcomePassWithIssues, OutcomeRules.OutcomePassWithIssues, false)]
-        public void Names_are_kept_when_either_the_final_or_the_initial_grade_failed(
-            int effective, int initial, bool named)
+        [InlineData(OutcomeRules.OutcomePass, OutcomeRules.OutcomePassWithIssues, false, false)]
+        public void Each_file_names_people_against_the_grade_it_reports(
+            int effective, int initial, bool namedDaily, bool namedQuarterly)
         {
-            var gate = GenerateExportPlugin.AccountabilityGate(effective, initial);
-            Assert.Equal(named, Names(null, Aq, ResponseRules.ChoicePass, gate.Value));
+            var daily = GenerateExportPlugin.FileOutcome(true, effective, initial);
+            var quarterly = GenerateExportPlugin.FileOutcome(false, effective, initial);
+            Assert.Equal(namedDaily, Names(null, Aq, ResponseRules.ChoicePass, daily.Value));
+            Assert.Equal(namedQuarterly, Names(null, Aq, ResponseRules.ChoicePass, quarterly.Value));
+        }
+
+        [Fact]
+        public void The_daily_file_falls_back_to_the_grade_in_force_when_none_was_first_recorded()
+        {
+            Assert.Equal(OutcomeRules.OutcomePass, GenerateExportPlugin.FileOutcome(true, OutcomeRules.OutcomePass, null));
+        }
+
+        [Theory]
+        [InlineData(ResponseRules.ChoiceFail, OutcomeRules.OutcomePass, null, true)]
+        [InlineData(ResponseRules.ChoicePass, OutcomeRules.OutcomePassWithIssues, null, true)]
+        [InlineData(ResponseRules.ChoicePass, OutcomeRules.OutcomeInsufficient, null, true)]
+        [InlineData(ResponseRules.ChoicePass, OutcomeRules.OutcomePotentialHarm, null, true)]
+        [InlineData(ResponseRules.ChoicePass, OutcomeRules.OutcomePass, null, false)]
+        // A Tax-only case: no advice grade, the Tax verdict decides. The Tax "Pass with issues" is
+        // stored as ChoiceInsufficient (120910302), as case 991106001 in DEV holds it.
+        [InlineData(ResponseRules.ChoicePass, null, ResponseRules.ChoiceFail, true)]
+        [InlineData(ResponseRules.ChoicePass, null, ResponseRules.ChoiceInsufficient, true)]
+        [InlineData(ResponseRules.ChoicePass, null, ResponseRules.ChoicePass, false)]
+        public void The_daily_file_holds_any_type_of_failure_and_no_clean_pass(
+            int fileChoice, int? advice, int? tax, bool belongs)
+        {
+            Assert.Equal(belongs, GenerateExportPlugin.BelongsInDailyFile(fileChoice, advice, tax));
+        }
+
+        [Fact]
+        public void The_batch_is_named_for_its_file_and_range()
+        {
+            var oct1 = new System.DateTime(2026, 10, 1);
+            var dec31 = new System.DateTime(2026, 12, 31);
+            Assert.Equal("Daily file, checked 1 Oct 2026", GenerateExportPlugin.FileName(true, oct1, oct1));
+            Assert.Equal("Quarterly file, checked 1 Oct 2026 to 31 Dec 2026", GenerateExportPlugin.FileName(false, oct1, dec31));
+            Assert.Equal("Quarterly file, every case", GenerateExportPlugin.FileName(false, null, null));
+            Assert.Equal("Daily file, checked on or after 1 Oct 2026", GenerateExportPlugin.FileName(true, oct1, null));
         }
 
         [Fact]

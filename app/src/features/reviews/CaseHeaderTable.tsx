@@ -4,7 +4,7 @@ import type { HeaderField } from './checklistForm';
  * The case header as the Checker Checklist draws it: a ruled table, two label/value pairs
  * to a row, in the document's own order (project owner, 2026-09-13).
  *
- * One component for the case page and the review page. Both draw the same eighteen fields
+ * One component for the case page and the review page. Both draw the same twenty fields
  * from `caseHeaderFields`, and each used to build the pairs itself; the audit of
  * 2026-09-13 found the two copies already disagreeing on how an empty value reads. The
  * pairing is the rule worth sharing - which cell an odd final field leaves empty, and the

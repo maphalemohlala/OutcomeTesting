@@ -2,7 +2,9 @@
 # them (al_advisermapping.al_tcmanagerid), on the same release rule as advisers.
 adx_append: false
 adx_appendto: false
-adx_contactrelationship: contact_al_tcsupervisorcontactid_al_outcomecase
+# Through the case's T&C Managers many-to-many (owner, 2026-11-24): an adviser may have
+# several managers, all equal, and CaseAccessReconciler links every one of them.
+adx_contactrelationship: al_outcomecase_tcmanagers
 adx_create: false
 adx_delete: false
 adx_entitylogicalname: al_outcomecase

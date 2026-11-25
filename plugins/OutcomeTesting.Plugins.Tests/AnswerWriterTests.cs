@@ -19,6 +19,24 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
+        public void A_written_answer_longer_than_the_column_is_refused_by_length_before_anything_is_written()
+        {
+            var svc = new FakeOrganizationService();
+            var payload = new AnswerRequestPayload { QuestionVersionId = VersionId.ToString("D") };
+
+            payload.AnswerText = new string('x', ResponseRules.AnswerTextMaxLength);
+            AnswerWriter.Save(svc, ReviewId, payload);
+
+            payload.AnswerText = new string('x', ResponseRules.AnswerTextMaxLength + 1);
+            var error = Assert.Throws<InvalidPluginExecutionException>(() => AnswerWriter.Save(svc, ReviewId, payload));
+
+            Assert.Equal(
+                "VALIDATION: This answer is 4,001 characters long and can be at most 4,000. Shorten it and it will save.",
+                error.Message);
+            Assert.Single(svc.Creates);
+        }
+
+        [Fact]
         public void Creates_a_response_when_none_exists()
         {
             var svc = new FakeOrganizationService();

@@ -53,6 +53,35 @@ namespace OutcomeTesting.Plugins.Tests
             CaseStatusGuardPlugin.Guard(service, Moving(CaseLifecycle.RemediationInProgress));
         }
 
+        [Fact]
+        public void Refuses_no_check_required_on_a_tier_1_case()
+        {
+            // Client, 2026-11-25: Tier 1 is "High Risk Item 1" on the IO task, always checked.
+            var service = new FakeOrganizationService();
+            service.Seed(
+                "al_outcomecase", CaseId,
+                "al_casestatus", new OptionSetValue(CaseLifecycle.Queued),
+                "al_checklistitems", "Tax Check\nhigh risk item 1 \n");
+
+            var error = Assert.Throws<InvalidPluginExecutionException>(
+                () => CaseStatusGuardPlugin.Guard(service, Moving(CaseLifecycle.NoCheckRequired)));
+
+            Assert.StartsWith(CommandHelpers.PreconditionPrefix, error.Message);
+            Assert.Contains("Tier 1", error.Message);
+        }
+
+        [Fact]
+        public void Allows_no_check_required_when_only_high_risk_item_2_is_ticked()
+        {
+            var service = new FakeOrganizationService();
+            service.Seed(
+                "al_outcomecase", CaseId,
+                "al_casestatus", new OptionSetValue(CaseLifecycle.Queued),
+                "al_checklistitems", "High Risk Item 2");
+
+            CaseStatusGuardPlugin.Guard(service, Moving(CaseLifecycle.NoCheckRequired));
+        }
+
         private static void Grade(FakeOrganizationService service, int aqsOutcome)
         {
             service.Seed(

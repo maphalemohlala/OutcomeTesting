@@ -20,7 +20,7 @@ function valueOf(fields: { label: string; value: string | null }[], label: strin
 }
 
 describe('toDetail choice labels', () => {
-  // Read off detail.header, the single eighteen-field list the Checker Checklist draws two
+  // Read off detail.header, the single twenty-field list the Checker Checklist draws two
   // to a row (project owner, 2026-09-13). It replaced four themed panels - Client, Adviser
   // and paraplanner, Advice and product, Check and tax - which the document has no trace of,
   // so the labels here are the document's own ("For Tax team usage", not "Tax team
@@ -114,5 +114,20 @@ describe('toDetail adviser release (AD-218)', () => {
   it('does not flag a case whose adviser contact is set', () => {
     const matched = { al_casestatus: 120910587, _al_advisercontactid_value: 'contact-1' } as Partial<Al_outcomecases>;
     expect(toDetail(record(matched)).adviserUnmatched).toBe(false);
+  });
+});
+
+describe('toDetail references', () => {
+  // TaskID stays the key; the service case reference is shown beside it (client, 2026-11-24).
+  it('carries the service case reference the upload stored', () => {
+    const detail = toDetail(record({ al_servicecaseref: 'IOA07066846' }));
+    expect(detail.caseReference).toBe('IO-100001');
+    expect(detail.serviceCaseRef).toBe('IOA07066846');
+    expect(valueOf(detail.header, 'Service case reference')).toBe('IOA07066846');
+  });
+
+  it('reports none when a case was uploaded without one', () => {
+    expect(toDetail(record({})).serviceCaseRef).toBeNull();
+    expect(toDetail(record({ al_servicecaseref: '  ' })).serviceCaseRef).toBeNull();
   });
 });

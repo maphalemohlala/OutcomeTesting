@@ -38,7 +38,7 @@ describe('formBlocks', () => {
     section('S-E1', 'Client Objectives & Information (COBS 9.2)', [row('e1', 120910006)], 'Lens one'),
     section('S-E2', 'Risk, Capacity & Loss (COBS 9.2 / FG)', [row('e2', 120910006)], 'Lens two'),
     section('S-CRP', 'Centralised Retirement Proposition', [row('crp1', 120910006)]),
-    section('S-CD', 'Consumer Duty overlay', [row('cd1', 120910009)], 'Short yes/no judgements only. Record any detail once in section H.'),
+    section('S-CD', 'Consumer Duty overlay', [row('cd1', 120910014)], 'Short yes/no judgements only. Record any detail once in section H.'),
     section('S-GRADE', 'Checker judgement and grading', [row('gr1', 120910010)]),
   ];
 
@@ -81,8 +81,8 @@ describe('formBlocks', () => {
     expect(suitability?.kind === 'section' && suitability.options.map((o) => o.label)).toEqual([
       'Pass',
       'Pass with issues',
-      'Potential harm',
       'Insufficient evidence',
+      'Potential harm',
       'N/A',
     ]);
   });
@@ -114,7 +114,8 @@ describe('formBlocks', () => {
     expect(cd?.kind === 'section' && [cd.columnHeading, cd.intro, cd.options.map((o) => o.label)]).toEqual([
       'Outcome',
       null,
-      ['Yes', 'No', 'Insufficient evidence'],
+      // The four outcomes from 2026-11-24, no N/A.
+      ['Pass', 'Pass with issues', 'Insufficient evidence', 'Potential harm'],
     ]);
   });
 

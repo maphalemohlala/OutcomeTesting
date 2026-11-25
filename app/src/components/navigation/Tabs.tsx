@@ -13,13 +13,29 @@ export interface TabItem {
  * Tabbed region following the WAI-ARIA tabs pattern with automatic activation:
  * arrow keys move focus and select, because every panel is already loaded.
  */
-export function Tabs({ label, items }: { label: string; items: TabItem[] }) {
-  const [activeId, setActiveId] = useState<string>(items[0]?.id ?? '');
+export function Tabs({
+  label,
+  items,
+  activeId: controlled,
+  onChange,
+}: {
+  label: string;
+  items: TabItem[];
+  /** Set with onChange when something outside the tab list also switches tabs (a header button). */
+  activeId?: string;
+  onChange?: (id: string) => void;
+}) {
+  const [own, setOwn] = useState<string>(items[0]?.id ?? '');
+  const activeId = controlled ?? own;
+  const setActiveId = (id: string) => {
+    setOwn(id);
+    onChange?.(id);
+  };
   const buttons = useRef<Record<string, HTMLButtonElement | null>>({});
 
   // Fall back to the first tab if the selected one is no longer present.
   const active = items.some((item) => item.id === activeId) ? activeId : (items[0]?.id ?? '');
-  if (active !== activeId) setActiveId(active);
+  if (controlled === undefined && active !== own) setOwn(active);
 
   if (items.length === 0) return null;
 

@@ -122,16 +122,33 @@ namespace OutcomeTesting.Plugins
 
                 var item = (entry.Item ?? string.Empty).Trim();
                 var text = (entry.Text ?? string.Empty).Trim();
+
+                // Formatted words arrive as markup from the card's editor (owner, 2026-11-23)
+                // and are reduced to HtmlSanitiser's allow-list here, so every page that
+                // draws them unescaped draws only that. Plain words are stored as before.
+                var formatted = text.StartsWith("<", StringComparison.Ordinal);
+                if (formatted)
+                {
+                    text = HtmlSanitiser.Clean(text) ?? string.Empty;
+                }
+
                 if (item.Length == 0 || text.Length == 0)
                 {
                     continue;
                 }
 
-                if (text.Length > RemedialActions.MaxLength)
+                if ((formatted ? HtmlSanitiser.TextLength(text) : text.Length) > RemedialActions.MaxLength)
                 {
                     throw new InvalidPluginExecutionException(
                         CommandHelpers.ValidationPrefix + "A remedial action can be at most "
                         + RemedialActions.MaxLength + " characters. Shorten the one for '" + item + "'.");
+                }
+
+                if (text.Length > RemedialActions.StoredMaxLength)
+                {
+                    throw new InvalidPluginExecutionException(
+                        CommandHelpers.ValidationPrefix + "The formatting in the remedial action for '" + item
+                        + "' makes it too long to store. Remove some of the formatting.");
                 }
 
                 map[item] = text;

@@ -45,7 +45,8 @@ internal static class PeopleOnboarding
 
     /// <summary>
     /// Reads email,name,staffcode,roles[,tcmanager[,admin[,objectid]]] with a header row.
-    /// Roles are separated by ';'. tcmanager is the adviser's T&amp;C Manager's email; admin
+    /// Roles are separated by ';'. tcmanager is the adviser's T&amp;C Managers' emails, also
+    /// separated by ';' (an adviser may have several, all equal); admin
     /// "yes" adds the App Admin security role; objectid is the Entra object id, used for a
     /// portal-only person who has no user in the environment.
     /// </summary>
@@ -331,34 +332,51 @@ internal static class PeopleOnboarding
             }
         }
 
-        // 5. Adviser -> T&C Manager mappings, after everyone's contact exists. The sheet is
-        // the source, so a mapping that points elsewhere is moved to the sheet's manager.
+        // 5. Adviser -> T&C Manager mappings, after everyone's contact exists. An adviser may
+        // have several managers (owner, 2026-11-24), so each manager the sheet names gets a row
+        // if it has none; a mapping the sheet does not name is left alone, never moved or
+        // removed - the sheet adds cover, the Adviser mapping page takes it away.
         foreach (var person in people.Where(p => p.TcManager.Length > 0))
         {
-            if (skipped.Contains(person.Email) || skipped.Contains(person.TcManager))
+            var managers = person.TcManager
+                .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Distinct(StringComparer.OrdinalIgnoreCase);
+            foreach (var managerEmail in managers)
             {
-                Console.WriteLine($"  SKIPPED  mapping {person.Email} -> {person.TcManager}: one of them is not a user of this environment");
-                Count("skipped - mapping with a non-user");
-                continue;
-            }
-
-            try
-            {
-                var manager = FindContact(svc, person.TcManager);
-                if (manager == Guid.Empty && apply)
+                if (skipped.Contains(person.Email) || skipped.Contains(managerEmail))
                 {
-                    throw new InvalidOperationException($"no contact has the T&C Manager's email {person.TcManager}");
+                    Console.WriteLine($"  SKIPPED  mapping {person.Email} -> {managerEmail}: one of them is not a user of this environment");
+                    Count("skipped - mapping with a non-user");
+                    continue;
                 }
 
-                var existing = svc.RetrieveMultiple(new QueryExpression("al_advisermapping")
+                try
                 {
-                    ColumnSet = new ColumnSet("al_tcmanagerid"),
-                    TopCount = 1,
-                    Criteria = { Conditions = { new ConditionExpression("al_adviseremail", ConditionOperator.Equal, person.Email) } },
-                }).Entities.FirstOrDefault();
+                    var manager = FindContact(svc, managerEmail);
+                    if (manager == Guid.Empty && apply)
+                    {
+                        throw new InvalidOperationException($"no contact has the T&C Manager's email {managerEmail}");
+                    }
 
-                if (existing == null)
-                {
+                    var existing = manager != Guid.Empty && svc.RetrieveMultiple(new QueryExpression("al_advisermapping")
+                    {
+                        ColumnSet = new ColumnSet(false),
+                        TopCount = 1,
+                        Criteria =
+                        {
+                            Conditions =
+                            {
+                                new ConditionExpression("al_adviseremail", ConditionOperator.Equal, person.Email),
+                                new ConditionExpression("al_tcmanagerid", ConditionOperator.Equal, manager),
+                            },
+                        },
+                    }).Entities.Count > 0;
+
+                    if (existing)
+                    {
+                        continue;
+                    }
+
                     if (apply)
                     {
                         svc.Create(new Entity("al_advisermapping")
@@ -371,21 +389,12 @@ internal static class PeopleOnboarding
 
                     Count("adviser mapping created");
                 }
-                else if (manager == Guid.Empty || existing.GetAttributeValue<EntityReference>("al_tcmanagerid")?.Id != manager)
+                catch (Exception ex)
                 {
-                    if (apply)
-                    {
-                        svc.Update(new Entity("al_advisermapping", existing.Id) { ["al_tcmanagerid"] = new EntityReference("contact", manager) });
-                    }
-
-                    Count("adviser mapping moved to the sheet's manager");
+                    failures.Add($"{person.Email} mapping to {managerEmail}: {ex.Message}");
+                    Console.Error.WriteLine($"  FAILED   {person.Email} mapping to {managerEmail}: {ex.Message}");
+                    Count("failed");
                 }
-            }
-            catch (Exception ex)
-            {
-                failures.Add($"{person.Email} mapping: {ex.Message}");
-                Console.Error.WriteLine($"  FAILED   {person.Email} mapping: {ex.Message}");
-                Count("failed");
             }
         }
 

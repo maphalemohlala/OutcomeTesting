@@ -133,7 +133,7 @@ export function applyFilters(
     if (!withinRange(item.createdOn, filters.from, filters.to)) return false;
     if (search) {
       const haystack =
-        `${item.caseReference} ${item.owner ?? ''} ${item.client ?? ''} ${item.adviser ?? ''}`.toLowerCase();
+        `${item.caseReference} ${item.serviceCaseRef ?? ''} ${item.owner ?? ''} ${item.client ?? ''} ${item.adviser ?? ''}`.toLowerCase();
       if (!haystack.includes(search)) return false;
     }
     return true;

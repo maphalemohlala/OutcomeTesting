@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Al_advisermappingsService, ContactsService } from '../../generated';
+import type { Al_advisermappingsal_adviserstatus } from '../../generated/models/Al_advisermappingsModel';
 import { logTechnical } from '../../services/errors';
 import {
   offeredManagers,
@@ -28,8 +29,9 @@ export type AdviserMappingsState =
  *
  * <p>
  * The mapping decides who is told a sign-off is waiting on a case, and it is also the gate
- * on acting: in the portal only the mapped T&C Manager can sign the case off or record its
- * final outcome (SupervisorMapping.EnsureManagesCase). It controls acting, not seeing.
+ * on acting: in the portal only a mapped T&C Manager can sign the case off or record its
+ * final outcome (SupervisorMapping.EnsureManagesCase). An adviser may have several, all
+ * equal (owner, 2026-11-24): one row each, every one told, any one may sign.
  * </p>
  * <p>
  * The manager list is contacts with a work email, because a mapping to somebody unreachable
@@ -102,12 +104,11 @@ export function useAdviserMappings(reloadKey = 0): AdviserMappingsState {
 }
 
 /**
- * Saves one mapping, creating or replacing the row for that adviser.
+ * Saves one mapping: a new adviser-and-manager row, or a changed manager on an existing row.
  *
  * <p>
- * `al_adviseremail` is the table's alternate key, so a second row for one adviser cannot
- * exist. That is enforced by Dataverse rather than by this function — which is why the
- * server-side resolver can take the first row it finds without checking for ambiguity.
+ * An adviser may have several rows, one per manager. Adviser email + manager is the table's
+ * alternate key, so the same pair cannot be saved twice; Dataverse enforces it.
  * </p>
  */
 export async function saveAdviserMapping(
@@ -152,13 +153,38 @@ export async function saveAdviserMapping(
 }
 
 /**
- * Removes one mapping. Nobody can then sign off that adviser's cases until they are mapped
- * again, and AdviserMappingPlugin takes the cases off the old manager's list.
+ * Sets the adviser's status, which OTIS follows over IO; null hands the decision back to IO.
+ * One row is enough: the server copies it to the adviser's other rows and open cases, and
+ * refuses anyone without the adviser.status capability.
+ */
+export async function saveAdviserStatus(
+  rowId: string,
+  status: number | null,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  try {
+    const result = await Al_advisermappingsService.update(rowId, {
+      // null, not undefined: undefined is dropped from the request and clears nothing.
+      al_adviserstatus: status as unknown as Al_advisermappingsal_adviserstatus,
+    });
+    if (!result.success) {
+      logTechnical('adviser status save', result.error);
+      return { ok: false, reason: describeSaveFailure(result.error) };
+    }
+    return { ok: true };
+  } catch (error) {
+    logTechnical('adviser status save', error);
+    return { ok: false, reason: describeSaveFailure(error) };
+  }
+}
+
+/**
+ * Removes one adviser-and-manager row. That manager stops being told about the adviser's cases
+ * and AdviserMappingPlugin takes the cases off their list; the adviser's other managers, if
+ * any, carry on. With none left, nobody can sign the adviser's cases off.
  *
- * Deleted rather than deactivated. `al_adviseremail` is an alternate key, and an alternate
- * key holds against inactive rows too, so a deactivated mapping would make that adviser
- * impossible to map again - "remove, then map them to someone else" would come back as a
- * duplicate with no row on the page to explain it.
+ * Deleted rather than deactivated. Adviser + manager is an alternate key, and an alternate
+ * key holds against inactive rows too, so a deactivated row would make that manager
+ * impossible to give the adviser again, with no row on the page to explain why.
  *
  * No history is lost by deleting: the mapping carries none, and the audit trail for a
  * sign-off records who was told at the time it happened (F18).

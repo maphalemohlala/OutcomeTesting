@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="FileKind">
+  <description default="Daily or Quarterly: which Trail Light file to produce.">
+    <label description="Daily or Quarterly: which Trail Light file to produce." languagecode="1033" />
+  </description>
+  <displayname default="File kind">
+    <label description="File kind" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>FileKind</name>
+  <type>10</type>
+</customapirequestparameter>

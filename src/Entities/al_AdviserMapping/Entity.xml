@@ -10,7 +10,7 @@
         <LocalizedCollectionName description="Adviser mappings" languagecode="1033" />
       </LocalizedCollectionNames>
       <Descriptions>
-        <Description description="Maps an adviser, by their work email, to the T&amp;C Manager who is notified about their cases and who owns the remediation sign-off (Fixes 5, AD-162). Routing only: it grants no access and restricts none, because T&amp;C Managers read every case (AD-158 era permission model, Phase 1)." languagecode="1033" />
+        <Description description="Maps an adviser, by their work email, to a T&amp;C Manager who is notified about their cases and may sign off their remediation (Fixes 5, AD-162). One row per adviser and manager: an adviser may have several managers, all equal (owner, 2026-11-24), and every one of them is linked to the adviser&apos;s released cases (al_outcomecase_tcmanagers), which is what lets them read a case on the portal." languagecode="1033" />
       </Descriptions>
       <attributes>
         <attribute PhysicalName="al_AdviserEmail">
@@ -50,7 +50,7 @@
             <displayname description="Adviser email" languagecode="1033" />
           </displaynames>
           <Descriptions>
-            <Description description="The adviser's work email, as al_outcomecase.al_adviseremail carries it from the extract. The alternate key, so one adviser cannot hold two conflicting mappings." languagecode="1033" />
+            <Description description="The adviser's work email, as al_outcomecase.al_adviseremail carries it from the extract. With the T&amp;C Manager, the alternate key: an adviser may have several managers, but never the same one twice." languagecode="1033" />
           </Descriptions>
         </attribute>
         <attribute PhysicalName="al_AdviserMappingId">
@@ -166,7 +166,7 @@
             <displayname description="T&amp;C Manager" languagecode="1033" />
           </displaynames>
           <Descriptions>
-            <Description description="The contact who is notified about this adviser's cases and owns the remediation sign-off. A Contact rather than a system user, so a T&amp;C Manager is reachable by email without a Dataverse licence (BR-009, as AD-081 has it for the para-planner)." languagecode="1033" />
+            <Description description="A contact who is notified about this adviser's cases and may sign off their remediation. A Contact rather than a system user, so a T&amp;C Manager is reachable by email without a Dataverse licence (BR-009, as AD-081 has it for the para-planner)." languagecode="1033" />
           </Descriptions>
         </attribute>
         <attribute PhysicalName="CreatedBy">
@@ -723,15 +723,16 @@
       </attributes>
       <EntityKeys>
         <EntityKey>
-          <Name>al_AdviserMappingEmailKey</Name>
-          <LogicalName>al_advisermappingemailkey</LogicalName>
-          <IntroducedVersion>1.0.4.0</IntroducedVersion>
+          <Name>al_AdviserManagerKey</Name>
+          <LogicalName>al_advisermanagerkey</LogicalName>
+          <IntroducedVersion>1.0.40.0</IntroducedVersion>
           <IsCustomizable>0</IsCustomizable>
           <EntityKeyAttributes>
             <AttributeName>al_adviseremail</AttributeName>
+            <AttributeName>al_tcmanagerid</AttributeName>
           </EntityKeyAttributes>
           <displaynames>
-            <displayname description="Adviser email" languagecode="1033" />
+            <displayname description="Adviser and T&amp;C Manager" languagecode="1033" />
           </displaynames>
         </EntityKey>
       </EntityKeys>

@@ -168,7 +168,10 @@ namespace OutcomeTesting.Plugins.Tests
             AdviserContactPlugin.Follow(counted, Email, Guid.NewGuid());
 
             Assert.Equal(2, counted.QueriesOf("team"));
-            Assert.Equal(1, counted.QueriesOf("al_advisermapping"));
+
+            // Once for the reconciler, plus once per moved action's letter: each asks whether the
+            // adviser is a new entrant, which OTIS's adviser status decides.
+            Assert.Equal(1 + Cases.Length, counted.QueriesOf("al_advisermapping"));
             foreach (var caseId in Cases)
             {
                 Assert.Equal(Adviser, fake.Row("al_outcomecase", caseId)

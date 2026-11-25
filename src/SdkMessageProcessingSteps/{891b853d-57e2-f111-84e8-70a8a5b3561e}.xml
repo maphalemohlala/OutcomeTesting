@@ -5,7 +5,7 @@
   <PluginTypeId>bf435f18-57e2-f111-84e8-70a8a5b3561e</PluginTypeId>
   <PrimaryEntity>al_outcome</PrimaryEntity>
   <AsyncAutoDelete>0</AsyncAutoDelete>
-  <FilteringAttributes>al_finaloutcome,al_regradereason,al_regradedon,al_finalisedon,al_fqadviseraccountable,al_fqparaplanneraccountable,al_aqadviseraccountable,al_aqparaplanneraccountable,al_fqaccountablecontactid,al_aqaccountablecontactid,al_fqadministratorcontactid</FilteringAttributes>
+  <FilteringAttributes>al_finaloutcome,al_regradereason,al_regradedon,al_finalisedon,al_fqadviseraccountable,al_fqparaplanneraccountable,al_aqadviseraccountable,al_aqparaplanneraccountable,al_fqaccountablecontactid,al_aqaccountablecontactid,al_fqadministratorcontactid,al_fqadministratoraccountable</FilteringAttributes>
   <ImpersonatingUserIdName></ImpersonatingUserIdName>
   <InvocationSource>1</InvocationSource>
   <Mode>0</Mode>

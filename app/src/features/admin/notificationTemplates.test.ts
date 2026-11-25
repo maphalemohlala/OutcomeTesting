@@ -83,7 +83,7 @@ describe('notificationTemplates', () => {
     it('matches the assembly, letter for letter', () => {
       // The two remediation letters are built by RemediationBody(harm), whose two variable
       // sentences sit either side of a ternary, so they are checked separately below.
-      const computed = new Set(['REMEDIATION-PASS-WITH-ISSUES', 'REMEDIATION-HARM']);
+      const computed = new Set(['REMEDIATION-PASS-WITH-ISSUES', 'REMEDIATION-INSUFFICIENT', 'REMEDIATION-HARM']);
 
       for (const code of TEMPLATE_CODES) {
         const hint = templateHint(code)!;
@@ -105,6 +105,8 @@ describe('notificationTemplates', () => {
 
     it('matches the assembly on the two letters it builds from a condition', () => {
       const harm = templateHint('REMEDIATION-HARM')!.body;
+      // Insufficient evidence has its own letter, built from the same harm half of the condition.
+      expect(templateHint('REMEDIATION-INSUFFICIENT')!.body).toBe(harm);
       const issues = templateHint('REMEDIATION-PASS-WITH-ISSUES')!.body;
 
       // Every literal RemediationBody declares outside its ternary appears in both.

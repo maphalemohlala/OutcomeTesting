@@ -47,11 +47,12 @@ Every displayed answerable question is mandatory before its section can be submi
 | `PassFail` | Pass, Fail | file quality outcome |
 | `PassFailInsufficient` | Pass, Fail, Insufficient evidence | suitability, CRP |
 | `YesNoNA` | Yes, No, N/A | AML and CRA |
-| `YesNoInsufficient` | Yes, No, Insufficient evidence | Consumer Duty |
+| `YesNoInsufficient` | Yes, No, Insufficient evidence | Consumer Duty until 2026-11-24 (reviews answered before then keep it) |
 | `YesNo` | Yes, No | remedial action required |
 | `Grade` | Pass, Pass with issues, Insufficient evidence, Potential harm | advice quality grade (BR-005) |
 | `PassFailInsufficientNa` (120910012) | Pass, Fail, Insufficient evidence, N/A | CRP (AD-219, 2026-09-24); every Suitability test point, Q-E1-01 to Q-E5-04 (Q-E4-03 from 2026-09-24, the rest from 2026-09-25, AD-223) |
 | `MultiSelectRootCause` (120910013) | the nine root causes, several permitted | primary root cause, Q-GR-02 v2 (AD-219) |
+| `OutcomeScale` (120910014) | Pass, Pass with issues, Insufficient evidence, Potential harm - exactly these four, Potential harm stored as 120910304 | Consumer Duty, Q-CD-01 to Q-CD-04 (project owner, 2026-11-24). Below Pass raises a remedial item; record-only for grading |
 
 ## Case header (Outcome Case columns, not questions)
 
@@ -200,6 +201,12 @@ These override anything below that disagrees, including AD-231's "allow any answ
   and -03 are owed on a Tax only check alone; on other routes the page records them unseen because
   the fail point ticks hang off Q-FQTAX-01. The Tax form lists only the new Tax file quality
   category of fail point, which AQS does not see.
+- **UAT, 2026-11-25**: three categories, not four - Calculations (Q-TAX-05/06), **Wording**
+  (Q-TAX-07/08, reworded from Taxation Narrative by retire-and-succeed) and Other
+  (Q-TAX-11/12). Omissions (Q-TAX-09/10) is retired, so reviews submitted before keep it. The
+  completed-check PDF prints only the review's own team's fail points, as the page does, and
+  is landscape. "The product outcome does not align with the intended tax objective" joins
+  the Tax file quality points. On Tax then AQS the File Quality Outcome block is drawn hidden.
 - **Client contact required?** is answered by the AQS checker on the remedial card, parked as
   `__clientcontact__` and written to each action raised. A Tax only case has no AQS checker, so
   it stays blank there.
@@ -374,7 +381,9 @@ for MI, because an N/A is an answer.
 
 ## S-CD — Consumer Duty overlay
 
-Owner: AQS checker. Response type `YesNoInsufficient`, all mandatory. **No intro line from
+Owner: AQS checker. Response type `OutcomeScale` (120910014: Pass, Pass with issues, Insufficient
+evidence, Potential harm) from 2026-11-24, `YesNoInsufficient` before; all mandatory. The answers
+raise remedial items below Pass but do not restrict the advice quality grade. **No intro line from
 2026-09-24** (project owner; AD-219): the document's "Short yes/no judgements only. Record any
 detail once in section H." is cleared from the section's help text and suppressed in all three
 renderers, so an environment still holding the text does not print it. The paragraph below

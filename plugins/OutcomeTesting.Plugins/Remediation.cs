@@ -221,8 +221,10 @@ namespace OutcomeTesting.Plugins
         /// direction that kept every yes/no scale out.</b> Each reaches exactly the questions
         /// it was asked for and nothing else, which is why the widening is by scale:
         ///
-        /// - Yes / No / Insufficient evidence is used only by Q-CD-01 to Q-CD-04, the
-        ///   Consumer Duty overlay's four outcomes.
+        /// - Yes / No / Insufficient evidence was used only by Q-CD-01 to Q-CD-04, the
+        ///   Consumer Duty overlay's four outcomes, until they moved to the outcome scale
+        ///   (Pass / Pass with issues / Insufficient evidence / Potential harm, project owner
+        ///   2026-11-24). Both stay listed: reviews answered before the move keep their answers.
         /// - Yes / No / N/A is used only by Q-AML-01 to Q-AML-05, section S-AMLCRA.
         ///
         /// <b>Plain Yes / No is deliberately still out, and it is not the same omission.</b>
@@ -243,7 +245,8 @@ namespace OutcomeTesting.Plugins
                 || responseType == ResponseRules.TypePassFailInsufficient
                 || responseType == ResponseRules.TypePassFailInsufficientNa
                 || responseType == ResponseRules.TypeYesNoInsufficient
-                || responseType == ResponseRules.TypeYesNoNa;
+                || responseType == ResponseRules.TypeYesNoNa
+                || responseType == ResponseRules.TypeOutcomeScale;
         }
 
         /// <summary>The scales <see cref="IsRemediableScale"/> admits, for the pre-filter below.</summary>
@@ -254,6 +257,7 @@ namespace OutcomeTesting.Plugins
             ResponseRules.TypePassFailInsufficientNa,
             ResponseRules.TypeYesNoInsufficient,
             ResponseRules.TypeYesNoNa,
+            ResponseRules.TypeOutcomeScale,
         };
 
         /// <summary>
@@ -291,8 +295,8 @@ namespace OutcomeTesting.Plugins
         /// <b>N/A is not a failure</b> and is the reason the AML scale cannot be read by
         /// <see cref="ResponseRules.IsNonPass"/> alone: a checking point that does not apply
         /// to this case is answered N/A, and putting that in front of an adviser as
-        /// something to put right would be worse than saying nothing. Potential harm cannot
-        /// reach here, being only on the grade scale.
+        /// something to put right would be worse than saying nothing. Potential harm reaches
+        /// here only from the Consumer Duty outcome scale; the grade scale is not remediable.
         /// </summary>
         public static bool IsNonPassAnswer(int responseType, int choice)
         {
@@ -317,6 +321,14 @@ namespace OutcomeTesting.Plugins
             {
                 return choice == ResponseRules.ChoiceNo
                     || choice == ResponseRules.ChoiceInsufficient;
+            }
+
+            // A Consumer Duty outcome below Pass is owed a remedial action, whichever of the three.
+            if (responseType == ResponseRules.TypeOutcomeScale)
+            {
+                return choice == ResponseRules.ChoicePassWithIssues
+                    || choice == ResponseRules.ChoiceInsufficient
+                    || choice == ResponseRules.ChoicePotentialHarm;
             }
 
             return ResponseRules.IsNonPass(choice);
@@ -1010,9 +1022,9 @@ namespace OutcomeTesting.Plugins
             var remedial = (remedialAction ?? string.Empty).Trim();
             if (remedial.Length > 0)
             {
-                action[RemedialActions.ActionAttr] = remedial.Length <= RemedialActions.MaxLength
+                action[RemedialActions.ActionAttr] = remedial.Length <= RemedialActions.StoredMaxLength
                     ? remedial
-                    : remedial.Substring(0, RemedialActions.MaxLength);
+                    : remedial.Substring(0, RemedialActions.StoredMaxLength);
             }
 
             // Set only when resolved. Writing an explicit null would be the same row to

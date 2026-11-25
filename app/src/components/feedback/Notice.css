@@ -1,18 +1,26 @@
+/* Inline feedback: a tinted card with a coloured edge. The words carry the meaning; the tone
+   only says how urgently to read them. */
 .notice {
-  margin-bottom: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--text-sm);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
   border: 1px solid var(--colour-border);
+  border-left-width: 4px;
+  border-radius: var(--radius-lg);
+  background: var(--colour-surface);
+  font-size: var(--text-sm);
 }
 
 .notice[data-tone='success'] {
-  border-color: var(--colour-action);
+  border-color: var(--colour-outcome-pass);
+  background: #eaf5ee;
 }
 
 .notice[data-tone='error'] {
-  border-color: var(--colour-outcome-harm);
+  border-color: var(--colour-danger-text);
+  background: var(--colour-danger-bg);
 }
 
 .notice[data-tone='info'] {
-  border-color: var(--colour-action);
+  border-color: var(--brand-teal);
+  background: var(--colour-chip);
 }

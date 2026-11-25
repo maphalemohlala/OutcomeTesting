@@ -48,6 +48,8 @@ namespace OutcomeTesting.Plugins
         private const string RouteCodeTaxOnly = "ROUTE-TAX";
         private const string DispositionAttr = "al_taxteamdisposition";
         private const int DispositionReturnToParaplanner = 120910571;
+        private const int DispositionSubmitToAqs = 120910570;
+        private const string ChecklistItemsAttr = "al_checklistitems";
 
         public const int CommandUpdateCaseDetails = 120910778;
 
@@ -331,9 +333,9 @@ namespace OutcomeTesting.Plugins
 
         /// <summary>
         /// BR-004 route derivation: Tax check required Yes routes the case Tax then AQS, No
-        /// routes it AQS only. Tax team disposition is not an input - it advances or ends the
-        /// route rather than choosing it, and Tax only is only reachable through the AD-036
-        /// wrong-route reassignment (an explicit RouteId). The route is recalculated only when
+        /// routes it AQS only. Yes routes it Tax only instead when the Tax check is the case's
+        /// only checklist item, and the Tax team's disposition overrides both: Return to
+        /// paraplanner makes it Tax only, Submit to AQS keeps the AQS leg. The route is recalculated only when
         /// the tax answer changes or the case has no route yet, so a deliberate reassignment
         /// is never silently reverted by an unrelated edit.
         ///
@@ -397,7 +399,13 @@ namespace OutcomeTesting.Plugins
                 switch (afterTax.Value)
                 {
                     case TaxCheckRequiredYes:
-                        code = RouteCodeTaxThenAqs;
+                        // A case whose only checklist item is the Tax check owes no AQS check
+                        // (project owner, 2026-11-25), unless the Tax team sends it on to AQS.
+                        var items = update.Contains(ChecklistItemsAttr)
+                            ? update.GetAttributeValue<string>(ChecklistItemsAttr)
+                            : before.GetAttributeValue<string>(ChecklistItemsAttr);
+                        var submittedToAqs = afterDisposition != null && afterDisposition.Value == DispositionSubmitToAqs;
+                        code = !submittedToAqs && IsTaxCheckOnly(items) ? RouteCodeTaxOnly : RouteCodeTaxThenAqs;
                         break;
                     case TaxCheckRequiredNo:
                         code = RouteCodeAqsOnly;
@@ -421,6 +429,30 @@ namespace OutcomeTesting.Plugins
 
             update[RouteAttr] = new EntityReference(RouteEntity, routeId.Value);
             changes.Add("Route " + Describe(currentRoute) + " -> " + code + " (derived from the case)");
+        }
+
+        /// <summary>
+        /// True when the case's checklist names the Tax check and nothing else. The import
+        /// stores the items one per line under their canonical names, so the "Tax" alias has
+        /// already become "Tax Check" by the time it is read here.
+        /// </summary>
+        public static bool IsTaxCheckOnly(string checklistItems)
+        {
+            if (string.IsNullOrWhiteSpace(checklistItems))
+            {
+                return false;
+            }
+
+            var named = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in checklistItems.Split('\n'))
+            {
+                if (item.Trim().Length > 0)
+                {
+                    named.Add(item.Trim());
+                }
+            }
+
+            return named.Count == 1 && named.Contains("Tax Check");
         }
 
         /// <summary>
@@ -639,7 +671,7 @@ namespace OutcomeTesting.Plugins
 
         private static ColumnSet BuildBeforeColumnSet()
         {
-            var columns = new List<string> { StatusAttr, RouteAttr, PriorityAttr, DueDateAttr, CaseAdviser.EmailAttr };
+            var columns = new List<string> { StatusAttr, RouteAttr, PriorityAttr, DueDateAttr, CaseAdviser.EmailAttr, ChecklistItemsAttr };
             foreach (var key in Editables.Keys)
             {
                 if (!columns.Contains(key))

@@ -87,10 +87,10 @@ namespace OutcomeTesting.Plugins
         /// to the shared queue for a manager to assign the AQS checker rather than moving
         /// straight to a named person. This is a handoff, not a backwards step.
         ///
-        /// Awaiting Sign-off also returns to Queued (OD-038, project owner direction
-        /// 2026-09-09): a Tax check that raised remediation holds the case until that
-        /// remediation is approved, and the AQS check then follows. The case has to go
-        /// through remediation before it can reach AQS, not instead of it.
+        /// Awaiting Sign-off also returns to Queued, for a case remediated after AQS that
+        /// still owes a recheck. It no longer carries a Tax remediation to AQS (OD-038,
+        /// reversed 2026-09-20): with AQS still to come, a Tax submit raises nothing and the
+        /// AQS submit raises one combined remediation (OutcomeRules.NextCaseStatusForTax).
         /// </summary>
         private static readonly Dictionary<int, int[]> Allowed = new Dictionary<int, int[]>
         {

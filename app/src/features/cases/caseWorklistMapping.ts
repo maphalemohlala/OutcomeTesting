@@ -36,7 +36,10 @@ export interface CaseOutcomeGrades {
 
 export interface CaseSummary {
   id: string;
+  /** The TaskID: the case key. */
   caseReference: string;
+  /** ServiceCaseSequentialRef, the reference people quote; two tasks can share one. */
+  serviceCaseRef: string | null;
   route: ReviewRoute | null;
   status: CaseStatus;
   owner: string | null;
@@ -232,7 +235,7 @@ export function productNamesByCase(
 
 /** Every column toSummary and the dashboard read, so a page does not pull the whole row. */
 export const CASE_SUMMARY_COLUMNS = [
-  'al_outcomecaseid', 'al_casereference', '_al_reviewrouteid_value', 'al_casestatus', '_ownerid_value',
+  'al_outcomecaseid', 'al_casereference', 'al_servicecaseref', '_al_reviewrouteid_value', 'al_casestatus', '_ownerid_value',
   'al_priority', 'createdon', 'al_taxoutcome', 'al_clientname', 'al_advisername', 'al_advisercode',
   'al_adviseremail', 'al_paraplanner', 'al_paraplannercode', 'al_paraplanneremail', 'al_taxcheckername',
   'al_aqscheckername', '_al_taxcheckercontactid_value', '_al_aqscheckercontactid_value', 'al_casetype',
@@ -252,6 +255,7 @@ export function toSummary(record: Al_outcomecases, grades?: CaseOutcomeGrades): 
   return {
     id: record.al_outcomecaseid,
     caseReference: record.al_casereference,
+    serviceCaseRef: record.al_servicecaseref?.trim() || null,
     route: toRoute(lookupLabel(record, 'al_reviewrouteid', record.al_reviewrouteidname)),
     status,
     owner: lookupLabel(record, 'ownerid', record.owneridname),

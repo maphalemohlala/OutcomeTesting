@@ -1,34 +1,37 @@
 .shell {
   display: grid;
-  grid-template-columns: var(--rail-width) 1fr;
+  grid-template-columns: var(--rail-width) minmax(0, 1fr);
   grid-template-rows: var(--header-height) 1fr;
   grid-template-areas:
-    'header header'
-    'rail main';
+    'side header'
+    'side main';
   min-height: 100vh;
 }
 
-.shell__header {
-  grid-area: header;
+/* The sidebar: brand, menu and the signed-in person, pinned while the page scrolls. */
+.shell__sidebar {
+  grid-area: side;
+  position: sticky;
+  top: 0;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding: 0 var(--space-4);
+  flex-direction: column;
+  height: 100vh;
   background: var(--colour-surface-inverse);
   color: var(--colour-text-inverse);
 }
 
 .shell__brand {
   display: flex;
-  align-items: center;
-  gap: var(--space-2);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-5) var(--space-4);
 }
 
-/* The logo is dark teal for the portal's white header, so it needs a white plate here. */
+/* The logo's own colours need a white ground on the dark rail, as in the portal header. */
 .shell__logo {
   display: flex;
-  padding: 3px var(--space-2);
+  padding: var(--space-2) var(--space-3);
   background: var(--brand-white);
   border-radius: var(--radius);
 }
@@ -36,30 +39,12 @@
 .shell__logo svg {
   display: block;
   width: auto;
-  height: 32px;
-}
-
-.shell__product {
-  font-family: var(--font-heading);
-  font-size: var(--text-lg);
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
-
-.shell__user {
-  font-size: var(--text-sm);
-  color: var(--colour-text-inverse);
-}
-
-.shell__user--error {
-  color: var(--colour-text-on-inverse-accent);
+  height: 2rem;
 }
 
 .shell__rail {
-  grid-area: rail;
-  padding: var(--space-4) 0;
-  background: var(--colour-surface);
-  border-right: 1px solid var(--colour-border);
+  flex: 1;
+  padding: var(--space-3) var(--space-3) var(--space-4);
   overflow-y: auto;
 }
 
@@ -68,76 +53,252 @@
 }
 
 .shell__group-heading {
-  margin: 0 0 var(--space-1);
+  margin: 0;
 }
 
+/* The group label is still a button, since a group can be folded away, but it reads as a label. */
 .shell__toggle {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   width: 100%;
-  padding: var(--space-2) var(--space-4);
+  padding: var(--space-2) var(--space-3);
   background: none;
   border: 0;
-  color: var(--colour-text);
+  border-radius: var(--radius);
+  color: var(--colour-text-inverse-muted);
   font-family: var(--font-body);
-  font-size: var(--text-base);
-  font-weight: 600;
+  font-size: var(--text-sm);
+  font-weight: 500;
   text-align: left;
   cursor: pointer;
 }
 
 .shell__toggle:hover {
-  color: var(--colour-action);
+  color: var(--colour-text-inverse);
 }
 
 .shell__chevron {
   flex: none;
+  margin-left: auto;
   width: 0;
   height: 0;
-  border-left: 5px solid currentColor;
-  border-top: 4px solid transparent;
-  border-bottom: 4px solid transparent;
-  transition: transform 120ms ease;
+  border-left: 4px solid currentColor;
+  border-top: 3px solid transparent;
+  border-bottom: 3px solid transparent;
+  opacity: 0;
+  transition: transform 120ms ease, opacity 120ms ease;
+}
+
+.shell__toggle:hover .shell__chevron,
+.shell__toggle:focus-visible .shell__chevron,
+.shell__toggle[aria-expanded='false'] .shell__chevron {
+  opacity: 1;
 }
 
 .shell__toggle[aria-expanded='true'] .shell__chevron {
   transform: rotate(90deg);
 }
 
-/* Children sit indented under the parent label with a guide rail. */
 .shell__list {
+  display: grid;
+  gap: 2px;
   list-style: none;
-  margin: 0 0 0 calc(var(--space-4) + 0.5rem);
+  margin: 0;
   padding: 0;
-  border-left: 1px solid var(--colour-border);
 }
 
 .shell__link {
-  display: block;
-  margin-left: -1px;
-  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
-  border-left: 2px solid transparent;
-  color: var(--colour-text-muted);
-  font-size: var(--text-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: 8px;
+  color: rgb(255 255 255 / 0.86);
+  font-size: 0.9375rem;
   text-decoration: none;
 }
 
-.shell__link:hover {
-  background: var(--colour-surface-sunken);
-  color: var(--colour-text);
+.shell__icon {
+  flex: none;
+  width: 1.125rem;
+  height: 1.125rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.85;
 }
 
+.shell__link:hover {
+  background: rgb(255 255 255 / 0.06);
+  color: var(--colour-text-inverse);
+}
+
+/* Where you are: a lifted row with the gold edge, never colour alone. */
 .shell__link.active {
-  border-left-color: var(--colour-action);
-  background: var(--colour-surface-sunken);
+  background: var(--brand-ink-raised);
+  box-shadow: inset 3px 0 0 var(--brand-gold);
+  color: var(--colour-text-inverse);
+  font-weight: 600;
+}
+
+/* The open-case count beside the worklist: quiet, pushed to the row's end. */
+.shell__badge {
+  margin-left: auto;
+  font-size: var(--text-sm);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  color: var(--colour-text-inverse-muted);
+}
+
+.shell__link:focus-visible,
+.shell__toggle:focus-visible {
+  outline-color: var(--brand-gold);
+}
+
+.shell__user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0 var(--space-3);
+  padding: var(--space-4) var(--space-2) var(--space-5);
+  border-top: 1px solid rgb(255 255 255 / 0.1);
+  font-size: var(--text-sm);
+  color: var(--colour-text-inverse);
+}
+
+.shell__user--error {
+  color: var(--colour-text-on-inverse-accent);
+}
+
+.shell__avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: #c9d6de;
+  color: #3d5566;
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.shell__user-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.shell__user-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell__user-role {
+  color: var(--colour-text-inverse-muted);
+}
+
+/* The top bar: where this page sits, and a way to any case from anywhere. */
+.shell__header {
+  grid-area: header;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 0 var(--space-7);
+  border-bottom: 1px solid var(--colour-border);
+}
+
+.shell__crumbs ol {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-base);
+  color: var(--colour-text-muted);
+}
+
+.shell__crumbs li + li::before {
+  content: '';
+  display: inline-block;
+  width: 0.4rem;
+  height: 0.4rem;
+  margin: 0 var(--space-3) 0.1rem 0;
+  border-top: 1.5px solid currentColor;
+  border-right: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.shell__crumbs a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.shell__crumbs a:hover {
+  color: var(--colour-text);
+  text-decoration: underline;
+}
+
+.shell__crumbs [aria-current='page'] {
   color: var(--colour-text);
   font-weight: 600;
 }
 
+.shell__search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: min(23rem, 45vw);
+}
+
+.shell__search-icon {
+  position: absolute;
+  left: var(--space-3);
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: var(--colour-text-muted);
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.shell__search input {
+  width: 100%;
+  padding: var(--space-2) 2.25rem;
+  border: 1px solid var(--colour-border);
+  border-radius: 8px;
+  background: var(--colour-surface);
+  color: var(--colour-text);
+  font: inherit;
+}
+
+.shell__search input::placeholder {
+  color: var(--colour-text-muted);
+}
+
+.shell__search kbd {
+  position: absolute;
+  right: var(--space-3);
+  padding: 0 0.35rem;
+  border: 1px solid var(--colour-border-strong);
+  border-radius: 4px;
+  color: var(--colour-text-muted);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  pointer-events: none;
+}
+
 .shell__main {
   grid-area: main;
-  padding: var(--space-5);
+  padding: var(--space-7);
   overflow-x: auto;
 }
 
@@ -145,24 +306,56 @@
   outline: none;
 }
 
-/* Tablet: the rail becomes a horizontal task bar rather than a shrunken column. */
+/* Tablet: the sidebar becomes a band above the page, and the rail a horizontal task bar. */
 @media (max-width: 60rem) {
   .shell {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
+      'side'
       'header'
-      'rail'
       'main';
-    grid-template-rows: var(--header-height) auto 1fr;
+    grid-template-rows: auto var(--header-height) 1fr;
+  }
+
+  .shell__sidebar {
+    position: static;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'brand user'
+      'nav nav';
+    height: auto;
+  }
+
+  .shell__brand {
+    grid-area: brand;
+    flex-direction: row;
+    align-items: center;
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .shell__logo svg {
+    height: 1.5rem;
+  }
+
+  .shell__user {
+    grid-area: user;
+    margin: 0;
+    padding: var(--space-3) var(--space-4);
+    border-top: none;
+  }
+
+  .shell__user-text {
+    display: none;
   }
 
   .shell__rail {
+    grid-area: nav;
     display: flex;
     align-items: center;
     gap: var(--space-2);
     padding: var(--space-2) var(--space-4);
-    border-right: none;
-    border-bottom: 1px solid var(--colour-border);
+    border-top: 1px solid rgb(255 255 255 / 0.1);
     overflow-x: auto;
 
     /*
@@ -189,30 +382,43 @@
   .shell__group + .shell__group {
     margin-top: 0;
     padding-left: var(--space-2);
-    border-left: 1px solid var(--colour-border);
+    border-left: 1px solid rgb(255 255 255 / 0.15);
   }
 
   .shell__list {
     display: flex;
     gap: var(--space-1);
-    margin-left: 0;
-    border-left: none;
   }
 
   .shell__link {
-    margin-left: 0;
     padding: var(--space-1) var(--space-2);
-    border-left: none;
-    border-bottom: 3px solid transparent;
     white-space: nowrap;
   }
+
+  .shell__link .shell__icon {
+    display: none;
+  }
+
   .shell__link.active {
-    border-left: none;
-    border-bottom-color: var(--colour-action);
+    box-shadow: inset 0 -2px 0 var(--brand-gold);
+  }
+
+  .shell__header {
+    padding: 0 var(--space-4);
   }
 
   .shell__main {
-    padding: var(--space-4);
+    padding: var(--space-5) var(--space-4);
+  }
+}
+
+@media (max-width: 40rem) {
+  .shell__crumbs {
+    display: none;
+  }
+
+  .shell__search {
+    width: 100%;
   }
 }
 
@@ -230,8 +436,8 @@
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--colour-outcome-issues);
   border-left-width: 4px;
-  border-radius: var(--radius);
-  background: var(--colour-surface-sunken);
+  border-radius: var(--radius-lg);
+  background: var(--colour-surface);
   color: var(--colour-text);
   line-height: 1.5;
 }

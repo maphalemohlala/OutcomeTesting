@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
@@ -382,10 +382,11 @@ namespace OutcomeTesting.Plugins
         /// approve. A case reached Awaiting Sign-off and waited for somebody to notice.
         /// </para>
         /// <para>
-        /// <b>Routing, not authorisation.</b> Every T&amp;C Manager may still sign off any
-        /// case; the mapping only decides who is told. So an unmapped adviser costs a
-        /// notification, not the ability to proceed, and the sign-off stays possible for
-        /// anyone who goes looking.
+        /// <b>Every manager is told.</b> An adviser may have several T&amp;C Managers, all equal
+        /// (owner, 2026-11-24), and any of them may sign the case off
+        /// (<see cref="SupervisorMapping"/>), so each gets their own letter, greeted by name, on
+        /// an outbox row of their own: the occurrence carries the manager, so a second
+        /// manager's copy is not taken for a replay of the first.
         /// </para>
         /// <para>
         /// Never throws. The adviser has just finished their work and the case has already
@@ -400,13 +401,18 @@ namespace OutcomeTesting.Plugins
             EntityReference caseRef,
             Guid correlationId,
             Action<string> trace,
-            // A coach taking over a waiting case is told in the same round the old coach was,
-            // so their letter needs an outbox row of its own.
-            string handover = null)
+            // Only these managers, when some were just linked to a case already waiting; the
+            // rest were told when it started waiting. Null tells every manager.
+            ICollection<Guid> onlyTo = null)
         {
             try
             {
                 var routing = TcManagerRouting.ForCase(service, caseRef);
+                if (trace != null && routing.IsRouted && !string.IsNullOrEmpty(routing.Reason))
+                {
+                    trace("Sign-off due on case " + caseRef.Id.ToString("D") + ": " + routing.Reason);
+                }
+
                 if (!routing.IsRouted)
                 {
                     if (trace != null)
@@ -419,53 +425,58 @@ namespace OutcomeTesting.Plugins
                 }
 
                 var reference = NotificationOutbox.CaseReference(service, caseRef) ?? "a case";
-
-                // Who it greets and whose work it reports (2026-10-08).
-                var manager = routing.Manager == null
-                    ? null
-                    : service.Retrieve("contact", routing.Manager.Id, new ColumnSet("fullname"))
-                        .GetAttributeValue<string>("fullname");
                 var adviser = service.Retrieve("al_outcomecase", caseRef.Id, new ColumnSet("al_advisername"))
                     .GetAttributeValue<string>("al_advisername");
+                var round = SignoffRound(service, caseRef.Id);
 
-                // The case's own remediation page, where the sign-off is made (reported
-                // 2026-10-08: the coach had to find the case under "Awaiting T&C sign-off").
-                var letter = NotificationTemplates.Render(
-                    service,
-                    NotificationTemplates.SignoffDue,
-                    new Dictionary<string, string>
+                foreach (var recipient in routing.Recipients)
+                {
+                    if (onlyTo != null && !onlyTo.Contains(recipient.Manager.Id))
                     {
-                        { NotificationTemplates.TokenReference, reference },
-                        {
-                            NotificationTemplates.TokenRecipient,
-                            string.IsNullOrWhiteSpace(manager) ? "T&C Manager" : manager.Trim()
-                        },
-                        {
-                            NotificationTemplates.TokenAdviser,
-                            string.IsNullOrWhiteSpace(adviser) ? "The adviser" : adviser.Trim()
-                        },
-                        {
-                            NotificationTemplates.TokenCaseButton,
-                            NotificationTemplates.CaseButton(
-                                NotificationOutbox.RemediationLink(service, caseRef),
-                                NotificationTemplates.Definition(NotificationTemplates.SignoffDue).ButtonLabel)
-                        },
-                    },
-                    caseRef);
+                        continue;
+                    }
 
-                NotificationOutbox.Queue(
-                    service,
-                    correlationId,
-                    NotificationOutbox.EventSignoffDue,
-                    "al_outcomecase",
-                    caseRef.Id,
-                    routing.Email,
-                    letter.Subject,
-                    letter.Body,
-                    NotificationTemplates.SignoffDue,
-                    handover == null
-                        ? SignoffRound(service, caseRef.Id)
-                        : SignoffRound(service, caseRef.Id) + "-" + handover);
+                    // Who it greets and whose work it reports (2026-10-08).
+                    var manager = service.Retrieve("contact", recipient.Manager.Id, new ColumnSet("fullname"))
+                        .GetAttributeValue<string>("fullname");
+
+                    // The case's own remediation page, where the sign-off is made (reported
+                    // 2026-10-08: the coach had to find the case under "Awaiting T&C sign-off").
+                    var letter = NotificationTemplates.Render(
+                        service,
+                        NotificationTemplates.SignoffDue,
+                        new Dictionary<string, string>
+                        {
+                            { NotificationTemplates.TokenReference, reference },
+                            {
+                                NotificationTemplates.TokenRecipient,
+                                string.IsNullOrWhiteSpace(manager) ? "T&C Manager" : manager.Trim()
+                            },
+                            {
+                                NotificationTemplates.TokenAdviser,
+                                string.IsNullOrWhiteSpace(adviser) ? "The adviser" : adviser.Trim()
+                            },
+                            {
+                                NotificationTemplates.TokenCaseButton,
+                                NotificationTemplates.CaseButton(
+                                    NotificationOutbox.RemediationLink(service, caseRef),
+                                    NotificationTemplates.Definition(NotificationTemplates.SignoffDue).ButtonLabel)
+                            },
+                        },
+                        caseRef);
+
+                    NotificationOutbox.Queue(
+                        service,
+                        correlationId,
+                        NotificationOutbox.EventSignoffDue,
+                        "al_outcomecase",
+                        caseRef.Id,
+                        recipient.Email,
+                        letter.Subject,
+                        letter.Body,
+                        NotificationTemplates.SignoffDue,
+                        round + "-" + ManagerKey(recipient.Manager.Id));
+                }
             }
             catch (Exception error)
             {
@@ -493,6 +504,15 @@ namespace OutcomeTesting.Plugins
         /// the actions because a sign-off made on the portal need not carry the case.
         /// </para>
         /// </summary>
+        /// <summary>
+        /// The part of an outbox occurrence that tells one manager's letter from another's: a
+        /// hash of the whole id, since two ids can share their first characters.
+        /// </summary>
+        public static string ManagerKey(Guid managerId)
+        {
+            return NotificationOutbox.ShortHash(managerId.ToString("D"));
+        }
+
         public static string SignoffRound(IOrganizationService service, Guid caseId)
         {
             var actions = new QueryExpression(ActionEntity)

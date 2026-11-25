@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Xrm.Sdk;
@@ -1624,40 +1624,29 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// Parks each Tax category answered Yes under its name, its comments as its words, so
-        /// the adviser's action carries them without the checker writing them twice. Refreshed
-        /// from the answers on every submit: a category changed to No takes its words with it.
-        /// True when any category owes a remedial action.
+        /// Each Tax category answered Yes is a row on the remedial actions card, and its
+        /// words are the card's (<see cref="TaxCategories.Settle"/>). Refreshed on every
+        /// submit: a category changed to No takes its words with it. True when any category
+        /// owes a remedial action.
         /// </summary>
         private static bool ParkTaxCategories(IOrganizationService service, Guid reviewId, SubmitReads reads)
         {
-            var raised = TaxCategories.Raised(
-                code => AnswerChoiceFor(service, reviewId, code, reads),
-                code => AnswerTextFor(service, reviewId, code, reads));
+            var raised = TaxCategories.Raised(code => AnswerChoiceFor(service, reviewId, code, reads));
+            var map = RemedialActions.Pending(service, reviewId);
+            var before = RemedialActions.Serialise(map);
 
-            var refusal = TaxCategories.Refusal(raised);
+            var refusal = TaxCategories.Settle(raised, map);
             if (refusal != null)
             {
                 throw new InvalidPluginExecutionException(PreconditionPrefix + refusal);
             }
 
-            var map = RemedialActions.Pending(service, reviewId);
-            if (raised.Count == 0 && TaxCategories.Parked(map).Count == 0)
+            var after = RemedialActions.Serialise(map);
+            if (after != before)
             {
-                return false;
+                service.Update(new Entity(ReviewEntity, reviewId) { [RemedialActions.PendingAttr] = after });
             }
 
-            foreach (var category in TaxCategories.All)
-            {
-                map.Remove(category.Name);
-            }
-
-            foreach (var pair in raised)
-            {
-                map[pair.Key] = pair.Value;
-            }
-
-            service.Update(new Entity(ReviewEntity, reviewId) { [RemedialActions.PendingAttr] = RemedialActions.Serialise(map) });
             return raised.Count > 0;
         }
 

@@ -105,8 +105,9 @@ namespace OutcomeTesting.Plugins
                         return AdviserEmail(service, caseRef);
 
                     case KindTcManager:
+                        // The first reachable manager; Resolve writes to every one of them.
                         var routing = TcManagerRouting.ForCase(service, caseRef);
-                        return routing == null ? null : routing.Email;
+                        return routing == null || routing.Recipients.Count == 0 ? null : routing.Recipients[0].Email;
 
                     case KindParaplanner:
                         return NotificationOutbox.ParaplannerEmail(service, caseRef);
@@ -158,6 +159,11 @@ namespace OutcomeTesting.Plugins
 
             foreach (var kind in choice.Kinds)
             {
+                if (kind == KindTcManager && ManagersOf(service, caseRef, resolved))
+                {
+                    continue;
+                }
+
                 var email = EmailFor(service, kind, caseRef, reviewRef, null);
                 resolved.Add(new Resolved
                 {
@@ -186,6 +192,34 @@ namespace OutcomeTesting.Plugins
             }
 
             return resolved;
+        }
+
+        /// <summary>
+        /// Adds one recipient per reachable T&amp;C Manager of the case (an adviser may have
+        /// several, owner 2026-11-24). False when there is none, so the caller records why.
+        /// </summary>
+        private static bool ManagersOf(IOrganizationService service, EntityReference caseRef, List<Resolved> resolved)
+        {
+            try
+            {
+                var routing = TcManagerRouting.ForCase(service, caseRef);
+                if (routing == null || routing.Recipients.Count == 0)
+                {
+                    return false;
+                }
+
+                foreach (var recipient in routing.Recipients)
+                {
+                    resolved.Add(new Resolved { Who = Name(KindTcManager), Email = recipient.Email.Trim() });
+                }
+
+                return true;
+            }
+            catch (Exception)
+            {
+                // As EmailFor: a recipient that cannot be worked out costs the letter, never the save.
+                return false;
+            }
         }
 
         /// <summary>

@@ -76,6 +76,8 @@ export interface CaseDetail {
   id: string;
   title: string;
   caseReference: string;
+  /** ServiceCaseSequentialRef: what people quote; not unique, so never the key. */
+  serviceCaseRef: string | null;
   status: CaseStatus;
   statusValue: number;
   route: ReviewRoute | null;
@@ -91,7 +93,7 @@ export interface CaseDetail {
    */
   adviserUnmatched: boolean;
   /**
-   * The case header exactly as the Checker Checklist draws it: eighteen fields, two to a
+   * The case header exactly as the Checker Checklist draws it: twenty fields, two to a
    * row (project owner, 2026-09-13). One list rather than the four themed groups this page
    * used to show - Client, Adviser and paraplanner, Advice and product, Check and tax -
    * because the document has no such grouping and a reader comparing the app with the paper
@@ -144,6 +146,7 @@ export function toDetail(
     id: record.al_outcomecaseid,
     title: text(record.al_name) ?? record.al_casereference,
     caseReference: record.al_casereference,
+    serviceCaseRef: text(record.al_servicecaseref),
     status: Al_outcomecasesal_casestatus[record.al_casestatus] as CaseStatus,
     statusValue: record.al_casestatus,
     route: toRoute(lookupLabel(record, 'al_reviewrouteid', record.al_reviewrouteidname)),

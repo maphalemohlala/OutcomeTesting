@@ -9,6 +9,8 @@ export interface AdviserMappingRow {
   managerId: string | null;
   managerName: string | null;
   managerEmail: string | null;
+  /** The adviser status OTIS holds (al_adviserstatus option value); null when IO decides. */
+  status?: number | null;
 }
 
 export interface ContactOption {
@@ -68,6 +70,7 @@ export function managerChoices(
 export interface RawAdviserMapping {
   al_advisermappingid: string;
   al_adviseremail?: string | null;
+  al_adviserstatus?: number | null;
   _al_tcmanagerid_value?: string | null;
   /**
    * Present only on a FetchXML/SDK read. The Web API expresses a lookup's label as the
@@ -120,6 +123,7 @@ export function toMappingRows(
       managerId,
       managerName: managerNameFor(row, contacts),
       managerEmail: nonBlank(contactById(contacts, managerId)?.email),
+      status: row.al_adviserstatus ?? null,
     };
   });
 }
@@ -139,6 +143,72 @@ export function filterMappings(
     [row.adviserEmail, row.adviserName, row.managerName, row.managerEmail].some(
       (value) => (value ?? '').toLowerCase().includes(needle),
     ),
+  );
+}
+
+/**
+ * True when a row maps an adviser to themselves: the manager's work email is the adviser's.
+ * Matched by email, never by name, so two people who share a name are not confused. The save
+ * refuses this now, so only rows from before that rule can show it.
+ */
+export function isSelfMapped(row: AdviserMappingRow): boolean {
+  const adviser = row.adviserEmail.trim().toLowerCase();
+  return adviser !== '' && adviser === (row.managerEmail ?? '').trim().toLowerCase();
+}
+
+export interface AdviserGroup {
+  adviserEmail: string;
+  adviserName: string | null;
+  /** One row per manager: an adviser may have several, all equal (owner, 2026-11-24). */
+  managers: AdviserMappingRow[];
+  /** Kept the same on every row by the server; the first row that carries one answers. */
+  status?: number | null;
+}
+
+/**
+ * Each adviser once, with every mapping row they hold, in the order the rows came. Advisers
+ * are matched on email ignoring case, as the server matches a case to its mapping.
+ */
+export function groupByAdviser(rows: readonly AdviserMappingRow[]): AdviserGroup[] {
+  const groups = new Map<string, AdviserGroup>();
+  for (const row of rows) {
+    const key = row.adviserEmail.trim().toLowerCase();
+    const group = groups.get(key) ?? { adviserEmail: row.adviserEmail, adviserName: row.adviserName, managers: [] };
+    group.managers.push(row);
+    group.status = group.status ?? row.status ?? null;
+    groups.set(key, group);
+  }
+  return [...groups.values()];
+}
+
+/**
+ * The advisers to show for a search: every adviser with a row that matches, each with ALL
+ * their managers, so a search by one manager's name still shows who else covers the adviser.
+ */
+export function filterAdvisers(rows: readonly AdviserMappingRow[], search: string): AdviserGroup[] {
+  const hits = new Set(filterMappings(rows, search).map((r) => r.adviserEmail.trim().toLowerCase()));
+  return groupByAdviser(rows).filter((g) => hits.has(g.adviserEmail.trim().toLowerCase()));
+}
+
+export interface ManagerLoad {
+  managerId: string;
+  name: string;
+  /** The advisers this manager covers, by name where a contact carries one. */
+  advisers: string[];
+}
+
+/** Each mapped T&C Manager with the advisers they cover, most advisers first. */
+export function managerLoads(rows: readonly AdviserMappingRow[]): ManagerLoad[] {
+  const byManager = new Map<string, ManagerLoad>();
+  for (const row of rows) {
+    const id = (row.managerId ?? '').trim().toLowerCase();
+    if (id === '') continue;
+    const load = byManager.get(id) ?? { managerId: id, name: row.managerName ?? 'Manager on record', advisers: [] };
+    load.advisers.push(row.adviserName ?? row.adviserEmail);
+    byManager.set(id, load);
+  }
+  return [...byManager.values()].sort(
+    (a, b) => b.advisers.length - a.advisers.length || a.name.localeCompare(b.name),
   );
 }
 

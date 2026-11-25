@@ -7,6 +7,7 @@ import {
   type FailReasonRow,
 } from './failReasons';
 import { reinstateFailReason, retireFailReason, saveFailReason, useFailReasons } from './useFailReasons';
+import { Skeleton } from '../../components/feedback/Skeleton';
 
 /**
  * The File Quality fail points the checklist ticks, managed beside the questions they sit
@@ -97,7 +98,7 @@ export function FailPointsPanel({ canEdit }: { canEdit: boolean }) {
           {problem}
         </p>
       ) : null}
-      {state.status === 'loading' ? <p role="status">Loading the fail points…</p> : null}
+      {state.status === 'loading' ? <Skeleton label="Loading the fail points…" /> : null}
       {state.status === 'unavailable' ? <p className="library__muted">{state.reason}</p> : null}
 
       {state.status === 'ready' ? (

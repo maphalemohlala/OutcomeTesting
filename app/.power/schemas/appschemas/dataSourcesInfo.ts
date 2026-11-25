@@ -405,37 +405,6 @@ export const dataSourcesInfo = {
       }
     }
   },
-  "al_createexportbatch": {
-    "tableId": "",
-    "version": "",
-    "primaryKey": "",
-    "dataSourceType": "Dataverse",
-    "apis": {
-      "al_CreateExportBatch": {
-        "path": "/api/data/v9.2/al_CreateExportBatch",
-        "method": "POST",
-        "parameters": [
-          {
-            "name": "Name",
-            "in": "body",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "IdempotencyKey",
-            "in": "body",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "responseInfo": {
-          "200": {
-            "type": "object"
-          }
-        }
-      }
-    }
-  },
   "al_createrole": {
     "tableId": "",
     "version": "",
@@ -594,6 +563,24 @@ export const dataSourcesInfo = {
             "name": "IdempotencyKey",
             "in": "body",
             "required": true,
+            "type": "string"
+          },
+          {
+            "name": "FileKind",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "CheckedFrom",
+            "in": "body",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "CheckedTo",
+            "in": "body",
+            "required": false,
             "type": "string"
           }
         ],
@@ -1197,6 +1184,12 @@ export const dataSourcesInfo = {
             "in": "body",
             "required": false,
             "type": "string"
+          },
+          {
+            "name": "FqAdministrator",
+            "in": "body",
+            "required": false,
+            "type": "boolean"
           }
         ],
         "responseInfo": {

@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="CheckedTo">
+  <description default="Last check date to include, yyyy-mm-dd. Omit for no upper bound.">
+    <label description="Last check date to include, yyyy-mm-dd. Omit for no upper bound." languagecode="1033" />
+  </description>
+  <displayname default="Checked to">
+    <label description="Checked to" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>1</isoptional>
+  <name>CheckedTo</name>
+  <type>10</type>
+</customapirequestparameter>

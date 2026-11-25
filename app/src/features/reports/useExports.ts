@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Al_exportbatchesService, Al_exportrecordsService } from '../../generated';
 import { Al_exportbatchesal_batchstatus, type Al_exportbatches } from '../../generated/models/Al_exportbatchesModel';
+import type { Al_exportrecords } from '../../generated/models/Al_exportrecordsModel';
 import { choiceLabel } from '../../lib/choiceLabel';
-import { isRecordId } from '../../services/odata';
 import { readAll } from '../../services/readAll';
-import { toExportRecordRow, type ExportRecordRow } from './exportRecordRow';
-
 
 interface ExportBatchRow {
   id: string;
@@ -22,7 +20,6 @@ type Loaded<T> =
   | ({ status: 'ready' } & T);
 
 export type ExportBatchesState = Loaded<{ batches: ExportBatchRow[] }>;
-export type ExportRecordsState = Loaded<{ records: ExportRecordRow[] }>;
 
 const UNAVAILABLE = 'Exports could not be loaded from Dataverse.';
 
@@ -39,61 +36,6 @@ function toBatchRow(b: Al_exportbatches): ExportBatchRow {
     generatedOn: b.al_generatedon ?? null,
     rowCount: Number(b.al_rowcount ?? 0),
   };
-}
-
-/**
- * One batch, and the id and generation time of every batch generated before it: its default
- * daily file starts on the day the previous batch was generated, so without them every batch
- * covered only its day before and a weekend's checks reached no default file.
- * A filtered read rather than get(), so a batch that is not there stays an empty answer
- * ("Batch not found") and only a failed read is "cannot be shown".
- */
-export async function loadExportBatch(batchId: string): Promise<ExportBatchesState> {
-  const result = await Al_exportbatchesService.getAll({ filter: `al_exportbatchid eq ${batchId}`, top: 1 });
-  if (!result.success) return { status: 'unavailable', reason: UNAVAILABLE };
-  const own = result.data[0]?.al_generatedon ? new Date(result.data[0].al_generatedon) : null;
-  if (!own || Number.isNaN(own.getTime())) return { status: 'ready', batches: result.data.map(toBatchRow) };
-
-  const earlier = await readAll((o) => Al_exportbatchesService.getAll(o), {
-    select: ['al_exportbatchid', 'al_generatedon'],
-    filter: `al_generatedon lt ${own.toISOString()}`,
-    orderBy: ['al_generatedon desc', 'al_exportbatchid asc'],
-  });
-  if (!earlier.success) return { status: 'unavailable', reason: UNAVAILABLE };
-  return { status: 'ready', batches: [...result.data, ...earlier.data].map(toBatchRow) };
-}
-
-/** {@link loadExportBatch} for the batch page. */
-export function useExportBatch(batchId: string): ExportBatchesState {
-  const [state, setState] = useState<ExportBatchesState>({ status: 'loading' });
-  const [loadedFor, setLoadedFor] = useState(batchId);
-
-  // Reset to loading when the route's batch changes, without a setState-in-effect.
-  if (batchId !== loadedFor) {
-    setLoadedFor(batchId);
-    setState({ status: 'loading' });
-  }
-
-  useEffect(() => {
-    // The id comes from the route, so it is untrusted until it parses as a record id.
-    if (!isRecordId(batchId)) return;
-    let cancelled = false;
-
-    loadExportBatch(batchId)
-      .then((loaded) => {
-        if (!cancelled) setState(loaded);
-      })
-      .catch(() => {
-        if (!cancelled) setState({ status: 'unavailable', reason: UNAVAILABLE });
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [batchId]);
-
-  // No batch has an id that is not one; the records read says what is wrong with the link.
-  return isRecordId(batchId) ? state : { status: 'ready', batches: [] };
 }
 
 export function useExportBatches(reloadKey: number): ExportBatchesState {
@@ -128,38 +70,13 @@ export function useExportBatches(reloadKey: number): ExportBatchesState {
 }
 
 /**
- * One batch's rows. Read per batch because every batch snapshots every closed case (and every
- * graded one still open), so the table grows by the whole closed caseload each time and cannot
- * be read in one go.
+ * One batch's rows, in the order they were written. The batch holds exactly one file's rows, so
+ * this is the file. Null when they could not be read.
  */
-export function useExportRecords(batchId: string): ExportRecordsState {
-  const [state, setState] = useState<ExportRecordsState>({ status: 'loading' });
-
-  useEffect(() => {
-    // The id comes from the route, so it is untrusted until it parses as a record id.
-    if (!isRecordId(batchId)) return;
-    let cancelled = false;
-
-    readAll((o) => Al_exportrecordsService.getAll(o), {
-      filter: `_al_exportbatchid_value eq ${batchId}`,
-      orderBy: ['createdon desc', 'al_exportrecordid asc'],
-    })
-      .then((result) => {
-        if (cancelled) return;
-        setState(
-          result.success
-            ? { status: 'ready', records: result.data.map((row) => toExportRecordRow(row)) }
-            : { status: 'unavailable', reason: UNAVAILABLE },
-        );
-      })
-      .catch(() => {
-        if (!cancelled) setState({ status: 'unavailable', reason: UNAVAILABLE });
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [batchId]);
-
-  return isRecordId(batchId) ? state : { status: 'unavailable', reason: UNAVAILABLE };
+export async function loadExportRecords(batchId: string): Promise<Al_exportrecords[] | null> {
+  const result = await readAll((o) => Al_exportrecordsService.getAll(o), {
+    filter: `_al_exportbatchid_value eq ${batchId}`,
+    orderBy: ['createdon asc', 'al_exportrecordid asc'],
+  });
+  return result.success ? result.data : null;
 }

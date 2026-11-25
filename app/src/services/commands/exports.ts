@@ -1,27 +1,21 @@
 import { executeCommand, type CommandResult } from './commandClient';
 
 /**
- * Trail Light export commands (AD-003, AD-039, AD-034 manual only). CreateExportBatch
- * opens a Draft run; GenerateExport snapshots each Closed case into the AD-039 20-column
- * shape and marks the batch Generated. Both are server-side Custom APIs that enforce the
- * caller and write an immutable Audit Event.
+ * The Trail Light export command (AD-003, AD-039, AD-034 manual only). One call produces one
+ * file: GenerateExport creates the batch under the id given and snapshots the rows of the Daily
+ * or Quarterly file for the check dates given. Server-side, it enforces the caller and writes an
+ * immutable Audit Event.
  */
 
-export interface CreateExportBatchInput {
-  name?: string;
-  idempotencyKey: string;
-}
-
-export interface CreateExportBatchOutput {
-  BatchId: string;
-  Status: string;
-  AuditEventId: string;
-  Conflict: boolean;
-}
+export type TrailLightFileKind = 'Daily' | 'Quarterly';
 
 export interface GenerateExportInput {
   batchId: string;
   idempotencyKey: string;
+  fileKind: TrailLightFileKind;
+  /** yyyy-mm-dd, both ends included; empty for an open bound. */
+  checkedFrom: string;
+  checkedTo: string;
 }
 
 export interface GenerateExportOutput {
@@ -32,19 +26,13 @@ export interface GenerateExportOutput {
   Conflict: boolean;
 }
 
-export function createExportBatch(
-  input: CreateExportBatchInput,
-): Promise<CommandResult<CreateExportBatchOutput>> {
-  const body: Record<string, unknown> = { IdempotencyKey: input.idempotencyKey };
-  if (input.name) {
-    body.Name = input.name;
-  }
-  return executeCommand<CreateExportBatchOutput>('al_CreateExportBatch', body);
-}
-
 export function generateExport(input: GenerateExportInput): Promise<CommandResult<GenerateExportOutput>> {
-  return executeCommand<GenerateExportOutput>('al_GenerateExport', {
+  const body: Record<string, unknown> = {
     BatchId: input.batchId,
     IdempotencyKey: input.idempotencyKey,
-  });
+    FileKind: input.fileKind,
+  };
+  if (input.checkedFrom) body.CheckedFrom = input.checkedFrom;
+  if (input.checkedTo) body.CheckedTo = input.checkedTo;
+  return executeCommand<GenerateExportOutput>('al_GenerateExport', body);
 }

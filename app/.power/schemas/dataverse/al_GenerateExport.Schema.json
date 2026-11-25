@@ -31,6 +31,30 @@
                 "type": "string",
                 "x-ms-dataverse-type": "StringType",
                 "x-ms-csdl-type": "Edm.String"
+              },
+              {
+                "name": "FileKind",
+                "in": "body",
+                "required": true,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              },
+              {
+                "name": "CheckedFrom",
+                "in": "body",
+                "required": false,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              },
+              {
+                "name": "CheckedTo",
+                "in": "body",
+                "required": false,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
               }
             ],
             "responses": {

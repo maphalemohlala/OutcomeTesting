@@ -8,18 +8,17 @@
 
 .users th,
 .users td {
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
   text-align: left;
   vertical-align: middle;
   border-bottom: 1px solid var(--colour-border);
 }
 
 .users thead th {
-  background: var(--colour-surface-sunken);
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  background: var(--colour-surface);
+  font-size: var(--text-sm);
   color: var(--colour-text-muted);
+  font-weight: 500;
 }
 
 .users tbody th {
@@ -27,8 +26,11 @@
 }
 
 .users__actions {
-  display: flex;
-  gap: var(--space-3);
+  white-space: nowrap;
+}
+
+.users__actions > * + * {
+  margin-left: var(--space-2);
 }
 
 .users__link {
@@ -37,12 +39,14 @@
   background: none;
   color: var(--colour-action);
   font: inherit;
+  font-weight: 600;
   cursor: pointer;
-  text-decoration: underline;
+  text-decoration: none;
 }
 
 .users__link:hover {
   color: var(--colour-action-hover);
+  text-decoration: underline;
 }
 
 .users__link:focus-visible {

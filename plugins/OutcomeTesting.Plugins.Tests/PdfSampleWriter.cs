@@ -17,6 +17,8 @@ namespace OutcomeTesting.Plugins.Tests
     /// </summary>
     public class PdfSampleWriter
     {
+        private static readonly Guid AqsReviewId = Guid.Parse("a9e51111-1111-4111-8111-111111111111");
+
         [Fact]
         public void Write_a_sample_when_asked()
         {
@@ -33,17 +35,35 @@ namespace OutcomeTesting.Plugins.Tests
 
             service.Seed("al_remediationaction", Guid.NewGuid(),
                 "al_outcomecaseid", caseRef,
-                "al_reviewinstanceid", new EntityReference("al_reviewinstance", Guid.NewGuid()) { Name = "AQS check" },
+                "al_reviewinstanceid", new EntityReference("al_reviewinstance", AqsReviewId) { Name = "AQS check" },
                 "al_description",
                 "Issues found on the check:\n- ID verification completed and retained for all relevant clients/parties.: No\n"
                 + "- Client objectives clearly evidenced and specific: Fail\n\n"
                 + "Raised automatically when the review was submitted (Insufficient evidence).",
+                RemedialActions.ActionAttr, "Legacy plain action.\nRe-verify ID <today> & file it.",
                 "al_actionstatus", new OptionSetValue(Remediation.StatusCompleted),
                 "al_duedate", new DateTime(2026, 10, 5, 0, 0, 0, DateTimeKind.Utc),
                 "al_completedon", new DateTime(2026, 9, 26, 9, 0, 0, DateTimeKind.Utc),
                 "al_adviserresponse", "ID re-verified and retained on file; objectives restated in the suitability report.",
                 "al_assignedcontactid", new EntityReference("contact", Guid.NewGuid()) { Name = "Adam Strumidlo" },
                 "createdon", new DateTime(2026, 9, 25, 10, 0, 0, DateTimeKind.Utc),
+                "statecode", 0);
+
+            // A checker's rich remedial action (2026-11-23), to see the formatting drawn.
+            service.Seed("al_remediationaction", Guid.NewGuid(),
+                "al_outcomecaseid", caseRef,
+                "al_reviewinstanceid", new EntityReference("al_reviewinstance", AqsReviewId) { Name = "AQS check" },
+                "al_description", "Issues found on the check:\n- Client objectives clearly evidenced and specific: Fail",
+                "al_actionstatus", new OptionSetValue(Remediation.StatusOpen),
+                "al_duedate", new DateTime(2026, 10, 5, 0, 0, 0, DateTimeKind.Utc),
+                "al_assignedcontactid", new EntityReference("contact", Guid.NewGuid()) { Name = "Adam Strumidlo" },
+                "createdon", new DateTime(2026, 9, 25, 10, 1, 0, DateTimeKind.Utc),
+                RemedialActions.ActionAttr,
+                "<p>Please <strong>restate the objectives</strong> in the report and <u>re-issue it</u>; "
+                + "<em>do not</em> change the fund choice.</p>"
+                + "<ul><li>Objectives in the client&#39;s own words, long enough to wrap onto a second line of the cell</li>"
+                + "<li>Attitude to risk &amp; capacity for loss</li></ul>"
+                + "<ol><li>Update the report</li><li>Send it to the client</li></ol>",
                 "statecode", 0);
 
             foreach (var document in CompletedCheckPdf.Documents(service, caseRef))

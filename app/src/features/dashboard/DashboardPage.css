@@ -6,50 +6,52 @@
  */
 
 .dashboard__link {
-  color: var(--colour-action);
-  text-decoration: none;
+  color: var(--colour-text-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
   font-size: var(--text-sm);
-  font-weight: 600;
 }
 
 .dashboard__link:hover {
-  text-decoration: underline;
+  color: var(--colour-action);
 }
 
-/* Work in hand: one bordered strip, cells divided by rules rather than boxed */
+/* Work in hand: four figures, each its own card, label above the number */
 
 .dashboard__strip {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-  margin-bottom: var(--space-4);
-  background: var(--colour-surface);
-  border: 1px solid var(--colour-border);
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
 }
 
 .dashboard__figure {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-4) var(--space-5) var(--space-4);
+  flex-direction: column-reverse;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
   color: inherit;
   text-decoration: none;
 }
 
-.dashboard__figure + .dashboard__figure {
-  border-left: 1px solid var(--colour-border);
+a.dashboard__figure:hover {
+  border-color: var(--colour-border-strong);
 }
 
-a.dashboard__figure:hover,
 a.dashboard__row:hover {
-  background: var(--colour-surface-sunken);
+  background: var(--colour-surface-hover);
 }
 
 .dashboard__figure-value {
-  font-family: var(--font-heading);
-  font-size: var(--text-3xl);
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 3rem;
+  font-weight: 500;
   line-height: 1;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: lining-nums tabular-nums;
 }
 
 .dashboard__figure-value[data-zero] {
@@ -64,7 +66,7 @@ a.dashboard__row:hover {
 }
 
 .dashboard__figure-label {
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
   color: var(--colour-text-muted);
 }
 
@@ -77,19 +79,24 @@ a.dashboard__row:hover {
   margin-bottom: var(--space-4);
 }
 
-@media (min-width: 64rem) {
-  .dashboard__panels--weighted {
-    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+@media (min-width: 80rem) {
+  .dashboard__panels--three {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr);
   }
+}
+
+.dashboard__panel--wide {
+  margin-bottom: var(--space-5);
 }
 
 .dashboard__panel {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-4) var(--space-5) var(--space-3);
+  gap: var(--space-4);
+  padding: var(--space-5);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
 }
 
 .dashboard__panel-heading {
@@ -97,12 +104,10 @@ a.dashboard__row:hover {
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-4);
-  padding-bottom: var(--space-2);
-  border-bottom: 1px solid var(--colour-border);
 }
 
 .dashboard__panel-heading h2 {
-  font-size: var(--text-lg);
+  font-size: 1.0625rem;
 }
 
 .dashboard__panel-meta {
@@ -115,13 +120,14 @@ a.dashboard__row:hover {
 
 .dashboard__stack {
   display: flex;
-  gap: 2px;
-  height: 10px;
+  gap: 4px;
+  height: 20px;
 }
 
 .dashboard__stack-segment {
   flex-grow: 0;
   flex-shrink: 1;
+  border-radius: 3px;
   background: var(--colour-outcome-none);
 }
 
@@ -170,13 +176,16 @@ a.dashboard__row:hover {
 
 .dashboard__track {
   display: block;
-  height: 8px;
+  height: 6px;
+  border-radius: var(--radius-pill);
   background: var(--colour-surface-sunken);
 }
 
 .dashboard__bar {
   display: block;
-  height: 8px;
+  width: calc(var(--share) * 1%);
+  height: 100%;
+  border-radius: inherit;
   background: var(--colour-stage-active);
 }
 
@@ -271,6 +280,7 @@ a.dashboard__row:hover {
   padding: var(--space-4);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
 }
 
 .dashboard__unavailable h2 {
@@ -278,9 +288,379 @@ a.dashboard__row:hover {
   font-size: var(--text-lg);
 }
 
+/* The band across the top: only what is late, in the sidebar's ink so it reads first. */
+
+.dashboard__attention {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-5) var(--space-6);
+  margin-bottom: var(--space-5);
+  padding: var(--space-5) var(--space-6);
+  border-radius: var(--radius-lg);
+  background: var(--colour-surface-inverse);
+  color: var(--colour-text-inverse-muted);
+}
+
+.dashboard__alert {
+  display: flex;
+  flex: 1 1 22rem;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.dashboard__alert + .dashboard__alert {
+  padding-left: var(--space-6);
+  border-left: 1px solid rgb(255 255 255 / 0.15);
+}
+
+.dashboard__alert .numeral {
+  font-size: 3.25rem;
+  color: var(--brand-gold);
+}
+
+.dashboard__alert strong {
+  display: block;
+  font-size: var(--text-lg);
+  color: var(--colour-text-inverse);
+}
+
+.dashboard__attention-action {
+  flex: none;
+  margin-left: auto;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius);
+  background: var(--colour-surface);
+  color: var(--colour-action);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.dashboard__attention-action:hover {
+  background: var(--colour-chip);
+}
+
+.dashboard__attention-action:focus-visible {
+  outline-color: var(--brand-gold);
+}
+
+/* Where cases sit: one column per stage, the count above the stage and its share. */
+
+.dashboard__ledger--pipeline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+}
+
+.dashboard__ledger--pipeline .dashboard__row,
+.dashboard__ledger--tiles .dashboard__row,
+.dashboard__ledger--columns .dashboard__row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  height: 100%;
+  border-bottom: none;
+}
+
+.dashboard__ledger--pipeline .dashboard__row {
+  padding: var(--space-2) var(--space-5) var(--space-3);
+  border-radius: var(--radius);
+}
+
+.dashboard__ledger--pipeline li + li .dashboard__row {
+  border-left: 1px solid var(--colour-border);
+}
+
+.dashboard__ledger--pipeline .dashboard__count,
+.dashboard__ledger--tiles .dashboard__count,
+.dashboard__ledger--columns .dashboard__count {
+  order: -1;
+  font-family: var(--font-display);
+  font-weight: 500;
+  text-align: left;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+.dashboard__ledger--pipeline .dashboard__count {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.dashboard__ledger--pipeline .dashboard__row[data-zero] .dashboard__count {
+  color: var(--colour-border-strong);
+}
+
+.dashboard__ledger--pipeline .dashboard__ledger-label {
+  font-size: var(--text-base);
+}
+
+.dashboard__ledger--pipeline .dashboard__track {
+  margin-top: auto;
+}
+
+/* Remediation: four tiles, the late ones tinted. */
+
+.dashboard__ledger--tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.dashboard__ledger--tiles li:last-child .dashboard__row {
+  border-bottom: 1px solid var(--colour-border);
+}
+
+.dashboard__ledger--tiles .dashboard__row {
+  padding: var(--space-4);
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius);
+}
+
+.dashboard__ledger--tiles .dashboard__spine {
+  align-items: baseline;
+  white-space: normal;
+  font-size: var(--text-sm);
+}
+
+.dashboard__ledger--tiles .dashboard__count {
+  font-size: 2.25rem;
+  line-height: 1;
+}
+
+.dashboard__ledger--tiles .dashboard__row:has([data-tone='blocked']) {
+  background: var(--colour-danger-bg);
+  border-color: transparent;
+}
+
+.dashboard__ledger--tiles .dashboard__row:has([data-tone='blocked']) .dashboard__count {
+  color: var(--colour-danger-text);
+}
+
+a.dashboard__row:has([data-tone='blocked']):hover {
+  border-color: var(--colour-danger-text);
+}
+
+/* Ageing: one column per band, drawn up from a shared baseline. */
+
+.dashboard__ledger--columns {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+  align-items: end;
+}
+
+.dashboard__ledger--columns .dashboard__row {
+  align-items: center;
+  justify-content: flex-end;
+  height: 13.5rem;
+  padding: 0;
+  text-align: center;
+}
+
+.dashboard__ledger--columns .dashboard__count {
+  text-align: center;
+  font-size: var(--text-xl);
+}
+
+.dashboard__ledger--columns .dashboard__ledger-label {
+  order: 2;
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
+
+.dashboard__ledger--columns .dashboard__track {
+  width: 100%;
+  height: max(calc(var(--share) * 0.1rem), 3px);
+  border-radius: 4px 4px 0 0;
+  background: none;
+}
+
+.dashboard__ledger--columns .dashboard__bar {
+  width: 100%;
+  border-radius: inherit;
+  background: var(--brand-teal);
+}
+
+.dashboard__ledger--columns li:last-child .dashboard__row:not([data-zero]) .dashboard__bar {
+  background: var(--colour-outcome-harm);
+}
+
+.dashboard__ledger--columns li:last-child .dashboard__row:not([data-zero]) .dashboard__count {
+  color: var(--colour-outcome-harm);
+}
+
+@media (max-width: 60rem) {
+  .dashboard__alert + .dashboard__alert {
+    padding-left: 0;
+    border-left: none;
+  }
+
+  .dashboard__attention-action {
+    margin-left: 0;
+  }
+}
+
 @media (forced-colors: active) {
   .dashboard__bar,
   .dashboard__stack-segment {
     background: CanvasText;
+  }
+}
+
+/* In the pipeline the stage is a heading for its column, not a pill. */
+.dashboard__ledger--pipeline .stage {
+  padding: 0;
+  background: none;
+  color: var(--colour-text);
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+/* Filters: two buttons in the page intro, each opening a small panel below it. */
+.dashboard__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.dashboard__pop {
+  position: relative;
+}
+
+.dashboard__pop .button-secondary {
+  min-height: 2.75rem;
+  font-size: var(--text-base);
+  color: var(--colour-text);
+  border-color: var(--colour-border);
+  border-radius: var(--radius-lg);
+}
+
+.dashboard__pop .button-secondary[data-active] {
+  border-color: var(--colour-action);
+}
+
+.dashboard__pop-panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  width: max-content;
+  max-width: min(26rem, calc(100vw - 2 * var(--space-4)));
+  padding: var(--space-4);
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
+  background: var(--colour-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.dashboard__pop-panel[hidden] {
+  display: none;
+}
+
+.dashboard__pop-panel .filter-bar {
+  flex-direction: column;
+  align-items: stretch;
+  margin-bottom: 0;
+}
+
+.dashboard__pop-panel .filter-bar__controls {
+  flex-direction: column;
+}
+
+.dashboard__pop-panel .filter-bar__field select {
+  flex: 1;
+}
+
+.dashboard__pop-panel .filter-bar__meta {
+  justify-content: space-between;
+}
+
+/* Pipeline: the stage name, a plain line under it, a chevron into the next stage. */
+.dashboard__ledger--pipeline .dashboard__row {
+  position: relative;
+}
+
+.dashboard__ledger--pipeline .dashboard__ledger-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dashboard__stage {
+  font-weight: 600;
+  color: var(--colour-text);
+}
+
+.dashboard__stage-note {
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
+
+.dashboard__ledger--pipeline .dashboard__row:has([data-tone='blocked']) .dashboard__count {
+  color: var(--colour-danger-text);
+}
+
+.dashboard__chevron {
+  position: absolute;
+  top: 1.75rem;
+  left: -0.55rem;
+  padding: 1px;
+  background: var(--colour-surface);
+  color: var(--colour-border-strong);
+}
+
+.dashboard__ledger--pipeline li:first-child .dashboard__chevron {
+  display: none;
+}
+
+/* Outcomes: count, then its share of the graded checks. */
+.dashboard__row--percent {
+  grid-template-columns: minmax(0, 1fr) 2.5rem 3rem;
+  padding: var(--space-3) 0;
+  font-size: var(--text-base);
+}
+
+.dashboard__percent {
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.dashboard__stack {
+  margin-bottom: var(--space-2);
+}
+
+.dashboard__stack + .dashboard__ledger {
+  border-top: 1px solid var(--colour-border);
+}
+
+.dashboard__meta-link {
+  color: inherit;
+}
+
+/* Remediation tiles: the figure, then the plain label; no status dot. */
+.dashboard__ledger--tiles .dashboard__spine::before {
+  display: none;
+}
+
+.dashboard__ledger--tiles .dashboard__spine {
+  font-weight: 400;
+  color: var(--colour-text-muted);
+  font-size: var(--text-base);
+}
+
+.dashboard__ledger--tiles .dashboard__row:has([data-tone='blocked']) .dashboard__spine {
+  color: var(--colour-danger-text);
+}
+
+.dashboard__ledger--tiles .dashboard__row {
+  padding: var(--space-4) var(--space-5);
+}
+
+@media (max-width: 40rem) {
+  .dashboard__pop-panel {
+    right: auto;
+    left: 0;
   }
 }

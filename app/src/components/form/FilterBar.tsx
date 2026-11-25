@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Icon } from '../icons/Icon';
 import './FilterBar.css';
 
 interface Props {
@@ -40,13 +41,18 @@ interface FieldProps {
   label: string;
   htmlFor: string;
   children: ReactNode;
+  /** A free-text search: the label is read out but not shown, and a magnifier stands in for it. */
+  search?: boolean;
 }
 
-/** A single labelled filter control. */
-export function FilterField({ label, htmlFor, children }: FieldProps) {
+/** A single labelled filter control, drawn as one pill: the label sits inside the box, before the value. */
+export function FilterField({ label, htmlFor, children, search }: FieldProps) {
   return (
-    <div className="filter-bar__field">
-      <label htmlFor={htmlFor}>{label}</label>
+    <div className={search ? 'filter-bar__field filter-bar__field--search' : 'filter-bar__field'}>
+      {search ? <Icon name="search" className="icon filter-bar__search-icon" /> : null}
+      <label htmlFor={htmlFor} className={search ? 'visually-hidden' : undefined}>
+        {label}
+      </label>
       {children}
     </div>
   );

@@ -1,4 +1,5 @@
 {% extends 'OT Layout' %}
+{% block lede %}<p class="ot-page__lede">The reviews allocated to you, outstanding first. A submitted review opens read-only.</p>{% endblock %}
 {% block content %}
 {% comment %}
   My Work dashboard (PP-03).
@@ -180,12 +181,13 @@
         does for its outcome filter - and the link below is an inner one, so a review whose
         case is missing drops out of a search rather than surviving it as a blank row.
       {% endcomment %}
-      {% if f_ref != '' %}<condition entityname="case" attribute="al_casereference" operator="like" value="%{{ f_ref | xml_escape }}%" />{% endif %}
+      {% if f_ref != '' %}<filter type="or"><condition entityname="case" attribute="al_casereference" operator="like" value="%{{ f_ref | xml_escape }}%" /><condition entityname="case" attribute="al_servicecaseref" operator="like" value="%{{ f_ref | xml_escape }}%" /></filter>{% endif %}
     </filter>
     <order attribute="al_submittedon" descending="false" />
     <link-entity name="al_outcomecase" from="al_outcomecaseid" to="al_outcomecaseid" link-type="inner" alias="case">
       <attribute name="al_outcomecaseid" />
       <attribute name="al_casereference" />
+      <attribute name="al_servicecaseref" />
       <attribute name="al_clientname" />
       <attribute name="al_advisername" />
       <attribute name="al_taxcheckername" />
@@ -276,36 +278,30 @@
   attribute: it posts back to whatever path this page is served at, which is what the
   review list's own search does and what keeps this free of a hard-coded route.
 {% endcomment %}
-<form class="ot-filters" method="get" role="search" aria-label="Search the reviews assigned to you">
-  <div class="ot-filters__grid">
-    <div class="ot-field">
-      <label for="f-ref">Case reference</label>
-      <input type="search" id="f-ref" name="ref" value="{{ f_ref | escape }}" placeholder="Contains">
-    </div>
-    <div class="ot-field">
-      <label for="f-check">Check</label>
-      <select id="f-check" name="check">
-        <option value="">Any</option>
-        <option value="tax"{% if f_check == 'tax' %} selected{% endif %}>Tax</option>
-        <option value="aqs"{% if f_check == 'aqs' %} selected{% endif %}>AQS</option>
-      </select>
-    </div>
-    <div class="ot-field">
-      <label for="f-state">State</label>
-      <select id="f-state" name="state">
-        <option value="">Any</option>
-        <option value="open"{% if f_state == 'open' %} selected{% endif %}>Outstanding</option>
-        <option value="done"{% if f_state == 'done' %} selected{% endif %}>Submitted</option>
-      </select>
-    </div>
+<form class="ot-toolbar" method="get" role="search" aria-label="Search the reviews assigned to you" data-ot-autosubmit>
+  <div class="ot-search">
+    <span class="ot-visually-hidden"><label for="f-ref">Case or service case reference</label></span>
+    <input type="search" id="f-ref" name="ref" value="{{ f_ref | escape }}" placeholder="Case or service case reference">
   </div>
-  <div class="ot-filters__actions">
-    <button type="submit" class="ot-btn ot-btn--primary">Search</button>
-    {% if filtered %}<a class="ot-btn" href="?">Clear</a>{% endif %}
-  </div>
+  <label class="ot-chip"><span class="ot-chip__label">Check</span>
+    <select id="f-check" name="check">
+      <option value="">Any</option>
+      <option value="tax"{% if f_check == 'tax' %} selected{% endif %}>Tax</option>
+      <option value="aqs"{% if f_check == 'aqs' %} selected{% endif %}>AQS</option>
+    </select>
+  </label>
+  <label class="ot-chip"><span class="ot-chip__label">State</span>
+    <select id="f-state" name="state">
+      <option value="">Any</option>
+      <option value="open"{% if f_state == 'open' %} selected{% endif %}>Outstanding</option>
+      <option value="done"{% if f_state == 'done' %} selected{% endif %}>Submitted</option>
+    </select>
+  </label>
+  <button type="submit" class="ot-btn ot-toolbar__apply">Search</button>
+  {% if filtered %}<span class="ot-toolbar__meta"><a class="ot-toolbar__clear" href="?">Clear filters</a></span>{% endif %}
 </form>
 
-<section class="ot-card" aria-labelledby="ot-recent-heading">
+<section class="ot-card ot-card--table" aria-labelledby="ot-recent-heading">
   <h2 class="ot-card__title" id="ot-recent-heading">Reviews assigned to you</h2>
 
   {% if filtered %}
@@ -313,7 +309,7 @@
       Showing
       {% if f_state == 'open' %}outstanding{% elsif f_state == 'done' %}submitted{% endif %}
       {% if f_check == 'tax' %}Tax{% elsif f_check == 'aqs' %}AQS{% endif %}
-      reviews assigned to you{% if f_ref != '' %} whose case reference contains
+      reviews assigned to you{% if f_ref != '' %} whose case or service case reference contains
       &ldquo;{{ f_ref | escape }}&rdquo;{% endif %}. The counts above are unaffected.
     </p>
   {% endif %}
@@ -321,18 +317,17 @@
   {% if my_reviews.results.entities.size > 0 %}
     <div class="ot-table-wrap">
       <table class="ot-table">
-        <caption>
+        <caption class="ot-visually-hidden">
           Your reviews, outstanding first by case due date, then the ones you have
           submitted. A submitted review opens read-only.
         </caption>
         <thead>
           <tr>
-            <th scope="col">Case reference</th>
+            <th scope="col">Case</th>
             <th scope="col">Check</th>
             <th scope="col">Client</th>
             <th scope="col">Adviser</th>
-            <th scope="col">Tax checker</th>
-            <th scope="col">AQS checker</th>
+            <th scope="col">Checkers</th>
             <th scope="col">Status</th>
             <th scope="col">Due</th>
             <th scope="col">Submitted</th>
@@ -345,6 +340,7 @@
                 <a href="/review?id={{ r.al_reviewinstanceid }}">
                   {{ r['case.al_casereference'] | default: 'Untitled case' | escape }}
                 </a>
+                {% if r['case.al_servicecaseref'] %}<span class="ot-service-ref"><span class="ot-visually-hidden">Service case reference </span>{{ r['case.al_servicecaseref'] | escape }}</span>{% endif %}
               </td>
               <td>{{ r.al_reviewtype.label | escape }}</td>
               <td>{{ r['case.al_clientname'] | escape }}</td>
@@ -359,10 +355,16 @@
               {% assign rt_name = r['route.al_name'] %}
               {% capture tax_checker %}{{ r['case.al_taxcheckername'] }}{% endcapture %}
               {% capture aqs_checker %}{{ r['case.al_aqscheckername'] }}{% endcapture %}
-              <td>{% if tax_checker != '' %}{{ tax_checker | escape }}{% elsif rt_name == 'AQS only' %}<span class="ot-checker ot-checker--na">No check of this type</span>{% else %}<span class="ot-checker">Not yet allocated</span>{% endif %}</td>
-              <td>{% if aqs_checker != '' %}{{ aqs_checker | escape }}{% elsif rt_name == 'Tax only' %}<span class="ot-checker ot-checker--na">No check of this type</span>{% else %}<span class="ot-checker">Not yet allocated</span>{% endif %}</td>
+              <td>
+                <ul class="ot-people">
+                  <li><span class="ot-people__role">Tax</span>{% if tax_checker != '' %}<span class="ot-avatar" data-ot-initials="{{ tax_checker | escape }}" aria-hidden="true"></span>{{ tax_checker | escape }}{% elsif rt_name == 'AQS only' %}<span class="ot-checker ot-checker--na">No check of this type</span>{% else %}<span class="ot-checker ot-unallocated">Not yet allocated</span>{% endif %}</li>
+                  <li><span class="ot-people__role">AQS</span>{% if aqs_checker != '' %}<span class="ot-avatar" data-ot-initials="{{ aqs_checker | escape }}" aria-hidden="true"></span>{{ aqs_checker | escape }}{% elsif rt_name == 'Tax only' %}<span class="ot-checker ot-checker--na">No check of this type</span>{% else %}<span class="ot-checker ot-unallocated">Not yet allocated</span>{% endif %}</li>
+                </ul>
+              </td>
               <td>{% include 'OT Status Badge' status: r.al_reviewstatus.label %}</td>
-              <td>{{ r['case.al_duedate'] | date: 'dd MMM yyyy' }}</td>
+              {% comment %}A review not yet submitted whose case is past due says by how much (OT Layout's script).{% endcomment %}
+              {% capture r_submitted %}{{ r.al_submittedon }}{% endcapture %}
+              <td class="ot-nowrap">{{ r['case.al_duedate'] | date: 'dd MMM yyyy' }}{% if r['case.al_duedate'] and r_submitted == '' %}<span class="ot-overdue" data-ot-overdue="{{ r['case.al_duedate'] | date: 'yyyy-MM-dd' }}"></span>{% endif %}</td>
               <td>{{ r.al_submittedon | date: 'dd MMM yyyy' | default: '—' }}</td>
             </tr>
           {% endfor %}

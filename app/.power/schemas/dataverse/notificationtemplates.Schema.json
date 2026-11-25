@@ -161,6 +161,14 @@
           "x-ms-schema-name": "al_recipientkindName",
           "x-ms-read-only": true
         },
+        "al_gradings": {
+          "type": "string",
+          "title": "Gradings",
+          "x-ms-dataverse-attribute": "al_gradings",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_Gradings",
+          "maxLength": 100
+        },
         "al_recipientkinds": {
           "type": "string",
           "title": "Recipient roles",

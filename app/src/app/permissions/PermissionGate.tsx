@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { usePermissions } from './permissionContext';
 import { PageUnavailable } from '../../components/feedback/PageUnavailable';
 import type { AccessLevel, ResourceKey } from '../../types/permissions';
+import { Skeleton } from '../../components/feedback/Skeleton';
 
 /**
  * Gates its children behind a resource/level (AD-041). The client gate is
@@ -55,7 +56,7 @@ export function RequirePermission({
     <PermissionGate
       resource={resource}
       need={need}
-      pending={<p role="status">Checking your access…</p>}
+      pending={<Skeleton page label="Checking your access…" />}
       fallback={
         <PageUnavailable
           title="No access"

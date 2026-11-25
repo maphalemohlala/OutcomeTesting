@@ -25,9 +25,7 @@
 
 .remediation__detail dt {
   margin-bottom: var(--space-1);
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-size: var(--text-sm);
   color: var(--colour-text-muted);
 }
 
@@ -75,6 +73,7 @@
   padding: var(--space-4);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
 }
 
 .remediation__unavailable h2 {

@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { PermissionGate } from '../../app/permissions/PermissionGate';
 import { setFailAccountability } from '../../services/commands/setFailAccountability';
 import { useIntentKeys } from '../../hooks/useIntentKey';
 import { UserPicker } from '../../components/form/UserPicker';
+import { Icon } from '../../components/icons/Icon';
 import type { CaseOutcomeRow, CaseOutcomeState } from './useCaseOutcome';
 import { messageForFailure } from '../../services/errors';
 import { useSecurityConfig } from '../admin/useSecurityConfig';
@@ -16,6 +17,7 @@ import {
   NOBODY,
 } from './failAccountability';
 import './FailAccountabilityPanel.css';
+import { Skeleton } from '../../components/feedback/Skeleton';
 
 /**
  * Who carries a fail on this case (item 8, 2026-09-19).
@@ -58,11 +60,14 @@ function OutcomeAccountability({
   people,
   holders,
   onSaved,
+  heading,
 }: {
   outcome: CaseOutcomeRow;
   people: PeopleNames;
   holders: NameableHolders;
   onSaved: () => void;
+  /** The card's title, drawn in this row's head when the case has only the one outcome. */
+  heading?: ReactNode;
 }) {
   const adviceQualityFailed = adviceQualityFailedFrom(outcome.finalOutcome ?? outcome.initialOutcome);
 
@@ -88,8 +93,8 @@ function OutcomeAccountability({
   // own adviser or paraplanner, which is what the extract falls back to.
   const [fqPerson, setFqPerson] = useState(outcome.fqAccountable?.id ?? '');
   const [aqPerson, setAqPerson] = useState(outcome.aqAccountable?.id ?? '');
-  // The administrator carrying the File Quality fail (requirements log row 10). Never exported.
-  const [fqAdministrator, setFqAdministrator] = useState(outcome.fqAdministrator?.id ?? '');
+  // Whether an administrator carries the File Quality fail (requirements log row 10). Never exported.
+  const [fqAdministrator, setFqAdministrator] = useState(Boolean(outcome.fqAdministrator));
 
   /*
    * Take the record's values when the record itself changes, and not before (F29).
@@ -109,7 +114,7 @@ function OutcomeAccountability({
     setDraft(effective);
     setFqPerson(outcome.fqAccountable?.id ?? '');
     setAqPerson(outcome.aqAccountable?.id ?? '');
-    setFqAdministrator(outcome.fqAdministrator?.id ?? '');
+    setFqAdministrator(Boolean(outcome.fqAdministrator));
     setAwaitingReread(false);
   }
   const personNote = namedPersonNote(holders.status, holders.emails);
@@ -123,7 +128,7 @@ function OutcomeAccountability({
     draft.aqParaplanner !== effective.aqParaplanner ||
     fqPerson !== (outcome.fqAccountable?.id ?? '') ||
     aqPerson !== (outcome.aqAccountable?.id ?? '') ||
-    fqAdministrator !== (outcome.fqAdministrator?.id ?? '');
+    fqAdministrator !== Boolean(outcome.fqAdministrator);
 
   function nameFor(who: 'adviser' | 'paraplanner'): string {
     const name = who === 'adviser' ? people.adviser : people.paraplanner;
@@ -162,7 +167,7 @@ function OutcomeAccountability({
       aqParaplanner: flags.aqParaplanner,
       fqContactId: fqPerson,
       aqContactId: aqPerson,
-      fqAdministratorId: fqAdministrator,
+      fqAdministrator,
       idempotencyKey: intent.keyFor(token),
     });
 
@@ -179,49 +184,91 @@ function OutcomeAccountability({
     onSaved();
   }
 
+  const anyTicked = LABELS.some(({ key }) => draft[key]);
+  const status = message?.text ?? (changed ? 'Not recorded yet' : anyTicked ? null : 'Nothing ticked yet');
+
+  /** One tick: which part of the check, and whose name goes in its slot. */
+  function tick(key: keyof AccountabilityFlags, discipline: string, who: 'adviser' | 'paraplanner') {
+    // The default the extract falls back to while nobody has been named on this check.
+    const isDefault =
+      source === 'derived' &&
+      ((key === 'fqParaplanner' && who === 'paraplanner') || (key === 'aqAdviser' && who === 'adviser'));
+    return (
+      <td>
+        <span className="accountability__tick">
+          <input
+            type="checkbox"
+            aria-label={`${discipline} — ${nameFor(who)}`}
+            checked={draft[key]}
+            disabled={busy}
+            onChange={(event) => setDraft((current) => ({ ...current, [key]: event.target.checked }))}
+          />
+          {isDefault ? <span className="accountability__default">Default</span> : null}
+        </span>
+      </td>
+    );
+  }
+
   return (
     <li className="accountability__outcome">
-      <div className="accountability__head">
-        <span className="accountability__check">{outcome.reviewInstance ?? outcome.reference}</span>
-        <span className="accountability__source" data-source={source}>
-          {source === 'recorded' ? 'Recorded' : 'Derived by default'}
+      <div className="case-card__head">
+        <span className="accountability__title">
+          {heading}
+          <span className="accountability__source" data-source={source}>
+            {source === 'recorded' ? 'Recorded' : 'Derived by default'}
+          </span>
         </span>
+        <span className="case-card__aside">{outcome.reviewInstance ?? outcome.reference}</span>
       </div>
 
       {source === 'derived' ? (
         <p className="accountability__note">
-          Nobody has been named on this check, so the extract uses the default: the
-          paraplanner carries a File Quality fail, and the adviser carries Insufficient
-          evidence or Potential harm. The File Quality half is not shown ticked here because this page does not
-          read the file quality answer &mdash; the extract does. Ticking anything below
-          records a judgement instead, and the default stops applying to this check.
+          Nobody has been named on this check, so the extract uses the default. Tick anyone below
+          to record a judgement instead; the default then stops applying to this check.
         </p>
       ) : null}
 
-      <p className="accountability__note">
-        The extract names someone only for a File Quality Fail, Insufficient evidence or
-        Potential harm. Ticks against any other grade are kept here but not exported.
-      </p>
+      <div className="accountability__scroll">
+        <table className="accountability__table">
+          <thead>
+            <tr>
+              <th scope="col">Part of the check</th>
+              <th scope="col">
+                Paraplanner
+                <span className="accountability__who">{people.paraplanner ?? 'Not recorded'}</span>
+              </th>
+              <th scope="col">
+                Adviser
+                <span className="accountability__who">{people.adviser ?? 'Not recorded'}</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">
+                File Quality
+                <span className="accountability__who">Exported for a File Quality fail</span>
+              </th>
+              {tick('fqParaplanner', 'File Quality', 'paraplanner')}
+              {tick('fqAdviser', 'File Quality', 'adviser')}
+            </tr>
+            <tr>
+              <th scope="row">
+                Advice Quality
+                <span className="accountability__who">Exported for Insufficient evidence or Potential harm</span>
+              </th>
+              {tick('aqParaplanner', 'Advice Quality', 'paraplanner')}
+              {tick('aqAdviser', 'Advice Quality', 'adviser')}
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
-      <ul className="accountability__flags">
-        {LABELS.map(({ key, discipline, who }) => (
-          <li key={key}>
-            <label>
-              <input
-                type="checkbox"
-                checked={draft[key]}
-                disabled={busy}
-                onChange={(event) =>
-                  setDraft((current) => ({ ...current, [key]: event.target.checked }))
-                }
-              />
-              <span>
-                <strong>{discipline}</strong> — {nameFor(who)}
-              </span>
-            </label>
-          </li>
-        ))}
-      </ul>
+      <p className="accountability__note">
+        The File Quality default is not shown ticked because this page does not read the file
+        quality answer; the extract does. Ticks against any other grade are kept here but not
+        exported.
+      </p>
 
       {/*
         Naming someone the case does not (project owner, 2026-09-19). The extract has only
@@ -230,13 +277,18 @@ function OutcomeAccountability({
         uses the case's own adviser or paraplanner.
       */}
       {personNote ? (
-        <p className="accountability__note" role="status">
+        <p
+          className="accountability__banner"
+          data-kind={holders.status === 'loading' ? 'info' : 'warn'}
+          role="status"
+        >
+          {holders.status === 'loading' ? null : <Icon name="warning" />}
           {personNote}
         </p>
       ) : (
         <div className="accountability__people">
           <label className="accountability__person">
-            <span>File Quality &mdash; named person</span>
+            <span>File Quality: named person</span>
             <UserPicker
               field="id"
               value={fqPerson}
@@ -247,7 +299,7 @@ function OutcomeAccountability({
             />
           </label>
           <label className="accountability__person">
-            <span>Advice Quality &mdash; named person</span>
+            <span>Advice Quality: named person</span>
             <UserPicker
               field="id"
               value={aqPerson}
@@ -262,40 +314,40 @@ function OutcomeAccountability({
 
       {/*
         Requirements log row 10: a File Quality fail can be the administrator's (an AML point,
-        say). Any contact can be chosen - administrators hold neither the Adviser nor the
-        Planner role - and the export never carries this person.
+        say). An option, not a person, since 2026-11-25 (project owner), and never exported.
       */}
-      <div className="accountability__people">
-        <label className="accountability__person">
-          <span>File Quality &mdash; administrator at fault</span>
-          <UserPicker
-            field="id"
-            value={fqAdministrator}
-            onChange={setFqAdministrator}
-            includeInactive
-            placeholder={outcome.fqAdministrator?.name ?? 'No administrator named'}
+      <div className="accountability__admin">
+        <label className="accountability__admin-tick">
+          <input
+            type="checkbox"
+            checked={fqAdministrator}
+            disabled={busy}
+            onChange={(event) => setFqAdministrator(event.target.checked)}
           />
+          <span>File Quality: an administrator</span>
         </label>
+        <p className="accountability__note">
+          Recorded for reporting only and not written to the export. Ticking it stops the
+          paraplanner being named by default for the File Quality fail.
+        </p>
       </div>
-      <p className="accountability__note">
-        The administrator is recorded for reporting only and is not written to the export. Naming
-        one stops the paraplanner being named by default for the File Quality fail.
-      </p>
 
       <div className="accountability__actions">
+        <span
+          className="accountability__message"
+          data-kind={message?.kind ?? 'idle'}
+          role="status"
+        >
+          {status}
+        </span>
         <button
           type="button"
-          className="accountability__save"
+          className="button-primary"
           disabled={recordDisabled({ changed, busy, awaitingReread })}
           onClick={save}
         >
           {busy ? 'Recording…' : 'Record accountability'}
         </button>
-        {message ? (
-          <span className="accountability__message" data-kind={message.kind} role="status">
-            {message.text}
-          </span>
-        ) : null}
       </div>
     </li>
   );
@@ -341,11 +393,15 @@ function AccountabilitySection({
     [security],
   );
 
+  const title = <h2 id="panel-accountability">Who carries a fail</h2>;
+  // One outcome: the title shares its row with the source chip and the check, as one card head.
+  const single = state.status === 'ready' && state.outcomes.length === 1;
+
   return (
     <section className="accountability" aria-labelledby="panel-accountability">
-      <h2 id="panel-accountability">Who carries a fail</h2>
+      {single ? null : title}
 
-      {state.status === 'loading' ? <p role="status">Loading outcomes…</p> : null}
+      {state.status === 'loading' ? <Skeleton label="Loading outcomes…" /> : null}
 
       {state.status === 'unavailable' ? (
         <p className="accountability__note">The outcomes for this case could not be loaded.</p>
@@ -377,6 +433,7 @@ function AccountabilitySection({
               people={people}
               holders={holders}
               onSaved={onSaved}
+              heading={single ? title : null}
             />
           ))}
         </ul>

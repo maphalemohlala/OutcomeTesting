@@ -10,8 +10,12 @@ import { useCaseWorklist } from '../cases/useCaseWorklist';
 import { useUserDirectory } from '../../hooks/useUserDirectory';
 import { casesForPerson, contactEmailsOf, identityOf, isPersonRole, positions } from './peopleDirectory';
 import { checkerLabel } from '../cases/checkerNames';
+import { CaseReferenceLink } from '../cases/CaseReferenceLink';
 import './PeoplePage.css';
 import { isoDay } from '../../lib/format';
+import { Skeleton } from '../../components/feedback/Skeleton';
+import { Pager } from '../../components/navigation/Pager';
+import { PAGE_SIZE, usePaged } from '../../components/navigation/paging';
 
 export function PersonCasesPage() {
   const { role, key = '' } = useParams<{ role: string; key: string }>();
@@ -61,6 +65,7 @@ export function PersonCasesPage() {
   }, [cases]);
 
   const exportRows = useMemo(() => cases.map(caseExportRow), [cases]);
+  const paged = usePaged(cases, PAGE_SIZE, key);
 
   if (!personRole) {
     return (
@@ -100,7 +105,7 @@ export function PersonCasesPage() {
         </Link>
       </p>
 
-      {state.status === 'loading' ? <p role="status">Loading cases…</p> : null}
+      {state.status === 'loading' ? <Skeleton label="Loading cases…" rows={6} /> : null}
 
       {state.status === 'unavailable' ? (
         <section className="people__unavailable" aria-labelledby="person-unavailable">
@@ -156,10 +161,10 @@ export function PersonCasesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {cases.map((item) => (
+                  {paged.rows.map((item) => (
                     <tr key={item.id}>
                       <th scope="row">
-                        <Link to={`/cases/${item.id}`}>{item.caseReference}</Link>
+                        <CaseReferenceLink id={item.id} caseReference={item.caseReference} serviceCaseRef={item.serviceCaseRef} />
                       </th>
                       <td>{item.client ?? '—'}</td>
                       <td>{checkerLabel(item.taxChecker, item.route, 'Tax')}</td>
@@ -184,6 +189,7 @@ export function PersonCasesPage() {
                 </tbody>
               </table>
             </div>
+            <Pager {...paged} label="cases" />
           </>
         )
       ) : null}

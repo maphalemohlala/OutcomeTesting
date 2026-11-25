@@ -122,11 +122,13 @@ describe('the portal case list agrees with this module', () => {
     }
   });
 
-  it('keeps them as two columns', () => {
-    // Merging them would reinstate the defect Fixes 2 removed: one column naming whichever
-    // discipline was allocated second.
-    expect(caseListTemplate).toContain('<th scope="col">Tax checker</th>');
-    expect(caseListTemplate).toContain('<th scope="col">AQS checker</th>');
+  it('keeps the two checkers apart, each under its own discipline', () => {
+    // One unlabelled name would reinstate the defect Fixes 2 removed: one column naming
+    // whichever discipline was allocated second. Since the 2026-11-24 redesign the two sit in
+    // one Checkers cell, but each on its own line, named Tax or AQS and read from its own field.
+    expect(caseListTemplate).toContain('<th scope="col">Checkers</th>');
+    expect(caseListTemplate).toMatch(/<li><span class="ot-people__role">Tax<\/span>\{% if tax_checker != '' %\}/);
+    expect(caseListTemplate).toMatch(/<li><span class="ot-people__role">AQS<\/span>\{% if aqs_checker != '' %\}/);
   });
 });
 

@@ -3,23 +3,7 @@
   display: inline-block;
 }
 
-.export-menu__trigger {
-  padding: var(--space-2) var(--space-3);
-  font: inherit;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--colour-action-text);
-  background: var(--colour-action);
-  border: 1px solid var(--colour-action);
-  border-radius: var(--radius);
-  cursor: pointer;
-}
-
-.export-menu__trigger:hover:not(:disabled) {
-  background: var(--colour-action-hover);
-  border-color: var(--colour-action-hover);
-}
-
+/* Drawn by .button-secondary: exporting is never the page's main action. */
 .export-menu__trigger:disabled {
   color: var(--colour-text-muted);
   background: var(--colour-surface-sunken);

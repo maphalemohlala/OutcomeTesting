@@ -35,6 +35,7 @@ function row(overrides: Partial<TemplateRow> = {}): TemplateRow {
     custom: true,
     eventValue: 120910800,
     recipients: { kinds: [120910813], contactIds: [] },
+    gradings: [],
     ...overrides,
   };
 }

@@ -92,6 +92,7 @@ describe('toMappingRows', () => {
             al_advisermappingid: 'm1',
             al_adviseremail: '  adviser@example.invalid  ',
             _al_tcmanagerid_value: 'bea63626-cbad-f111-aaac-000000000001',
+            al_adviserstatus: 120910501,
           },
           { al_advisermappingid: 'm2', al_adviseremail: 'other@example.invalid' },
         ],
@@ -105,6 +106,7 @@ describe('toMappingRows', () => {
         managerId: 'bea63626-cbad-f111-aaac-000000000001',
         managerName: 'A Manager',
         managerEmail: 'a@example.invalid',
+        status: 120910501,
       },
       {
         id: 'm2',
@@ -113,6 +115,7 @@ describe('toMappingRows', () => {
         managerId: null,
         managerName: null,
         managerEmail: null,
+        status: null,
       },
     ]);
   });

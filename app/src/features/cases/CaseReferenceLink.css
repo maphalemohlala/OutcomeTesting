@@ -1,0 +1,8 @@
+/* The service case reference under the TaskID: what people quote, but not unique, so it sits
+   beneath the key as supporting detail rather than replacing it (client, 2026-11-24). */
+.case-ref__service {
+  display: block;
+  font-size: 0.85em;
+  font-weight: normal;
+  color: var(--colour-text-muted);
+}

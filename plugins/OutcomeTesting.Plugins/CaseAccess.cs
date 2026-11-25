@@ -62,7 +62,11 @@ namespace OutcomeTesting.Plugins
                 // Never guessed (AD-082): an unmatched adviser leaves the case released to
                 // nobody, and the reconciler reports it.
                 result.Adviser = input.ResolvedAdviser;
-                result.Supervisor = input.ResolvedSupervisor;
+                result.Supervisors = input.ResolvedSupervisors.ToList();
+
+                // The single column keeps the one manager when there is exactly one, as it did
+                // before an adviser could have several; the portal reads the list.
+                result.Supervisor = result.Supervisors.Count == 1 ? result.Supervisors[0] : null;
             }
 
             return result;
@@ -154,7 +158,8 @@ namespace OutcomeTesting.Plugins
 
         public EntityReference ResolvedAdviser { get; set; }
 
-        public EntityReference ResolvedSupervisor { get; set; }
+        /// <summary>The case's T&amp;C Managers: the one chosen for it, else every mapped one.</summary>
+        public IList<EntityReference> ResolvedSupervisors { get; set; } = new List<EntityReference>();
 
         public EntityReference AqsQueueAccount { get; set; }
 
@@ -175,7 +180,11 @@ namespace OutcomeTesting.Plugins
 
         public EntityReference Adviser { get; set; }
 
+        /// <summary>The one manager when exactly one resolves, else null (al_tcsupervisorcontactid).</summary>
         public EntityReference Supervisor { get; set; }
+
+        /// <summary>Every manager who may read and sign the case (al_outcomecase_tcmanagers).</summary>
+        public List<EntityReference> Supervisors { get; set; } = new List<EntityReference>();
 
         public bool ShareWithTaxTeam { get; set; }
 

@@ -1,4 +1,6 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, type ReactNode } from 'react';
+import { Icon } from '../icons/Icon';
+import { cleanHtml, decorateTokens } from './rteChips';
 import './RichTextEditor.css';
 
 export interface RichTextEditorHandle {
@@ -13,6 +15,8 @@ interface Props {
   /** Read out to a screen reader in place of a visible label. */
   label: string;
   disabled?: boolean;
+  /** Pinned to the right-hand end of the toolbar. */
+  toolbarEnd?: ReactNode;
 }
 
 /**
@@ -39,10 +43,16 @@ interface Props {
  * </p>
  */
 export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function RichTextEditor(
-  { id, value, onChange, label, disabled = false },
+  { id, value, onChange, label, disabled = false, toolbarEnd },
   ref,
 ) {
   const areaRef = useRef<HTMLDivElement>(null);
+
+  // Every change goes out without the chips (see rteChips), so the saved letter never carries them.
+  const emit = (area: HTMLElement) => {
+    decorateTokens(area);
+    onChange(cleanHtml(area));
+  };
 
   useImperativeHandle(ref, () => ({
     insertText(text: string) {
@@ -55,7 +65,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
       // at the beginning rather than silently dropping it.
       area.focus();
       document.execCommand('insertText', false, text);
-      onChange(area.innerHTML);
+      emit(area);
     },
   }));
 
@@ -69,9 +79,11 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
   // innerHTML on every render puts the caret back to the start on each keystroke, which is
   // the classic way a contenteditable becomes unusable for anything longer than a word.
   useEffect(() => {
+    // Compared without the chips, which are the editor's own and never part of the value.
     const area = areaRef.current;
-    if (area && area.innerHTML !== value) {
+    if (area && cleanHtml(area) !== value) {
       area.innerHTML = value;
+      decorateTokens(area);
     }
   }, [value]);
 
@@ -83,7 +95,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     // toolbar click moves focus to the button first.
     area.focus();
     document.execCommand(command, false);
-    onChange(area.innerHTML);
+    emit(area);
   };
 
   return (
@@ -100,7 +112,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => run('bold')}
         >
-          <strong>B</strong>
+          <Icon name="bold" />
         </button>
         <button
           type="button"
@@ -111,7 +123,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => run('italic')}
         >
-          <em>I</em>
+          <Icon name="italic" />
         </button>
         <button
           type="button"
@@ -122,7 +134,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => run('underline')}
         >
-          <u>U</u>
+          <Icon name="underline" />
         </button>
 
         <span className="rte__sep" aria-hidden="true" />
@@ -136,7 +148,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => run('insertUnorderedList')}
         >
-          • List
+          <Icon name="list" />
         </button>
         <button
           type="button"
@@ -147,7 +159,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => run('insertOrderedList')}
         >
-          1. List
+          <Icon name="listOrdered" />
         </button>
 
         <span className="rte__sep" aria-hidden="true" />
@@ -161,8 +173,10 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => run('removeFormat')}
         >
-          Clear
+          Clear formatting
         </button>
+
+        {toolbarEnd ? <span className="rte__end">{toolbarEnd}</span> : null}
       </div>
 
       <div
@@ -174,7 +188,11 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
         role="textbox"
         aria-multiline="true"
         aria-label={label}
-        onInput={(e) => onChange((e.target as HTMLDivElement).innerHTML)}
+        onInput={(e) => {
+          // Mid-composition (an IME), the DOM is the input method's; chips wait for it to finish.
+          if ((e.nativeEvent as InputEvent).isComposing) return;
+          emit(e.currentTarget);
+        }}
         // Pasted content comes in as whatever the source was — a whole styled document, in the
         // worst case. Taking the plain text keeps what was meant and drops the rest, and the
         // person can then format it with the toolbar.
@@ -183,7 +201,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
           const text = e.clipboardData.getData('text/plain');
           document.execCommand('insertText', false, text);
           const area = areaRef.current;
-          if (area) onChange(area.innerHTML);
+          if (area) emit(area);
         }}
       />
     </div>

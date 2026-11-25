@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 import { downloadCsv, downloadWorkbook, stampedFilename, type CellValue } from '../../lib/tabular';
 import './ExportMenu.css';
+import { Icon } from '../icons/Icon';
 
 interface Props {
   label: string;
@@ -73,13 +74,14 @@ export function ExportMenu({
     >
       <button
         type="button"
-        className="export-menu__trigger"
+        className="export-menu__trigger button-secondary"
         aria-expanded={open}
         aria-controls={menuId}
         disabled={disabled || empty}
         title={empty ? (emptyHint ?? 'There is nothing to download yet.') : undefined}
         onClick={() => setOpen((current) => !current)}
       >
+        <Icon name="download" />
         {label}
       </button>
       <div id={menuId} className="export-menu__panel" hidden={!open}>

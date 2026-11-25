@@ -1,4 +1,5 @@
 import { Fragment, useMemo } from 'react';
+import { RemedialText } from './RemedialText';
 import { Link, useParams } from 'react-router-dom';
 import { PageIntro } from '../../components/layout/PageIntro';
 import { StageLabel } from '../../components/status/StageLabel';
@@ -23,6 +24,7 @@ import '../../styles/document.css';
 import './RemediationPage.css';
 import { useProductName } from '../../app/product/useProductName';
 import { remediationFooter } from '../../app/product/productName';
+import { Skeleton } from '../../components/feedback/Skeleton';
 
 
 
@@ -156,7 +158,7 @@ export function ActionsTable({
                 <td className="remediation__issue">{issue}</td>
                 {index === 0 ? (
                   <>
-                    <td rowSpan={lines.length}>{action.remedialAction ?? '—'}</td>
+                    <td rowSpan={lines.length}><RemedialText text={action.remedialAction} /></td>
                     <td rowSpan={lines.length}>
                       {action.actionPerformed ?? '—'}
                       {action.adviserNote ? (
@@ -286,7 +288,15 @@ export function RemediationPage() {
   );
   // The outcome the remediation was raised for. Read across every action rather than the
   // filtered set: it is the case's, so narrowing the table by status must not change it.
-  const outcome = useMemo(() => outcomeOf(allActions), [allActions]);
+  // The newest outcome (read createdon asc) holds the grade an amendment rewrites.
+  const currentGrade =
+    state.status === 'ready' && state.outcomes.length > 0
+      ? state.outcomes[state.outcomes.length - 1].initialOutcome
+      : null;
+  const outcome = useMemo(
+    () => outcomeOf(allActions, currentGrade === '—' ? null : currentGrade),
+    [allActions, currentGrade],
+  );
 
 
   return (
@@ -295,7 +305,7 @@ export function RemediationPage() {
         <Link to={caseId ? `/cases/${caseId}` : '/cases'}>← Back to case</Link>
       </p>
 
-      {state.status === 'loading' ? <p role="status">Loading remediation…</p> : null}
+      {state.status === 'loading' ? <Skeleton label="Loading remediation…" rows={6} /> : null}
 
       {state.status === 'unavailable' ? (
         <section className="remediation__unavailable" aria-labelledby="remediation-unavailable">

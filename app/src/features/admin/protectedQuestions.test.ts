@@ -30,8 +30,6 @@ describe('protectedQuestions', () => {
         'Q-TAX-06',
         'Q-TAX-07',
         'Q-TAX-08',
-        'Q-TAX-09',
-        'Q-TAX-10',
         'Q-TAX-11',
         'Q-TAX-12',
       ].sort(),
@@ -74,7 +72,7 @@ describe('the mirror matches the plug-in assembly', () => {
       .sort();
 
     // The C# holds codes and prefixes as dictionary entries of the same shape.
-    expect(inCsharp).toHaveLength(22);
+    expect(inCsharp).toHaveLength(20);
     expect(inCsharp).toEqual([...PROTECTED_QUESTION_CODES, ...PROTECTED_QUESTION_PREFIXES].sort());
   });
 });

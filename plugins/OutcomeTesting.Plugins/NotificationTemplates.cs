@@ -63,8 +63,13 @@ namespace OutcomeTesting.Plugins
         /// <summary>Remediation raised on a Pass with issues grading.</summary>
         public const string RemediationPassWithIssues = "REMEDIATION-PASS-WITH-ISSUES";
 
-        /// <summary>Remediation raised on an insufficient evidence / potential harm grading.</summary>
+        /// <summary>Remediation raised on a Potential harm grading. Shared with Insufficient
+        /// evidence until the client asked for a letter each (2026-11-25); the code was kept so
+        /// wording already stored against it stays with Potential harm.</summary>
         public const string RemediationHarm = "REMEDIATION-HARM";
+
+        /// <summary>Remediation raised on an Insufficient evidence grading.</summary>
+        public const string RemediationInsufficient = "REMEDIATION-INSUFFICIENT";
 
         /// <summary>Remediation raised on a grading the supplied copy was never written for.</summary>
         public const string RemediationOther = "REMEDIATION-OTHER";
@@ -831,8 +836,14 @@ namespace OutcomeTesting.Plugins
                     "Confirm remedial action",
                     TokenReference, TokenAdviser, TokenClient, TokenGrading, TokenDueText, TokenCaseButton),
 
-                Html(RemediationHarm, "Remedial needed - insufficient evidence or potential harm",
-                    "Remedial needed - insufficient evidence/ potential harm: {{reference}} - {{client}}",
+                Html(RemediationInsufficient, "Remedial needed - insufficient evidence",
+                    "Remedial needed - Insufficient evidence: {{reference}} - {{client}}",
+                    RemediationBody(harm: true),
+                    "Confirm remedial action",
+                    TokenReference, TokenAdviser, TokenClient, TokenGrading, TokenDueText, TokenCaseButton),
+
+                Html(RemediationHarm, "Remedial needed - potential harm",
+                    "Remedial needed - Potential harm: {{reference}} - {{client}}",
                     RemediationBody(harm: true),
                     "Confirm remedial action",
                     TokenReference, TokenAdviser, TokenClient, TokenGrading, TokenDueText, TokenCaseButton),

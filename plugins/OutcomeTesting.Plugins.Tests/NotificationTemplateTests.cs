@@ -63,8 +63,10 @@ namespace OutcomeTesting.Plugins.Tests
         [Theory]
         [InlineData(OutcomeRules.OutcomePassWithIssues, NotificationTemplates.RemediationPassWithIssues,
             "a pass with issues grading")]
+        [InlineData(OutcomeRules.OutcomeInsufficient, NotificationTemplates.RemediationInsufficient,
+            "an insufficient evidence grading")]
         [InlineData(OutcomeRules.OutcomePotentialHarm, NotificationTemplates.RemediationHarm,
-            "an insufficient evidence/ potential harm grading")]
+            "a potential harm grading")]
         public void The_remedial_letter_is_unchanged_for_both_gradings(
             int outcome, string code, string grading)
         {

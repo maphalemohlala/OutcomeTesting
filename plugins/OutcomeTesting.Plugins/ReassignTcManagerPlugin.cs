@@ -7,8 +7,10 @@ namespace OutcomeTesting.Plugins
 {
     /// <summary>
     /// Custom API message <c>al_ReassignTcManager</c> (requirements log row 4): hands one case's
-    /// remedial action and sign-off to another T&amp;C Manager, for when the manager mapped to the
-    /// adviser is away. Changing the adviser mapping would move every case of that adviser.
+    /// remedial action and sign-off to another T&amp;C Manager, for when the managers mapped to the
+    /// adviser are away. Changing the adviser mapping would move every case of that adviser.
+    /// The chosen manager replaces ALL the mapped ones for this case; an adviser with several
+    /// managers rarely needs it, since any of them may sign.
     ///
     /// The choice is stored on the case (<see cref="TcManagerRouting.OverrideAttr"/>), and
     /// routing reads it before the mapping, so the portal sign-off and regrade gates, the
@@ -81,11 +83,8 @@ namespace OutcomeTesting.Plugins
             // The same follow-up an adviser mapping change runs: access moves with the manager,
             // and a manager taking over a waiting sign-off is told.
             var change = CaseAccessReconciler.Reconcile(systemService, caseId, DateTime.UtcNow);
-            if (change.ChangedColumns.Contains(CaseAccessReconciler.SupervisorAttr))
-            {
-                AdviserMappingPlugin.TellNewCoach(
-                    systemService, caseId, context.CorrelationId, message => localPluginContext.Trace(message));
-            }
+            AdviserMappingPlugin.TellNewCoach(
+                systemService, caseId, change.NewSupervisors, context.CorrelationId, message => localPluginContext.Trace(message));
 
             var auditId = CommandHelpers.WriteAuditEvent(
                 systemService, CommandReassignTcManager, "ReassignTcManager", CaseEntity, caseId,
@@ -120,7 +119,7 @@ namespace OutcomeTesting.Plugins
 
             var reference = found.GetAttributeValue<string>("al_casereference") ?? "the case";
             var before = TcManagerRouting.ChosenFor(found);
-            var beforeText = before == null ? "the adviser's mapped T&C Manager" : NameOf(service, before.Id);
+            var beforeText = before == null ? "the adviser's mapped T&C Managers" : NameOf(service, before.Id);
 
             EntityReference chosen = null;
             if (managerId.HasValue)
@@ -164,7 +163,7 @@ namespace OutcomeTesting.Plugins
 
             service.Update(new Entity(CaseEntity, caseId) { [TcManagerRouting.OverrideAttr] = chosen });
 
-            var afterText = chosen == null ? "the adviser's mapped T&C Manager" : NameOf(service, chosen.Id);
+            var afterText = chosen == null ? "the adviser's mapped T&C Managers" : NameOf(service, chosen.Id);
             return "Case " + reference + " handed from " + beforeText + " to " + afterText + ".";
         }
 

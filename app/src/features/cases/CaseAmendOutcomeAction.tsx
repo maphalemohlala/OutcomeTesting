@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Modal } from '../../components/feedback/Modal';
+import { Icon } from '../../components/icons/Icon';
 import { Notice } from '../../components/feedback/Notice';
 import { PermissionGate } from '../../app/permissions/PermissionGate';
 import { useIntentKeys, type IntentKeys } from '../../hooks/useIntentKey';
@@ -84,7 +85,8 @@ function AmendButton({ caseId, adviceGrade, onSaved }: Props) {
 
   return (
     <div className="case-detail__amend">
-      <button type="button" className="case-edit__cancel" onClick={() => { setDone(null); setOpen(true); }}>
+      <button type="button" className="button-secondary" onClick={() => { setDone(null); setOpen(true); }}>
+        <Icon name="pencil" />
         Amend outcome
       </button>
       {done ? <Notice tone="success">{done}</Notice> : null}

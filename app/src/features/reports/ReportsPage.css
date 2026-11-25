@@ -1,14 +1,3 @@
-.reports__link {
-  color: var(--colour-action);
-  text-decoration: none;
-  font-size: var(--text-sm);
-  font-weight: 600;
-}
-
-.reports__link:hover {
-  text-decoration: underline;
-}
-
 .reports__stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
@@ -23,18 +12,22 @@
   padding: var(--space-4);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
 }
 
 .reports__stat[data-tone='blocked'] {
-  border-color: var(--colour-stage-blocked);
+  border-color: transparent;
+  background: var(--colour-danger-bg);
 }
 
-.reports__stat[data-tone='waiting'] {
-  border-color: var(--colour-stage-waiting);
+.reports__stat[data-tone='blocked'] .reports__stat-value {
+  color: var(--colour-danger-text);
 }
 
+/* A finished or waiting count reads as an ordinary card; only overdue work is tinted. */
+.reports__stat[data-tone='waiting'],
 .reports__stat[data-tone='closed'] {
-  border-color: var(--colour-stage-closed);
+  border-color: var(--colour-border);
 }
 
 /* A tile that opens the worklist it counted. */
@@ -60,16 +53,15 @@
 }
 
 .reports__stat-value {
-  font-family: var(--font-heading);
-  font-size: var(--text-2xl);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
+  font-family: var(--font-display);
+  font-size: 2.5rem;
+  font-weight: 500;
+  line-height: 1.1;
+  font-variant-numeric: lining-nums tabular-nums;
 }
 
 .reports__stat-label {
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-size: var(--text-base);
   color: var(--colour-text-muted);
 }
 
@@ -83,6 +75,7 @@
   padding: var(--space-4);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
 }
 
 .reports__panel h2 {
@@ -141,6 +134,7 @@
   padding: var(--space-4);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
 }
 
 .reports__unavailable h2 {

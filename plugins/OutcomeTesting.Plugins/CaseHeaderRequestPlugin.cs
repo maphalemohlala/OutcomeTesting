@@ -275,7 +275,7 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static List<string> BeforeColumns(IEnumerable<string> fields)
         {
-            var columns = new List<string> { TaxRequiredAttr, DispositionAttr, "al_reviewrouteid", "al_casestatus" };
+            var columns = new List<string> { TaxRequiredAttr, DispositionAttr, "al_reviewrouteid", "al_casestatus", "al_checklistitems" };
             columns.AddRange(CasePeople.Columns);
 
             foreach (var field in fields ?? new string[0])

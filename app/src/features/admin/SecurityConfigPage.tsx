@@ -23,8 +23,25 @@ import {
   type Notice,
   type RoleOption,
 } from './SecurityModals';
-import { classifyHolder, isRetiredRole, roleDetailPath, type RoleHolderRecord } from './roleDetail';
+import {
+  classifyHolder,
+  isRetiredRole,
+  roleDetailPath,
+  sameRoleCode,
+  type RoleHolderRecord,
+} from './roleDetail';
+import { Icon } from '../../components/icons/Icon';
+import { PersonCell } from '../../components/people/Avatar';
+import { Modal } from '../../components/feedback/Modal';
+import { FilterBar, FilterField } from '../../components/form/FilterBar';
+import { useUserDirectory } from '../../hooks/useUserDirectory';
+import { holdingSummary, matrixColumns, matrixRows, roleDisplayName, type MatrixRow } from './securityMatrix';
 import './SecurityConfigPage.css';
+import { Skeleton } from '../../components/feedback/Skeleton';
+import { Pager } from '../../components/navigation/Pager';
+import { PAGE_SIZE, usePaged } from '../../components/navigation/paging';
+
+/** The matrix opens short, so the role columns and the legend are visible without scrolling. */
 
 /** One role whose holders include a state `classifyHolder` does not call `consistent` (AD-089). */
 interface UnreconciledRole {
@@ -369,85 +386,194 @@ export function SecurityConfigPage() {
     }
   }
 
+  const directory = useUserDirectory();
+  const nameByEmail = new Map(
+    (directory.status === 'ready' ? directory.users : []).map((u) => [u.email.toLowerCase(), u.name]),
+  );
+  const personName = (email: string) => nameByEmail.get(email.trim().toLowerCase()) ?? email;
+
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'withdrawn'>('all');
+  /** Null until someone picks; until then only the roles somebody holds now are shown. */
+  const [pickedHidden, setHiddenRoles] = useState<string[] | null>(null);
+  /** A held cell asks first: in a dense matrix a withdrawal would otherwise be one stray click. */
+  const [heldChoice, setHeldChoice] = useState<RoleMappingRow | null>(null);
+
+  const allColumns = state.status === 'ready' ? matrixColumns(knownRoles, state.mappings) : [];
+  const hiddenRoles =
+    pickedHidden ??
+    (state.status === 'ready'
+      ? allColumns
+          .filter((c) => !state.mappings.some((m) => m.active && sameRoleCode(m.role, c.code)))
+          .map((c) => c.code)
+      : []);
+  const columns = allColumns.filter((c) => !hiddenRoles.includes(c.code));
+  const needle = query.trim().toLowerCase();
+  const rows =
+    state.status === 'ready'
+      ? matrixRows(state.mappings, columns)
+          .filter((row) =>
+            statusFilter === 'active' ? row.active > 0 : statusFilter === 'withdrawn' ? row.withdrawn > 0 : true,
+          )
+          .filter(
+            (row) =>
+              !needle ||
+              row.email.toLowerCase().includes(needle) ||
+              personName(row.email).toLowerCase().includes(needle),
+          )
+          .sort((a, b) => personName(a.email).localeCompare(personName(b.email)))
+      : [];
+  const peoplePage = usePaged(rows, PAGE_SIZE, `${needle}|${statusFilter}`);
+  const shownRows = peoplePage.rows;
+  const permissionsPage = usePaged(state.status === 'ready' ? state.permissions : []);
+  const rolesPage = usePaged(knownRoles);
+
+  function openAssignFor(email: string, roleCode: string) {
+    openAssign(null);
+    setEmail(email);
+    setAssignRole(`custom:${roleCode}`);
+  }
+
+  const notices = [
+    assignOpen ? null : assignNotice,
+    permOpen ? null : permNotice,
+    roleOpen ? null : roleNotice,
+    rowNotice,
+  ];
+
+  function cellButton(row: MatrixRow, cell: MatrixRow['cells'][number]) {
+    const who = personName(row.email);
+    const role = cell.column.label;
+    if (cell.state === 'held' && cell.mapping) {
+      const mapping = cell.mapping;
+      return (
+        <button
+          type="button"
+          className="security__toggle"
+          data-state="held"
+          aria-pressed="true"
+          aria-label={`${who} holds ${role}. Withdraw or change it`}
+          disabled={!canManage || rowBusy !== null}
+          onClick={() => setHeldChoice(mapping)}
+        >
+          <Icon name="check" />
+        </button>
+      );
+    }
+    if (cell.state === 'withdrawn' && cell.mapping) {
+      const mapping = cell.mapping;
+      const retired = isRetiredRole(mapping.role, knownRoles);
+      return (
+        <button
+          type="button"
+          className="security__toggle"
+          data-state="withdrawn"
+          aria-pressed="false"
+          aria-label={
+            retired
+              ? `${role} withdrawn from ${who}. Role retired, so it cannot be restored`
+              : `Restore ${role} for ${who}`
+          }
+          disabled={!canManage || retired || rowBusy !== null}
+          onClick={() => onSetAssignmentActive(mapping)}
+        />
+      );
+    }
+    return (
+      <button
+        type="button"
+        className="security__toggle"
+        data-state="none"
+        aria-pressed="false"
+        aria-label={`Assign ${role} to ${who}`}
+        disabled={!canManage || cell.column.retired || rowBusy !== null}
+        onClick={() => openAssignFor(row.email, cell.column.code)}
+      />
+    );
+  }
+
   return (
     <>
       <PageIntro
         title="Security configuration"
-        purpose="Assign application roles to people and set what each role can see and do. Changes are enforced server-side and recorded in the audit trail."
-      />
-
-      <div className="security">
-        <section className="security__panel" aria-labelledby="assign-heading">
-          <div className="security__panel-bar">
-            <h2 id="assign-heading">Assign a role</h2>
-            {canManage ? (
-              <button type="button" className="security__btn" onClick={() => openAssign(null)}>
-                Assign a role
-              </button>
-            ) : null}
-          </div>
-          <p className="security__hint">
-            Give a registered person an application role. The assignment is keyed on their work
-            email, and only people on the{' '}
-            <Link to="/admin/people">People</Link> page can be chosen.
-          </p>
-          {unreconciled.length > 0 ? (
-            <p className="security__notice security__notice--error" role="status">
-              {unreconciled.length === 1
-                ? '1 role has an assignment that does not match Power Pages: '
-                : `${unreconciled.length} roles have assignments that do not match Power Pages: `}
-              {unreconciled.map((entry, index) => (
-                <span key={entry.code}>
-                  {index > 0 ? ', ' : ''}
-                  <Link to={roleDetailPath(entry.code)}>{entry.name}</Link>
-                </span>
-              ))}
-            </p>
-          ) : null}
-          {assignNotice && !assignOpen ? (
-            <p className={`security__notice security__notice--${assignNotice.tone}`} role="status">
-              {assignNotice.message}
-            </p>
-          ) : null}
-        </section>
-
-        <section className="security__panel" aria-labelledby="perm-heading">
-          <div className="security__panel-bar">
-            <h2 id="perm-heading">Page and capability permissions</h2>
-            {canManage ? (
-              <button type="button" className="security__btn" onClick={() => openPermission(null)}>
-                Set a permission
-              </button>
-            ) : null}
-          </div>
-          <p className="security__hint">Grant a role an access level on a page or capability.</p>
-          {permNotice && !permOpen ? (
-            <p className={`security__notice security__notice--${permNotice.tone}`} role="status">
-              {permNotice.message}
-            </p>
-          ) : null}
-        </section>
-
-        <section className="security__panel" aria-labelledby="roles-heading">
-          <div className="security__panel-bar">
-            <h2 id="roles-heading">Roles</h2>
-            {canManage ? (
-              <button type="button" className="security__btn" onClick={() => openRoleForm(null)}>
+        purpose="Who holds each application role, and what each role can see and do. Changes are enforced server-side and recorded in the audit trail."
+        actions={
+          canManage ? (
+            <>
+              <button type="button" className="button-secondary" onClick={() => openRoleForm(null)}>
                 Create role
               </button>
-            ) : null}
-          </div>
-          <p className="security__hint">
-            The roles that can be assigned. Administrators can add, describe and retire them.
-            Select a role to see everything it grants and everyone who holds it.
+              <button type="button" className="button-secondary" onClick={() => openPermission(null)}>
+                Set a permission
+              </button>
+              <button type="button" className="button-primary" onClick={() => openAssign(null)}>
+                <Icon name="plus" />
+                Assign a role
+              </button>
+            </>
+          ) : null
+        }
+      />
+
+      {unreconciled.length > 0 ? (
+        <p className="security__notice security__notice--error" role="status">
+          {unreconciled.length === 1
+            ? '1 role has an assignment that does not match Power Pages: '
+            : `${unreconciled.length} roles have assignments that do not match Power Pages: `}
+          {unreconciled.map((entry, index) => (
+            <span key={entry.code}>
+              {index > 0 ? ', ' : ''}
+              <Link to={roleDetailPath(entry.code)}>{entry.name}</Link>
+            </span>
+          ))}
+        </p>
+      ) : null}
+      {notices.map((notice, index) =>
+        notice ? (
+          <p key={index} className={`security__notice security__notice--${notice.tone}`} role="status">
+            {notice.message}
           </p>
-          {roleNotice && !roleOpen ? (
-            <p className={`security__notice security__notice--${roleNotice.tone}`} role="status">
-              {roleNotice.message}
-            </p>
-          ) : null}
-        </section>
-      </div>
+        ) : null,
+      )}
+
+      {heldChoice ? (
+        <Modal
+          title={`${roleDisplayName(heldChoice.role)} for ${personName(heldChoice.email)}`}
+          onClose={() => setHeldChoice(null)}
+        >
+          <p className="security__hint">
+            Withdrawing keeps the record for the audit trail, and it can be restored later. Changing
+            grants the new role first, then withdraws this one.
+          </p>
+          <div className="security__form-actions">
+            <button type="button" className="button-secondary" onClick={() => setHeldChoice(null)}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="button-secondary"
+              onClick={() => {
+                const mapping = heldChoice;
+                setHeldChoice(null);
+                openAssign(mapping);
+              }}
+            >
+              Change role
+            </button>
+            <button
+              type="button"
+              className="button-primary security__danger"
+              onClick={() => {
+                const mapping = heldChoice;
+                setHeldChoice(null);
+                void onSetAssignmentActive(mapping);
+              }}
+            >
+              Withdraw
+            </button>
+          </div>
+        </Modal>
+      ) : null}
 
       {assignOpen ? (
         <AssignRoleModal
@@ -503,7 +629,7 @@ export function SecurityConfigPage() {
         />
       ) : null}
 
-      {state.status === 'loading' ? <p role="status">Loading security configuration…</p> : null}
+      {state.status === 'loading' ? <Skeleton label="Loading security configuration…" rows={6} /> : null}
 
       {state.status === 'unavailable' ? (
         <section className="security__unavailable" aria-labelledby="security-unavailable">
@@ -527,61 +653,150 @@ export function SecurityConfigPage() {
             count: state.status === 'ready' ? state.mappings.length : undefined,
             render: () =>
               state.status !== 'ready' ? (
-                <p role="status">
-                  {state.status === 'loading'
-                    ? 'Loading role assignments…'
-                    : 'Role assignments cannot be shown.'}
-                </p>
+                state.status === 'loading' ? (
+                  <Skeleton label="Loading role assignments…" rows={6} />
+                ) : (
+                  <p role="status">Role assignments cannot be shown.</p>
+                )
               ) : state.mappings.length === 0 ? (
                 <p>
                   No roles assigned yet. Everyone has full access until the first role is assigned.
                 </p>
               ) : (
-                <table className="security__table">
-                  <thead>
-                    <tr>
-                      <th scope="col">Work email</th>
-                      <th scope="col">Role</th>
-                      <th scope="col">Status</th>
-                      {canManage ? <th scope="col">Actions</th> : null}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {state.mappings.map((m) => (
-                      <tr key={m.id} data-inactive={m.active ? undefined : 'true'}>
-                        <td>{m.email}</td>
-                        <td>{m.role}</td>
-                        <td>{m.active ? 'Active' : 'Withdrawn'}</td>
-                        {canManage ? (
-                          <td className="security__row-actions">
-                            {m.active ? (
-                              <button
-                                type="button"
-                                className="security__link-btn"
-                                onClick={() => openAssign(m)}
-                                disabled={rowBusy !== null}
-                              >
-                                Change role
-                              </button>
-                            ) : null}
-                            {m.active || !isRetiredRole(m.role, knownRoles) ? (
-                              <button
-                                type="button"
-                                className="security__link-btn"
-                                onClick={() => onSetAssignmentActive(m)}
-                                disabled={rowBusy !== null}
-                              >
-                                {rowBusy === m.id ? 'Working…' : m.active ? 'Withdraw' : 'Restore'}
-                              </button>
-                            ) : (
-                              <span>Role retired</span>
-                            )}
-                          </td>
-                        ) : null}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <>
+                  <div className="security__filters">
+                    <FilterBar
+                      onClear={
+                        query || statusFilter !== 'all' || pickedHidden
+                          ? () => {
+                              setQuery('');
+                              setStatusFilter('all');
+                              setHiddenRoles(null);
+                            }
+                          : undefined
+                      }
+                    >
+                      <FilterField label="Search" htmlFor="security-search" search>
+                        <input
+                          id="security-search"
+                          type="search"
+                          placeholder="Name or work email"
+                          value={query}
+                          onChange={(event) => setQuery(event.target.value)}
+                        />
+                      </FilterField>
+                      <FilterField label="Status" htmlFor="security-status">
+                        <select
+                          id="security-status"
+                          value={statusFilter}
+                          onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
+                        >
+                          <option value="all">Active and withdrawn</option>
+                          <option value="active">Holds an active role</option>
+                          <option value="withdrawn">Has a withdrawn role</option>
+                        </select>
+                      </FilterField>
+                      <details className="security__roles-pick">
+                        <summary>
+                          <span className="security__pill-label">Roles</span>
+                          {columns.length} of {allColumns.length} shown
+                          <Icon name="chevronDown" />
+                        </summary>
+                        <fieldset>
+                          <legend className="visually-hidden">Role columns shown</legend>
+                          {allColumns.map((column) => (
+                            <label key={column.code}>
+                              <input
+                                type="checkbox"
+                                checked={!hiddenRoles.includes(column.code)}
+                                onChange={(event) =>
+                                  setHiddenRoles(
+                                    event.target.checked
+                                      ? hiddenRoles.filter((code) => code !== column.code)
+                                      : [...hiddenRoles, column.code],
+                                  )
+                                }
+                              />
+                              {column.label}
+                            </label>
+                          ))}
+                        </fieldset>
+                      </details>
+                    </FilterBar>
+                    <p className="security__people-hint">
+                      Only people on the <Link to="/admin/people">People</Link> page can be given a role
+                    </p>
+                  </div>
+                  <div className="security__card">
+                    <div className="security__scroll">
+                      <table className="security__matrix">
+                        <thead>
+                          <tr>
+                            <th scope="col">Person</th>
+                            {columns.map((column) => (
+                              <th key={column.code} scope="col" data-privileged={column.privileged || undefined}>
+                                {column.label}
+                                {column.retired ? <span className="security__retired"> (retired)</span> : null}
+                              </th>
+                            ))}
+                            <th scope="col">
+                              <span className="visually-hidden">Roles held</span>
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {shownRows.length === 0 ? (
+                            <tr>
+                              <td colSpan={columns.length + 2} className="security__empty">
+                                Nobody matches these filters.
+                              </td>
+                            </tr>
+                          ) : (
+                            shownRows.map((row) => (
+                              <tr key={row.email.toLowerCase()}>
+                                <th scope="row">
+                                  <PersonCell
+                                    name={personName(row.email)}
+                                    detail={personName(row.email) === row.email ? null : row.email}
+                                  />
+                                </th>
+                                {row.cells.map((cell) => (
+                                  <td
+                                    key={cell.column.code}
+                                    className="security__cell"
+                                    data-privileged={cell.column.privileged || undefined}
+                                  >
+                                    {cellButton(row, cell)}
+                                  </td>
+                                ))}
+                                <td className="security__held">{holdingSummary(row)}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                    <Pager {...peoplePage} label="people" />
+                    <div className="security__legend">
+                      <ul>
+                        <li>
+                          <span className="security__toggle" data-state="held" aria-hidden="true">
+                            <Icon name="check" />
+                          </span>
+                          Holds the role. Select to withdraw.
+                        </li>
+                        <li>
+                          <span className="security__toggle" data-state="withdrawn" aria-hidden="true" />
+                          Withdrawn. Select to restore.
+                        </li>
+                        <li>
+                          <span className="security__toggle" data-state="none" aria-hidden="true" />
+                          Not held. Select to assign.
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </>
               ),
           },
           {
@@ -590,14 +805,16 @@ export function SecurityConfigPage() {
             count: state.status === 'ready' ? state.permissions.length : undefined,
             render: () =>
               state.status !== 'ready' ? (
-                <p role="status">
-                  {state.status === 'loading'
-                    ? 'Loading permission rules…'
-                    : 'Permission rules cannot be shown.'}
-                </p>
+                state.status === 'loading' ? (
+                  <Skeleton label="Loading permission rules…" rows={6} />
+                ) : (
+                  <p role="status">Permission rules cannot be shown.</p>
+                )
               ) : state.permissions.length === 0 ? (
                 <p>No rules stored. The built-in role defaults apply until the first rule is set.</p>
               ) : (
+                <>
+                <div className="security__card security__scroll">
                 <table className="security__table">
                   <thead>
                     <tr>
@@ -609,7 +826,7 @@ export function SecurityConfigPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {state.permissions.map((p) => (
+                    {permissionsPage.rows.map((p) => (
                       <tr key={p.id} data-inactive={p.active ? undefined : 'true'}>
                         <td>{p.resource}</td>
                         <td>{p.role}</td>
@@ -645,6 +862,9 @@ export function SecurityConfigPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
+                <Pager {...permissionsPage} label="rules" />
+                </>
               ),
           },
           {
@@ -653,12 +873,14 @@ export function SecurityConfigPage() {
             count: roles.status === 'ready' ? roles.roles.length : undefined,
             render: () =>
               roles.status === 'loading' ? (
-                <p role="status">Loading roles…</p>
+                <Skeleton label="Loading roles…" />
               ) : roles.status === 'unavailable' ? (
                 <p>{roles.reason}</p>
               ) : roles.roles.length === 0 ? (
                 <p>No roles have been created yet.</p>
               ) : (
+                <>
+                <div className="security__card security__scroll">
                 <table className="security__table">
                   <thead>
                     <tr>
@@ -670,7 +892,7 @@ export function SecurityConfigPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {roles.roles.map((r) => (
+                    {rolesPage.rows.map((r) => (
                       <tr key={r.id} data-inactive={r.active ? undefined : 'true'}>
                         <td>
                           <Link to={roleDetailPath(r.code)}>{r.name}</Link>
@@ -702,6 +924,9 @@ export function SecurityConfigPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
+                <Pager {...rolesPage} label="roles" />
+                </>
               ),
           },
         ]}

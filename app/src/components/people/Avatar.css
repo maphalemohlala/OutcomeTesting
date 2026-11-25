@@ -1,0 +1,47 @@
+.avatar {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1;
+}
+
+.avatar--sm {
+  width: 1.75rem;
+  height: 1.75rem;
+  font-size: 0.6875rem;
+}
+
+.avatar[data-tone='0'] { background: #dcebe0; color: #2f6b45; }
+.avatar[data-tone='1'] { background: #f3e6c8; color: #8a6418; }
+.avatar[data-tone='2'] { background: #e6e0f3; color: #5a4a8c; }
+.avatar[data-tone='3'] { background: #f5dfdf; color: #9a4040; }
+.avatar[data-tone='4'] { background: #d9e9ec; color: #2c5e66; }
+
+.person-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.person-cell__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.person-cell__name {
+  font-weight: 600;
+  color: var(--colour-text);
+}
+
+.person-cell__detail {
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+  overflow-wrap: anywhere;
+}

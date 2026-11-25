@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Xrm.Sdk;
@@ -165,6 +165,17 @@ namespace OutcomeTesting.Plugins
             if (code == null
                 || !code.Trim().Equals(
                     GradingRules.GradeQuestionCode, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            // A submitted check's root causes are its record: an amended grade (AmendOutcome,
+            // 2026-11-23) changes the grade alone, and the submitted lock would refuse the clear.
+            var reviewQuery = new QueryExpression(ReviewEntity) { ColumnSet = new ColumnSet("al_reviewstatus"), TopCount = 1 };
+            reviewQuery.Criteria.AddCondition("al_reviewinstanceid", ConditionOperator.Equal, reviewId);
+            var reviewRows = service.RetrieveMultiple(reviewQuery).Entities;
+            var reviewStatus = reviewRows.Count == 0 ? null : reviewRows[0].GetAttributeValue<OptionSetValue>("al_reviewstatus");
+            if (reviewStatus != null && reviewStatus.Value == ResponseRules.StatusSubmitted)
             {
                 return;
             }

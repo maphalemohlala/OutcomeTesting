@@ -1,7 +1,22 @@
-.worklist__scroll {
-  overflow-x: auto;
+/* The status tabs sit on the page's rule; the filters and the list below are their one panel. */
+.worklist__tabs {
+  margin-bottom: var(--space-4);
+}
+
+.worklist__tabs .tabs__tab {
+  font-size: var(--text-base);
+}
+
+/* The table and its pager share one white card. */
+.worklist__card {
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.worklist__scroll {
+  overflow-x: auto;
 }
 
 .worklist__scope {
@@ -10,6 +25,7 @@
   font-size: var(--text-sm);
   background: var(--colour-surface-sunken);
   border: 1px solid var(--colour-action);
+  border-radius: var(--radius);
 }
 
 .worklist__scope-clear {
@@ -24,43 +40,182 @@
 
 .worklist {
   min-width: 60rem;
-  font-size: var(--text-sm);
 }
 
 .worklist th,
 .worklist td {
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-4) var(--space-2);
   text-align: left;
-  vertical-align: top;
+  vertical-align: middle;
   border-bottom: 1px solid var(--colour-border);
+}
+
+.worklist th:first-child,
+.worklist td:first-child {
+  padding-left: var(--space-4);
+}
+
+.worklist th:last-child,
+.worklist td:last-child {
+  padding-right: var(--space-4);
+}
+
+.worklist tbody tr:last-child > * {
+  border-bottom: none;
 }
 
 .worklist thead th {
   position: sticky;
   top: 0;
-  background: var(--colour-surface-sunken);
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  padding-top: var(--space-3);
+  padding-bottom: var(--space-3);
+  background: var(--colour-surface);
+  font-size: var(--text-sm);
   color: var(--colour-text-muted);
+  font-weight: 500;
 }
 
 .worklist tbody th {
+  font-weight: 400;
+}
+
+/* Case: the reference, its service reference under it, then the client. */
+.worklist__ref {
+  display: block;
   font-weight: 600;
 }
 
-.worklist tbody th a {
-  color: var(--colour-action);
+.worklist__ref a {
+  color: var(--colour-text);
   text-decoration: none;
 }
 
-.worklist tbody th a:hover {
+.worklist__ref a:hover {
+  color: var(--colour-action);
   text-decoration: underline;
+}
+
+.worklist__client {
+  display: block;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--colour-text-muted);
+}
+
+/* A long grade takes two lines before the list scrolls sideways. */
+.worklist .outcome {
+  white-space: normal;
 }
 
 .worklist__numeric {
   text-align: right;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* People in the table are links to their cases, read as names until pointed at. */
+.worklist td a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.worklist td a:hover {
+  color: var(--colour-action);
+  text-decoration: underline;
+}
+
+.worklist tbody tr:hover > * {
+  background: var(--colour-surface-hover);
+}
+
+/* Route: each check as a small bordered chip, in the order they run. */
+.worklist__route {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
+.worklist__chip {
+  padding: 0.0625rem 0.5rem;
+  border: 1px solid var(--colour-border-strong);
+  border-radius: var(--radius);
+  background: var(--colour-surface);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.worklist__route-arrow {
+  color: var(--colour-text-muted);
+}
+
+/* Checkers: one line per discipline, its name in a fixed gutter so the avatars line up. */
+.worklist__checkers {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.worklist__checkers li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
+.worklist__checker-type {
+  width: 2.25rem;
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
+
+.worklist__remediation {
+  white-space: nowrap;
+}
+
+.worklist__done {
+  color: var(--colour-outcome-pass);
+}
+
+.worklist__open {
+  display: block;
+  color: var(--colour-danger-text);
+  font-weight: 500;
+}
+
+/* How much of an open remediation is done, as a thin track under the count. */
+.worklist__bar {
+  display: block;
+  width: 7rem;
+  height: 4px;
+  margin-top: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--colour-surface-sunken);
+  overflow: hidden;
+}
+
+.worklist__bar > span {
+  display: block;
+  height: 100%;
+  background: var(--colour-danger-text);
+}
+
+.worklist__dates {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--space-2);
+  min-width: 0;
+  color: var(--colour-text-muted);
+}
+
+/* The search pill is narrower here than the shared default, so the date pill can share its row. */
+.worklist__panel .filter-bar__field--search {
+  min-width: min(16rem, 100%);
 }
 
 .worklist__empty {
@@ -73,6 +228,7 @@
   padding: var(--space-4);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
 }
 
 .worklist__unavailable h2 {
@@ -84,18 +240,12 @@
   margin-top: var(--space-3);
 }
 
-/* An absent checker is not a blank: it says which of the two absences it is. Muted, and
-   italic for the one that is nobody's outstanding work, so a column of them skims. */
-.worklist__checker {
-  color: var(--colour-text-muted);
-}
-
-.worklist__checker--not-required {
-  font-style: italic;
-}
-
-/* The action count beside a remediation state, and a case that raised none: supporting
-   detail, so it recedes behind the state itself. */
+/* Supporting detail - a case that raised no remediation, an unallocated check - recedes. */
 .worklist__muted {
   color: var(--colour-text-muted);
+}
+
+/* The page buttons sit inside the card, not under it. */
+.worklist__card .pager {
+  border-top: 1px solid var(--colour-border);
 }

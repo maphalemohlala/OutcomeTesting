@@ -79,6 +79,20 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
+        public void A_submitted_review_keeps_its_root_cause_when_an_amendment_passes_the_grade()
+        {
+            // AmendOutcome rewrites the grade on a submitted check (2026-11-23); its root
+            // causes are the check's record, and the submitted lock would refuse the clear.
+            var service = Checklist();
+            service.Seed("al_reviewinstance", ReviewId, "al_reviewstatus", new OptionSetValue(ResponseRules.StatusSubmitted));
+            SeedRootCause(service, RootCauseResponseId, ReviewId, FactFindQuality);
+
+            ResponseProgressPlugin.ClearRootCauseOnPass(service, GradeAnswer(ResponseRules.ChoicePass), null, ReviewId);
+
+            Assert.Empty(service.Updates);
+        }
+
+        [Fact]
         public void A_grade_of_pass_clears_a_root_cause_already_recorded()
         {
             // The case the rule exists for: graded Potential harm, a cause chosen, then the

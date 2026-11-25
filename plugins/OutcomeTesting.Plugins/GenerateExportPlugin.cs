@@ -7,19 +7,26 @@ namespace OutcomeTesting.Plugins
 {
     /// <summary>
     /// Server-side command GenerateExport (AD-003, AD-039, AD-034 manual only). Registered
-    /// against the Custom API <c>al_GenerateExport</c>. Snapshots each Closed case, and each
-    /// graded case not yet closed (marked by <see cref="NotYetClosedMarker"/>), into an
-    /// al_exportrecord in the AD-039 20-column Trail Light shape, so the delivered values
-    /// are preserved for reconciliation (BR-012). Columns B and D carry CODES again from
-    /// 2026-09-22 (AD-207, superseding AD-183's emails), resolved from the REGISTRY and
-    /// never from the case - see <c>app/src/features/reports/trailLight.ts</c>, which is
-    /// where the file's column order lives. Enforces the caller holds Edit on
-    /// <c>export.generate</c>, is idempotent per batch, and writes an Audit Event.
+    /// against the Custom API <c>al_GenerateExport</c>. One call produces one Trail Light file
+    /// (2026-11-25): it creates the batch under the id the app chose, and snapshots exactly the
+    /// rows of the file asked for - Daily or Quarterly, cut to the check dates given - with the
+    /// values that file reports, so the batch is the file that was delivered (BR-012). Columns
+    /// B and D carry CODES (AD-207), resolved from the REGISTRY and never from the case - see
+    /// <c>app/src/features/reports/trailLight.ts</c>, which is where the file's column order
+    /// lives. Enforces the caller holds Edit on <c>export.generate</c>, is idempotent per
+    /// intent, and writes an Audit Event.
     /// </summary>
     public class GenerateExportPlugin : PluginBase
     {
         private const string InBatchId = "BatchId";
         private const string InIdempotencyKey = "IdempotencyKey";
+        private const string InFileKind = "FileKind";
+        private const string InCheckedFrom = "CheckedFrom";
+        private const string InCheckedTo = "CheckedTo";
+
+        /// <summary>The two files a batch can be: <c>FileKind</c> takes one of these.</summary>
+        public const string FileDaily = "Daily";
+        public const string FileQuarterly = "Quarterly";
 
         private const string OutBatchId = "BatchId";
         private const string OutRowCount = "RowCount";
@@ -56,6 +63,10 @@ namespace OutcomeTesting.Plugins
         // The administrator carrying a File Quality fail (requirements log row 10). Read only
         // by IsAccountable - it is never written to an export column.
         public const string FqAdministratorContactAttr = "al_fqadministratorcontactid";
+
+        // Since 2026-11-25 the choice is "an administrator", with no name (project owner).
+        // The contact above stays for outcomes recorded before then and still counts.
+        public const string FqAdministratorFlag = "al_fqadministratoraccountable";
         private const string TaxOutcomeAttr = "al_taxoutcome";
         private const int CaseStatusClosed = 120910591;
         private const int BatchStatusDraft = 120910770;
@@ -86,6 +97,21 @@ namespace OutcomeTesting.Plugins
 
             var batchId = CommandHelpers.ParseRequiredGuid(context, InBatchId);
             var idempotencyKey = CommandHelpers.GetRequiredString(context, InIdempotencyKey);
+            var fileKind = CommandHelpers.GetRequiredString(context, InFileKind).Trim();
+            var daily = string.Equals(fileKind, FileDaily, StringComparison.OrdinalIgnoreCase);
+            if (!daily && !string.Equals(fileKind, FileQuarterly, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix + "Choose the Daily or the Quarterly file.");
+            }
+
+            var checkedFrom = ParseDay(context, InCheckedFrom);
+            var checkedTo = ParseDay(context, InCheckedTo);
+            if (checkedFrom.HasValue && checkedTo.HasValue && checkedFrom.Value > checkedTo.Value)
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix + "The first check date is after the last one.");
+            }
 
             PermissionHelpers.EnsureAppPermission(systemService, context, "export.generate", PermissionHelpers.AccessEdit);
 
@@ -97,23 +123,46 @@ namespace OutcomeTesting.Plugins
                 return;
             }
 
-            var batch = userService.Retrieve(BatchEntity, batchId, new ColumnSet("al_exportbatchcode", "al_batchstatus"));
-            var batchCode = batch.GetAttributeValue<string>("al_exportbatchcode");
-            var batchRef = new EntityReference(BatchEntity, batchId);
-
-            // An export batch is a snapshot of what was produced, and the records are
-            // upserted in place. Re-generating one that has already been produced would
-            // rewrite those rows with today's values and revert a Delivered batch to
-            // Generated, destroying the record of what was actually sent (AD-042). A
-            // re-run is a new batch, not a second pass over this one. Retries of the same
-            // intent are already handled by the idempotency replay above.
-            var currentStatus = batch.GetAttributeValue<OptionSetValue>("al_batchstatus");
-            if (currentStatus != null && currentStatus.Value != BatchStatusDraft)
+            // The app names a new id per export; a Draft batch made by the retired two-step
+            // flow is still generated in place. A query, not a Retrieve, so a new id is an
+            // empty answer rather than a fault.
+            var batchQuery = new QueryExpression(BatchEntity)
             {
-                throw new InvalidPluginExecutionException(
-                    CommandHelpers.PreconditionPrefix +
-                    "This export batch has already been generated. Create a new batch to produce a fresh export.");
+                ColumnSet = new ColumnSet("al_exportbatchcode", "al_batchstatus"),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            batchQuery.Criteria.AddCondition("al_exportbatchid", ConditionOperator.Equal, batchId);
+            var batch = userService.RetrieveMultiple(batchQuery).Entities.FirstOrDefault();
+            string batchCode;
+            if (batch == null)
+            {
+                batchCode = "EXB-" + idempotencyKey;
+                userService.Create(new Entity(BatchEntity, batchId)
+                {
+                    ["al_name"] = FileName(daily, checkedFrom, checkedTo),
+                    ["al_exportbatchcode"] = batchCode,
+                    ["al_batchstatus"] = new OptionSetValue(BatchStatusDraft),
+                    ["al_rowcount"] = 0,
+                });
             }
+            else
+            {
+                batchCode = batch.GetAttributeValue<string>("al_exportbatchcode");
+
+                // A batch is a snapshot of what was produced (AD-042): re-generating one would
+                // rewrite its rows with today's values. A re-run is a new batch. Retries of the
+                // same intent are already handled by the idempotency replay above.
+                var currentStatus = batch.GetAttributeValue<OptionSetValue>("al_batchstatus");
+                if (currentStatus != null && currentStatus.Value != BatchStatusDraft)
+                {
+                    throw new InvalidPluginExecutionException(
+                        CommandHelpers.PreconditionPrefix +
+                        "This export batch has already been generated. Export again to produce a fresh file.");
+                }
+            }
+
+            var batchRef = new EntityReference(BatchEntity, batchId);
 
             var cases = new QueryExpression(CaseEntity)
             {
@@ -129,17 +178,33 @@ namespace OutcomeTesting.Plugins
             };
             cases.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
 
-            // Every Closed case, for the quarterly file, and every graded case still open and
-            // dated, for the daily file: any non-pass goes to remediation on its check day, so
-            // a Closed-only snapshot held none of the daily file's fails (owner, 2026-11-17).
+            // The quarterly file takes Closed cases. The daily file also takes graded cases still
+            // open and dated: any non-pass goes to remediation on its check day, so Closed alone
+            // holds none of the daily file's fails (owner, 2026-11-17).
             var wanted = new FilterExpression(LogicalOperator.Or);
             wanted.AddCondition("al_casestatus", ConditionOperator.Equal, CaseStatusClosed);
-            var gradedOpen = new FilterExpression();
-            gradedOpen.AddCondition("al_casestatus", ConditionOperator.In, GradedOpenStatuses);
-            gradedOpen.AddCondition("al_checkdate", ConditionOperator.NotNull);
-            wanted.AddFilter(gradedOpen);
+            if (daily)
+            {
+                var gradedOpen = new FilterExpression();
+                gradedOpen.AddCondition("al_casestatus", ConditionOperator.In, GradedOpenStatuses);
+                gradedOpen.AddCondition("al_checkdate", ConditionOperator.NotNull);
+                wanted.AddFilter(gradedOpen);
+            }
+
             cases.Criteria.AddFilter(wanted);
             cases.ColumnSet.AddColumn("al_casestatus");
+
+            // al_checkdate is date-only, so a day compares as that day at midnight; a case with
+            // no check date cannot be shown to fall in a range and drops out once one is set.
+            if (checkedFrom.HasValue)
+            {
+                cases.Criteria.AddCondition("al_checkdate", ConditionOperator.GreaterEqual, checkedFrom.Value);
+            }
+
+            if (checkedTo.HasValue)
+            {
+                cases.Criteria.AddCondition("al_checkdate", ConditionOperator.LessEqual, checkedTo.Value);
+            }
 
             // Paged: a bare RetrieveMultiple stops at 5000 and the batch would then stamp
             // that truncated figure as its complete row count (AD-042), leaving no way to
@@ -200,6 +265,18 @@ namespace OutcomeTesting.Plugins
                     continue;
                 }
 
+                // The daily file reports the grade first recorded, the quarterly file the one in
+                // force (client, 2026-11-16); the record holds the one its file reports.
+                var fileOutcome = FileOutcome(daily, effectiveOutcome, initialOutcome);
+                var fileGrade = daily && adviceRow != null
+                    ? CommandHelpers.Formatted(adviceRow, Outcomes.InitialOutcomeAttr) ?? adviceGrade
+                    : adviceGrade;
+                var taxOutcome = aqsExpected ? null : outcomeCase.GetAttributeValue<OptionSetValue>(TaxOutcomeAttr)?.Value;
+                if (daily && !BelongsInDailyFile(fileQualityChoice, fileOutcome, taxOutcome))
+                {
+                    continue;
+                }
+
                 // Someone named in place of the case's own adviser or paraplanner (project
                 // owner, 2026-09-19). Read once per case; FlaggedText decides per column
                 // whether it applies, since only the slot the flags point at is filled.
@@ -253,18 +330,11 @@ namespace OutcomeTesting.Plugins
                     ["al_clientname"] = outcomeCase.GetAttributeValue<string>("al_clientname"),
                     ["al_preorpostcheck"] = ManagedOption(
                         outcomeCase, ListOptionRules.PreOrPostCheckAttribute, "al_preorpostcheck"),
-                    ["al_advicequalitygrade"] = adviceGrade,
-                    // The daily file reports the grade first recorded, the quarterly file the
-                    // one in force (client, 2026-11-16); one batch serves both, so both are kept.
-                    ["al_initialadvicequalitygrade"] = adviceRow == null
-                        ? null : CommandHelpers.Formatted(adviceRow, Outcomes.InitialOutcomeAttr),
+                    ["al_advicequalitygrade"] = fileGrade,
                     // A Tax-only case's own verdict, which no Trail Light column carries; the
                     // daily file includes the row on it (client, 2026-11-16).
                     ["al_taxoutcome"] = aqsExpected ? null : CommandHelpers.Formatted(outcomeCase, TaxOutcomeAttr),
                     ["al_filequalitygrade"] = fileQualityGrade,
-                    // The separator left the file (AD-224), so the column now says which rows
-                    // were not yet closed: the quarterly file leaves those out.
-                    ["al_separator"] = isClosed ? string.Empty : NotYetClosedMarker,
                     ["statecode"] = new OptionSetValue(0),
                     ["statuscode"] = new OptionSetValue(1),
                 };
@@ -276,7 +346,7 @@ namespace OutcomeTesting.Plugins
                 // passed every test FlaggedText and NamedPerson had in isolation).
                 foreach (var column in AccountabilityColumns(
                     judgementRow, outcomeCase, fqNamedPerson, aqNamedPerson, registryCodes,
-                    fileQualityChoice, AccountabilityGate(effectiveOutcome, initialOutcome)))
+                    fileQualityChoice, fileOutcome))
                 {
                     record[column.Key] = column.Value;
                 }
@@ -295,6 +365,7 @@ namespace OutcomeTesting.Plugins
 
             var update = new Entity(BatchEntity, batchId)
             {
+                ["al_name"] = FileName(daily, checkedFrom, checkedTo),
                 ["al_batchstatus"] = new OptionSetValue(BatchStatusGenerated),
                 ["al_rowcount"] = rows,
                 ["al_generatedon"] = DateTime.UtcNow,
@@ -590,11 +661,81 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// What al_separator holds on a row whose case was graded but not yet closed when the
-        /// batch was generated. Closed rows keep it empty, as every batch before 2026-11-17 did.
-        /// The column holds ten characters.
+        /// An optional <c>yyyy-MM-dd</c> day parameter, or null when it is not given. Anything
+        /// else is refused rather than read as "no bound", which would widen the file silently.
         /// </summary>
-        public const string NotYetClosedMarker = "Open";
+        private static DateTime? ParseDay(IPluginExecutionContext context, string name)
+        {
+            var value = CommandHelpers.GetOptionalString(context, name);
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            DateTime day;
+            if (!DateTime.TryParseExact(value.Trim(), "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out day))
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix + name + " must be a date written yyyy-mm-dd.");
+            }
+
+            return day;
+        }
+
+        /// <summary>
+        /// The batch's name, which says which file it is: "Daily file, checked 24 Nov 2026",
+        /// "Quarterly file, checked 1 Oct 2026 to 31 Dec 2026", "Quarterly file, every case".
+        /// </summary>
+        public static string FileName(bool daily, DateTime? from, DateTime? to)
+        {
+            Func<DateTime, string> day = d => d.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
+            string range;
+            if (from.HasValue && to.HasValue)
+            {
+                range = from.Value == to.Value ? "checked " + day(from.Value) : "checked " + day(from.Value) + " to " + day(to.Value);
+            }
+            else if (from.HasValue)
+            {
+                range = "checked on or after " + day(from.Value);
+            }
+            else if (to.HasValue)
+            {
+                range = "checked on or before " + day(to.Value);
+            }
+            else
+            {
+                range = "every case";
+            }
+
+            return (daily ? "Daily file, " : "Quarterly file, ") + range;
+        }
+
+        /// <summary>
+        /// The advice outcome a file reports, and names its accountable people against: the
+        /// daily file the grade first recorded, the quarterly file the one in force (client,
+        /// 2026-11-16). A fail regraded to a pass names someone in the daily file only.
+        /// </summary>
+        public static int? FileOutcome(bool daily, int? effectiveOutcome, int? initialOutcome)
+        {
+            return daily ? initialOutcome ?? effectiveOutcome : effectiveOutcome;
+        }
+
+        /// <summary>
+        /// Whether a row belongs in the daily file (client, 2026-11-16): any type of failure - a
+        /// File Quality Fail; an advice grade of Pass with issues, Insufficient evidence or
+        /// Potential harm; or a Tax-only check that came back Fail or Pass with issues, which no
+        /// Trail Light column carries. A clean pass is left out.
+        /// </summary>
+        public static bool BelongsInDailyFile(int? fileQualityChoice, int? adviceOutcome, int? taxOutcome)
+        {
+            // The Tax scale is Pass / Fail / ChoiceInsufficient, which the Tax check labels "Pass
+            // with issues" (AD-055); al_taxoutcome holds that value, never ChoicePassWithIssues.
+            return FileQuality.Failed(fileQualityChoice)
+                || adviceOutcome == OutcomeRules.OutcomePassWithIssues
+                || AdviceQualityFailed(adviceOutcome)
+                || (taxOutcome.HasValue && OutcomeRules.TaxResultRequiresRemediation(taxOutcome.Value));
+        }
 
         /// <summary>Graded, so dated and holding its first grades, but not yet closed.</summary>
         private static readonly object[] GradedOpenStatuses =
@@ -652,7 +793,8 @@ namespace OutcomeTesting.Plugins
                 "al_finaloutcome", "al_initialoutcome",
                 "al_fqadviseraccountable", "al_fqparaplanneraccountable",
                 "al_aqadviseraccountable", "al_aqparaplanneraccountable",
-                FqAccountableContactAttr, AqAccountableContactAttr, FqAdministratorContactAttr, "al_outcomecaseid");
+                FqAccountableContactAttr, AqAccountableContactAttr, FqAdministratorContactAttr, FqAdministratorFlag,
+                "al_outcomecaseid");
         }
 
         /// <summary>
@@ -788,18 +930,6 @@ namespace OutcomeTesting.Plugins
         {
             return effectiveOutcome == OutcomeRules.OutcomeInsufficient
                 || effectiveOutcome == OutcomeRules.OutcomePotentialHarm;
-        }
-
-        /// <summary>
-        /// The advice outcome the accountable people are snapshotted against: the one in force
-        /// when it is a fail, else the initial one. The daily file reports the initial grade
-        /// and the quarterly file the final one (client, 2026-11-16), and a fail regraded to a
-        /// pass must still name someone in the daily file - so the names are kept whenever
-        /// either grade failed, and the app blanks them in the file whose grade did not.
-        /// </summary>
-        public static int? AccountabilityGate(int? effectiveOutcome, int? initialOutcome)
-        {
-            return AdviceQualityFailed(effectiveOutcome) ? effectiveOutcome : initialOutcome;
         }
 
         /// <summary>
@@ -1057,6 +1187,16 @@ namespace OutcomeTesting.Plugins
         /// expressible - it was not expressible before either, the OD-024 gate having
         /// refused a row that named no one.
         /// </summary>
+        /// <summary>
+        /// Whether an administrator carries the File Quality fail: the flag, or a contact
+        /// named before the flag replaced the name.
+        /// </summary>
+        public static bool AdministratorCarriesFile(Entity outcomeRow)
+        {
+            return Flagged(outcomeRow, FqAdministratorFlag)
+                || outcomeRow?.GetAttributeValue<EntityReference>(FqAdministratorContactAttr) != null;
+        }
+
         public static bool IsAccountable(Entity outcomeRow, string flag, int? fileQualityChoice, int? effectiveOutcome)
         {
             var fileFlag = flag == FqAdviserFlag || flag == FqParaplannerFlag;
@@ -1071,7 +1211,7 @@ namespace OutcomeTesting.Plugins
             // themselves is never exported - the File Quality person columns stay blank.
             var recorded = fileFlag
                 ? Flagged(outcomeRow, FqAdviserFlag) || Flagged(outcomeRow, FqParaplannerFlag)
-                    || outcomeRow?.GetAttributeValue<EntityReference>(FqAdministratorContactAttr) != null
+                    || AdministratorCarriesFile(outcomeRow)
                 : Flagged(outcomeRow, AqAdviserFlag) || Flagged(outcomeRow, AqParaplannerFlag);
 
             // The adviser does not carry the file and the paraplanner does not carry the

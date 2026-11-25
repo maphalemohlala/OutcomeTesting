@@ -1,68 +1,75 @@
-.case-edit {
-  padding: var(--space-4);
-  margin-bottom: var(--space-5);
-  background: var(--colour-surface);
-  border: 1px solid var(--colour-border);
-}
-
-.case-edit__bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.case-edit__bar-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.case-edit h2 {
-  margin-bottom: var(--space-2);
-  padding-bottom: var(--space-2);
-  font-size: var(--text-lg);
-  border-bottom: 1px solid var(--colour-border);
-}
-
-.case-edit__bar h2 {
-  margin: 0;
-  padding: 0;
-  border: none;
-}
-
 .case-edit__intro {
   margin-bottom: var(--space-3);
   font-size: var(--text-sm);
   color: var(--colour-text-muted);
 }
 
-/* A fieldset's default min-inline-size is min-content, so without the reset it widens to
-   the longest unbreakable line inside it and runs out of the 36rem modal. */
+/*
+ * One row per section: its name in the left column, its fields in three columns on the right.
+ * A floated legend is ordinary content, so the fieldset's grid can place it. min-width: 0
+ * because a fieldset's default min-inline-size is min-content, which would widen it to the
+ * longest unbreakable line inside it.
+ */
 .case-edit__section {
+  display: grid;
+  grid-template-columns: 13rem minmax(0, 1fr);
+  gap: var(--space-4);
   min-width: 0;
-  margin: 0 0 var(--space-3);
-  padding: var(--space-3);
-  border: 1px solid var(--colour-border);
-  border-radius: var(--radius);
+  margin: 0 calc(-1 * var(--space-5));
+  padding: var(--space-5);
+  border: 0;
+  border-top: 1px solid var(--colour-border);
 }
 
 .case-edit__section > legend {
-  padding: 0 var(--space-2);
-  font-size: var(--text-sm);
+  float: left;
+  padding: 0;
+  font-size: var(--text-base);
   font-weight: 600;
   color: var(--colour-text);
 }
 
-.case-edit__section .case-edit__grid {
-  margin-bottom: 0;
+/* Anything else in a section (notes, the checkers' help) stays in the fields column. */
+.case-edit__section > :not(legend) {
+  grid-column: 2;
+}
+
+.case-edit__form > .case-edit__section:first-child {
+  margin-top: calc(-1 * var(--space-5));
+  border-top: 0;
 }
 
 .case-edit__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-  gap: var(--space-3);
-  margin-bottom: var(--space-3);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4) var(--space-5);
+}
+
+.case-edit__field--span2 {
+  grid-column: span 2;
+}
+
+.case-edit__field--span3 {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 52rem) {
+  .case-edit__section {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+  }
+
+  .case-edit__section > :not(legend) {
+    grid-column: 1;
+  }
+
+  .case-edit__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .case-edit__field--span2 {
+    grid-column: auto;
+  }
 }
 
 /* min-width: 0 because a grid item defaults to its content's min width, and a nowrap
@@ -83,13 +90,80 @@
   margin-top: var(--space-3);
 }
 
-.case-edit__field--wide {
-  grid-column: 1 / -1;
-}
-
 .case-edit__field > span {
   font-weight: 600;
   color: var(--colour-text);
+}
+
+/* Label on the left, the list's Manage link on the right. */
+.case-edit__label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.case-edit__manage {
+  font-weight: 500;
+  color: var(--colour-action);
+}
+
+.case-edit__field select,
+.case-edit__field input:not([type='checkbox'], [type='radio']),
+.case-edit__set-toggle {
+  min-height: 2.75rem;
+}
+
+.case-edit__chip {
+  display: inline-flex;
+  align-items: center;
+  margin-right: var(--space-2);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--colour-chip);
+  color: var(--colour-chip-text);
+  font-weight: 500;
+}
+
+/* A section that cannot be changed right now, said with a lock in a dashed box. */
+.case-edit__locked {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--colour-border-strong);
+  border-radius: var(--radius);
+  background: var(--colour-surface-sunken);
+  font-size: var(--text-sm);
+  color: var(--colour-text);
+}
+
+.case-edit__locked .icon {
+  color: var(--colour-text-muted);
+}
+
+/* The reason and the two buttons on one sunken band that stays in view while the form scrolls. */
+.case-edit__footer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  margin: 0 calc(-1 * var(--space-5)) calc(-1 * var(--space-5));
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--colour-border);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  background: var(--colour-surface-sunken);
+}
+
+.case-edit__reason {
+  flex: 1 1 18rem;
+}
+
+.case-edit__footer > button {
+  min-height: 2.75rem;
 }
 
 .case-edit__field select,
@@ -202,14 +276,14 @@
   font: inherit;
   text-align: left;
   color: inherit;
-  background: var(--surface, #fff);
-  border: 1px solid var(--border, #c7c7c7);
-  border-radius: 4px;
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border-strong);
+  border-radius: var(--radius);
   cursor: pointer;
 }
 
 .case-edit__set-toggle:hover {
-  border-color: var(--ink, #333);
+  border-color: var(--colour-action);
 }
 
 /* Drawn rather than typed, so it needs no icon font and no glyph a screen reader reads out

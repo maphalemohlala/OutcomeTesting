@@ -23,6 +23,8 @@
     <div class=' d-xs-block d-sm-block d-md-block d-lg-block navbar-brand navbar-header'>
       {% editable snippets 'Mobile Header' type: 'html' %}
     </div>
+    {% comment %}The product the portal serves, beside the logo (settings OT/ProductName, OTIS in PROD).{% endcomment %}
+    <span class='ot-header__product'>{{ settings['OT/ProductName'] | default: 'Outcome Testing' | escape }} portal</span>
     <button type='button' class='navbar-toggler collapsed custom-navbar-toggler' title='{{ snippets["Header/Toggle Navigation"] | default: resx['Toggle_Navigation'] | h }}' data-bs-toggle='collapse' data-bs-target='#navbar' aria-expanded='false' onclick='setHeight();'>
       <span class='visually-hidden'>{{ snippets['Header/Toggle Navigation'] | default: resx.Toggle_Navigation | h }}</span>
       <span class='navbar-toggler-icon'></span>
@@ -58,9 +60,12 @@
               {% else %}
                 {% assign sublinks = link.weblinks %}
               {% endif %}
-              <li class=' nav-item weblink {% if sublinks.size > 0 %} dropdown{% endif %}'>
+              {% comment %}The page you are on, or one under it, marks its menu item (the gold rule).{% endcomment %}
+              {% assign ot_here = false %}
+              {% if link.url == page.url %}{% assign ot_here = true %}{% elsif link.url != '/' and link.url != null and page.url contains link.url %}{% assign ot_here = true %}{% endif %}
+              <li class=' nav-item weblink {% if sublinks.size > 0 %} dropdown{% endif %}{% if ot_here %} ot-nav--here{% endif %}'>
                 <a
-                  aria-label='{{ link.name | escape }}'
+                  aria-label='{{ link.name | escape }}'{% if ot_here %} aria-current='page'{% endif %}
                   {% if sublinks.size > 0 -%}
                     href='#' role='button' class='dropdown-toggle' data-bs-toggle='dropdown'
                   {%- else -%}
@@ -177,6 +182,7 @@
               <li class=' nav-item dropdown'>
                 {% assign username = user.fullname | escape %}
                 <a href='#' class=' nav-link dropdown-toggle' aria-roledescription='link' title='{{username | default: resx['Default_Profile_name'] }}' data-bs-toggle='dropdown' role='button' aria-expanded='false'>
+                  <span class='ot-avatar' data-ot-initials='{{ username }}' aria-hidden='true'></span>
                   <span class='username'>{{ username | default: resx.Default_Profile_name }}</span>
                   <span class='caret'></span>
                 </a>

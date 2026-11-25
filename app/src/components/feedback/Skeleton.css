@@ -1,0 +1,45 @@
+.skeleton {
+  display: grid;
+  gap: var(--space-3);
+  padding-block: var(--space-2);
+}
+
+.skeleton--page {
+  gap: var(--space-4);
+  padding-block: var(--space-4);
+}
+
+.skeleton__bar {
+  display: block;
+  height: 0.875rem;
+  border-radius: 4px;
+  /* The page behind is surface-sunken, so the bar itself is the darker border tone and the shimmer lightens it. */
+  background: linear-gradient(
+    90deg,
+    var(--colour-border) 25%,
+    var(--colour-surface-hover) 50%,
+    var(--colour-border) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+/* Uneven widths so it reads as text, not a striped block. */
+.skeleton__bar:nth-of-type(3n + 1) { width: 100%; }
+.skeleton__bar:nth-of-type(3n + 2) { width: 85%; }
+.skeleton__bar:nth-of-type(3n) { width: 60%; }
+
+.skeleton__bar--title {
+  height: 1.75rem;
+  width: 40% !important;
+  margin-bottom: var(--space-2);
+}
+
+@keyframes skeleton-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+@media print {
+  .skeleton { display: none; }
+}

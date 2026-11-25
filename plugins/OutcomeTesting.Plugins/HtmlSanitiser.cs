@@ -122,6 +122,44 @@ namespace OutcomeTesting.Plugins
             return HasText(cleaned) ? cleaned : null;
         }
 
+        /// <summary>How many characters the markup reads as: tags left out, each entity one character.</summary>
+        public static int TextLength(string html)
+        {
+            if (string.IsNullOrEmpty(html))
+            {
+                return 0;
+            }
+
+            var length = 0;
+            var inside = false;
+            for (var i = 0; i < html.Length; i++)
+            {
+                var c = html[i];
+                if (c == '<')
+                {
+                    inside = true;
+                }
+                else if (c == '>')
+                {
+                    inside = false;
+                }
+                else if (!inside)
+                {
+                    length++;
+                    if (c == '&')
+                    {
+                        var end = html.IndexOf(';', i);
+                        if (end > i && end - i <= 10)
+                        {
+                            i = end;
+                        }
+                    }
+                }
+            }
+
+            return length;
+        }
+
         /// <summary>
         /// Whether markup carries any words at all, ignoring tags and whitespace. What
         /// "answered" means for a rich-text question: SubmitReviewPlugin's mandatory gate

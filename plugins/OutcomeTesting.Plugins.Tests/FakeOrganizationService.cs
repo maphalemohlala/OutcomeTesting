@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Xrm.Sdk;
@@ -608,6 +608,9 @@ namespace OutcomeTesting.Plugins.Tests
                     // A missing value never satisfies a range, as in SQL.
                     return actual is IComparable && expected != null
                         && ((IComparable)actual).CompareTo(expected) >= 0;
+                case ConditionOperator.LessEqual:
+                    return actual is IComparable && expected != null
+                        && ((IComparable)actual).CompareTo(expected) <= 0;
                 default:
                     throw new NotSupportedException(
                         "ConditionOperator." + condition.Operator + " is not supported by this fake. "
@@ -893,6 +896,9 @@ namespace OutcomeTesting.Plugins.Tests
         /// </summary>
         private const string ProductsRelationship = ListOptionRules.ProductsRelationship;
 
+        /// <summary>A case's T&amp;C Managers; relationship and intersect share a name, as with products.</summary>
+        private const string ManagersRelationship = CaseAccessReconciler.SupervisorsRelationship;
+
         public void Associate(
             string entityName, Guid entityId, Relationship relationship, EntityReferenceCollection relatedEntities)
         {
@@ -930,6 +936,14 @@ namespace OutcomeTesting.Plugins.Tests
                         Guid.NewGuid(),
                         "al_failreasonid", related.Id,
                         "al_responseid", entityId);
+                }
+                else if (relationship.SchemaName == ManagersRelationship)
+                {
+                    Seed(
+                        ManagersRelationship,
+                        Guid.NewGuid(),
+                        "contactid", related.Id,
+                        "al_outcomecaseid", entityId);
                 }
                 else if (relationship.SchemaName == ProductsRelationship)
                 {
@@ -980,6 +994,19 @@ namespace OutcomeTesting.Plugins.Tests
                     var stale = table.Values
                         .Where(r => Equals(r.GetAttributeValue<object>("al_failreasonid"), related.Id)
                                  && Equals(r.GetAttributeValue<object>("al_responseid"), entityId))
+                        .Select(r => r.Id)
+                        .ToList();
+                    foreach (var id in stale)
+                    {
+                        table.Remove(id);
+                    }
+                }
+                else if (relationship.SchemaName == ManagersRelationship)
+                {
+                    var table = Table(ManagersRelationship);
+                    var stale = table.Values
+                        .Where(r => Equals(r.GetAttributeValue<object>("contactid"), related.Id)
+                                 && Equals(r.GetAttributeValue<object>("al_outcomecaseid"), entityId))
                         .Select(r => r.Id)
                         .ToList();
                     foreach (var id in stale)

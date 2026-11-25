@@ -17,6 +17,7 @@ import { useCaseDetail } from './useCaseDetail';
 import { useCaseOutcome } from './useCaseOutcome';
 
 import './RecheckPage.css';
+import { Skeleton } from '../../components/feedback/Skeleton';
 
 /**
  * Recheck and regrade (FR-024, BR-007, OD-007, AD-031). The T&C Manager records the final
@@ -131,7 +132,7 @@ export function RecheckPage() {
         <Notice tone="error">This case is not available to you, so it cannot be regraded.</Notice>
       ) : null}
 
-      {outcomes.status === 'loading' ? <p role="status">Loading outcomes…</p> : null}
+      {outcomes.status === 'loading' ? <Skeleton label="Loading outcomes…" rows={6} /> : null}
 
       {outcomes.status === 'unavailable' ? (
         <Notice tone="error">
@@ -257,6 +258,9 @@ export function RecheckPage() {
               ))}
             </tbody>
           </table>
+        ) : null}
+        {outcomes.status === 'ready' && rows.length === 0 ? (
+          <p className="recheck__hint">No outcome has been recorded on this case yet.</p>
         ) : null}
       </section>
     </>

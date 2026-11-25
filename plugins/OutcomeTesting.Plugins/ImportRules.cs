@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 
 namespace OutcomeTesting.Plugins
@@ -55,15 +56,19 @@ namespace OutcomeTesting.Plugins
 
         /// <summary>
         /// The Business Unit a Group2 value means (project owner, 2026-11-18: "Whole of Market =
-        /// Independent", "Restricted Market" = Restricted), or null for anything else.
+        /// Independent", "Restricted Market" = Restricted), or null for anything else. The
+        /// extract itself says "Whole of Market Proposition" and "Restricted Proposition"
+        /// (project owner, 2026-11-24).
         /// </summary>
         public static int? BusinessUnitFor(string group2)
         {
             switch ((group2 ?? string.Empty).Trim().ToLowerInvariant())
             {
+                case "whole of market proposition":
                 case "whole of market":
                 case "independent":
                     return BusinessUnitIndependent;
+                case "restricted proposition":
                 case "restricted market":
                 case "restricted":
                     return BusinessUnitRestricted;
@@ -77,6 +82,20 @@ namespace OutcomeTesting.Plugins
         /// IO has no task of its own for these, so the extract is amended by hand.
         /// </summary>
         public const string PostSaleName = "Post sale advice check required";
+
+        /// <summary>
+        /// The IO checklist item that makes a case Tier 1 high risk: always checked, never
+        /// "No check required" (client, 2026-11-25). High Risk Item 2 is Tier 2.
+        /// </summary>
+        public const string Tier1Name = "High Risk Item 1";
+
+        /// <summary>Whether the stored checklist items (one per line) include the Tier 1 item.</summary>
+        public static bool IsTier1(string checklistItems)
+        {
+            return (checklistItems ?? string.Empty)
+                .Split('\n')
+                .Any(line => string.Equals(line.Trim(), Tier1Name, StringComparison.OrdinalIgnoreCase));
+        }
 
         private const string NoChecklistItems =
             "No checklist items are selected, so the review route cannot be determined.";
@@ -376,7 +395,7 @@ namespace OutcomeTesting.Plugins
                 { "Tax", true },
                 { "Trust Documentation Check", true },
                 { "Trust documentation", true },
-                { "High Risk Item 1", false },
+                { Tier1Name, false },
                 { "High Risk Item 2", false },
                 { "Enhanced Supervision", false },
                 { "Pre-CAS Adviser", false },

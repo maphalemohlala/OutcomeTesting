@@ -56,8 +56,14 @@ namespace OutcomeTesting.Plugins
         public const int ActionPerformedYes = 120910815;
         public const int ActionPerformedNo = 120910816;
 
-        /// <summary>The length of <see cref="ActionAttr"/>, and the most one entry may carry.</summary>
+        /// <summary>The most characters one entry may read as (its words, not its markup).</summary>
         public const int MaxLength = 4000;
+
+        /// <summary>
+        /// al_remediationaction.al_remedialaction's MaxLength. Formatted words are stored as
+        /// markup, so the column is wider than <see cref="MaxLength"/>, which counts what reads.
+        /// </summary>
+        public const int StoredMaxLength = 20000;
 
         /// <summary>The stored map, or an empty one when there is nothing readable.</summary>
         public static Dictionary<string, string> Parse(string json)

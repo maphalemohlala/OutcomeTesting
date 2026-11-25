@@ -1,6 +1,6 @@
 <customapirequestparameter uniquename="BatchId">
-  <description default="Id of the al_exportbatch to populate.">
-    <label description="Id of the al_exportbatch to populate." languagecode="1033" />
+  <description default="Id of the al_exportbatch to create (or a Draft batch to populate).">
+    <label description="Id of the al_exportbatch to create (or a Draft batch to populate)." languagecode="1033" />
   </description>
   <displayname default="Batch id">
     <label description="Batch id" languagecode="1033" />

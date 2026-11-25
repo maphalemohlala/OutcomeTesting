@@ -128,6 +128,7 @@ describe('caseHeaderFields', () => {
     // (F6, 2026-09-20).
     al_casereference: 'TASK-100001',
     al_ioreference: 'IO-100001',
+    al_servicecaseref: 'IOA07066846',
     al_casestatus: 120910585,
     al_advisername: 'A. Adviser',
     al_adviserstatus: 120910501,
@@ -166,6 +167,8 @@ describe('caseHeaderFields', () => {
       'Business Unit',
       'Client name / initials',
       'IO reference',
+      'Case reference',
+      'Service case reference',
       'Pre or post check',
       'Vulnerable client?',
       'Tax check required',
@@ -183,6 +186,10 @@ describe('caseHeaderFields', () => {
     // reference is the TaskID and belongs to the heading, not to this field.
     expect(byLabel.get('IO reference')).toBe('IO-100001');
     expect(byLabel.get('IO reference')).not.toBe('TASK-100001');
+    // Both references side by side (client, 2026-11-24): the TaskID keys the case, the
+    // service case reference is the one people quote.
+    expect(byLabel.get('Case reference')).toBe('TASK-100001');
+    expect(byLabel.get('Service case reference')).toBe('IOA07066846');
     expect(byLabel.get('For Tax team usage')).toBe('Submit to AQS');
     // Requirements log row 6: imported from Group2 (Whole of Market = Independent).
     expect(byLabel.get('Business Unit')).toBe('Independent');
@@ -256,11 +263,10 @@ describe('failPoints', () => {
     { id: 'tax-2', name: 'Tax check – insufficient evidence to complete the check or to pass', category: 'Tax check', categoryValue: 120910403, order: 20 },
     { id: 'tax-1', name: 'Tax check - not completed when this should have been', category: 'Tax check', categoryValue: 120910403, order: 19 },
     { id: 'bre-1', name: 'Breach - Any other process breach has been identified', category: 'Breach', categoryValue: 120910401, order: 6 },
+    { id: 'tfq-1', name: 'OEL missing or incomplete', category: 'Tax file quality', categoryValue: 120910404, order: 30 },
   ];
 
-  it('offers every reason, whatever its category, in display order', () => {
-    // One undivided list on the document, and one here: the category groups the reasons, it
-    // does not decide who may tick them.
+  it('offers an AQS review every reason but the Tax file quality points, in display order', () => {
     expect(failPoints(reasons, new Set()).map((p) => p.id)).toEqual([
       'aml-1',
       'bre-1',
@@ -282,7 +288,16 @@ describe('failPoints', () => {
     expect(failPoints(withRetired, new Set(), true).map((p) => p.id)).not.toContain('old');
   });
 
-  it('offers the Tax check reasons to whoever is looking, not only the Tax team', () => {
+  it('offers a Tax review the Tax file quality points alone (client decision, 2026-11-06)', () => {
+    expect(failPoints(reasons, new Set(), false, true).map((p) => p.id)).toEqual(['tfq-1']);
+  });
+
+  it("keeps a point the review ticked even outside its team's list", () => {
+    expect(failPoints(reasons, new Set(['aml-1']), true, true).map((p) => p.id)).toEqual(['aml-1', 'tfq-1']);
+    expect(failPoints(reasons, new Set(['tfq-1']), true).map((p) => p.id)).toContain('tfq-1');
+  });
+
+  it('offers the Tax check reasons to an AQS review', () => {
     expect(failPoints(reasons, new Set()).map((p) => p.id)).toContain('tax-1');
   });
 
@@ -389,6 +404,15 @@ describe('inlineOptionsFor', () => {
       'Insufficient evidence',
     ]);
     expect(optionsFor(120910006, true)[2].value).toBe(120910302);
+  });
+
+  it('offers the Consumer Duty outcomes exactly Pass to Potential harm, harm stored as itself', () => {
+    expect(optionsFor(120910014).map((o) => [o.label, o.value])).toEqual([
+      ['Pass', 120910300],
+      ['Pass with issues', 120910303],
+      ['Insufficient evidence', 120910302],
+      ['Potential harm', 120910304],
+    ]);
   });
 
   it('leaves a scale the Tax check never reworded alone on a Tax review', () => {

@@ -23,6 +23,7 @@ import '../../styles/document.css';
 import './ReviewDetailPage.css';
 import { useProductName } from '../../app/product/useProductName';
 import { checklistFooter, checklistTitle } from '../../app/product/productName';
+import { Skeleton } from '../../components/feedback/Skeleton';
 
 interface ReviewDetailPageProps {
   reviewType: ReviewType;
@@ -122,7 +123,7 @@ function onScale(row: FormRow<ReviewResponse>, block: SectionBlock): boolean {
 }
 
 /**
- * The case header: the document's opening block, its eighteen fields two to a row. Outcome
+ * The case header: the document's opening block, its twenty fields two to a row. Outcome
  * Case columns captured at intake, not checklist questions (checklist-v8.md).
  */
 /**
@@ -331,7 +332,7 @@ export function ReviewDetailPage({ reviewType }: ReviewDetailPageProps) {
         </p>
       ) : null}
 
-      {state.status === 'loading' ? <p role="status">Loading review…</p> : null}
+      {state.status === 'loading' ? <Skeleton label="Loading review…" rows={6} /> : null}
 
       {state.status === 'unavailable' ? (
         <section className="review__unavailable" aria-labelledby="review-unavailable">
@@ -343,7 +344,12 @@ export function ReviewDetailPage({ reviewType }: ReviewDetailPageProps) {
       {state.status === 'ready' ? (
         <>
           <PageIntro
-            title={`${reviewType} check — ${state.detail.header.reference}`}
+            // The review name often IS "AQS check"; saying it twice tells the reader nothing.
+            title={
+              state.detail.header.reference === `${reviewType} check`
+                ? state.detail.header.reference
+                : `${reviewType} check — ${state.detail.header.reference}`
+            }
             purpose={INTRO[reviewType]}
             actions={
               /*
@@ -354,7 +360,7 @@ export function ReviewDetailPage({ reviewType }: ReviewDetailPageProps) {
                */
               <button
                 type="button"
-                className="dashboard__link"
+                className="button-secondary"
                 onClick={() => window.print()}
               >
                 Save as PDF

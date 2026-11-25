@@ -15,12 +15,13 @@ import type { AdviserMappingRow, ContactOption } from './adviserMappingRows';
  * right both times, and nothing from the fault leaked, but the administrator was told
  * nothing they could act on.
  *
- * None of this is a security boundary. The uniqueness of an adviser is a Dataverse
- * alternate key on `al_adviseremail` and stays the gate; this only reads the refusal back.
+ * None of this is a security boundary. An adviser may have several T&C Managers but never the
+ * same one twice: a Dataverse alternate key on `al_adviseremail` + `al_tcmanagerid` is the
+ * gate, and this only reads the refusal back.
  */
 
 /**
- * The alternate key on al_adviseremail, refused. Dataverse says so three ways and the
+ * The alternate key on adviser and manager, refused. Dataverse says so three ways and the
  * wording of the sentence is not ours to rely on, so the error code and the structured
  * duplicate-attribute detail are checked too.
  */
@@ -37,8 +38,7 @@ export const SAVE_FALLBACK = 'That mapping could not be saved.';
 export const REMOVE_FALLBACK = 'That mapping could not be removed.';
 
 export const DUPLICATE_ADVISER =
-  'That adviser is already mapped. Use Change on their row to point them at a different ' +
-  'T&C Manager.';
+  'That adviser already has this T&C Manager. Choose a different manager to add.';
 
 export function describeSaveFailure(error: unknown, online = browserOnline()): string {
   const text = textOf(error);
@@ -52,18 +52,28 @@ export function describeRemoveFailure(error: unknown, online = browserOnline()):
 }
 
 /**
- * The refusal for mapping an adviser the page can already see mapped, or null.
+ * The refusal for giving an adviser a T&C Manager the page can already see them holding, or
+ * null. Another manager for the same adviser is fine: an adviser may have several.
  *
  * Checked before the round trip purely so the answer is immediate — the alternate key is
- * what actually prevents it, and it prevents it however the row is created.
+ * what actually prevents it, and it prevents it however the row is created. `exceptId` is
+ * the row being changed, which always matches itself.
  */
 export function alreadyMappedRefusal(
   adviserEmail: string,
+  managerId: string,
   mappings: readonly AdviserMappingRow[],
+  exceptId: string | null = null,
 ): string | null {
   const email = adviserEmail.trim().toLowerCase();
-  if (email === '') return null;
-  const clash = mappings.some((m) => m.adviserEmail.trim().toLowerCase() === email);
+  const manager = managerId.trim().toLowerCase();
+  if (email === '' || manager === '') return null;
+  const clash = mappings.some(
+    (m) =>
+      m.id !== exceptId &&
+      m.adviserEmail.trim().toLowerCase() === email &&
+      (m.managerId ?? '').trim().toLowerCase() === manager,
+  );
   return clash ? DUPLICATE_ADVISER : null;
 }
 

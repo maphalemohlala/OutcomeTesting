@@ -15,7 +15,7 @@ import {
 } from './checklistForm';
 import type { ReviewType } from '../../types/domain';
 import { isRecordId } from '../../services/odata';
-import { ownerRoleForReviewType } from '../../lib/ownerRole';
+import { OWNER_ROLE_TAX, ownerRoleForReviewType } from '../../lib/ownerRole';
 import { lookupLabel } from '../cases/lookupLabel';
 import {
   Al_reviewinstancesService,
@@ -397,6 +397,7 @@ export function useReviewDetail(
               reasons.success ? reasons.data.map(toFailReason) : [],
               linked,
               header.submittedOn !== null,
+              ownerRole === OWNER_ROLE_TAX,
             ),
           },
         });

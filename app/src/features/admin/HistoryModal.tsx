@@ -3,6 +3,9 @@ import { dateTime } from '../../lib/format';
 import type { LibraryQuestion, LibrarySection } from './useQuestionLibrary';
 import { useQuestionHistory, type HistoryState } from './useQuestionHistory';
 import { useSectionHistory } from './useSectionHistory';
+import { Skeleton } from '../../components/feedback/Skeleton';
+import { Pager } from '../../components/navigation/Pager';
+import { usePaged } from '../../components/navigation/paging';
 
 function formatWhen(iso: string | null): string {
   if (!iso) return 'Date not recorded';
@@ -61,12 +64,13 @@ function HistoryModal({
   state: HistoryState;
   onClose: () => void;
 }) {
+  const page = usePaged(state.status === 'ready' ? state.entries : []);
   return (
     <Modal title={title} onClose={onClose}>
       <p className="history__subject">{subject}</p>
       {note ? <p className="history__muted history__note">{note}</p> : null}
 
-      {state.status === 'loading' ? <p role="status">Loading the history…</p> : null}
+      {state.status === 'loading' ? <Skeleton label="Loading the history…" /> : null}
       {state.status === 'unavailable' ? <p role="alert">{state.reason}</p> : null}
 
       {state.status === 'ready' ? (
@@ -74,7 +78,7 @@ function HistoryModal({
           <p>No history is recorded.</p>
         ) : (
           <ol className="history">
-            {state.entries.map((entry) => (
+            {page.rows.map((entry) => (
               <li key={entry.id} className="history__entry" data-action={entry.action}>
                 <div className="history__head">
                   <strong>{entry.action}</strong>
@@ -118,6 +122,7 @@ function HistoryModal({
           </ol>
         )
       ) : null}
+      {state.status === 'ready' && state.entries.length > 0 ? <Pager {...page} label="changes" /> : null}
     </Modal>
   );
 }

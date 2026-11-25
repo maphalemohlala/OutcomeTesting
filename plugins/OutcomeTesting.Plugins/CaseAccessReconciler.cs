@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.Crm.Sdk;
 using Microsoft.Crm.Sdk.Messages;
@@ -28,6 +28,13 @@ namespace OutcomeTesting.Plugins
         public const string QueuedOnAttr = "al_aqsqueuedon";
         public const string AdviserAttr = "al_advisercontactid";
         public const string SupervisorAttr = "al_tcsupervisorcontactid";
+
+        /// <summary>
+        /// The case's T&amp;C Managers, many-to-many to contact (owner, 2026-11-24): an adviser
+        /// may have several, and the portal reads a case through this rather than the single
+        /// column above, which holds only the one manager when there is exactly one.
+        /// </summary>
+        public const string SupervisorsRelationship = "al_outcomecase_tcmanagers";
 
         private const string CaseEntity = "al_outcomecase";
 
@@ -76,7 +83,7 @@ namespace OutcomeTesting.Plugins
                 new ColumnSet(
                     "al_casestatus", "al_reviewrouteid", "al_adviseremail", CaseAdviser.NameAttr,
                     TaxCheckerAttr, AqsCheckerAttr, QueueAccountAttr, QueuedOnAttr, AdviserAttr, SupervisorAttr,
-                    TcManagerRouting.OverrideAttr));
+                    TcManagerRouting.OverrideAttr, AdviserStatus.Attr));
 
             var status = outcomeCase.GetAttributeValue<OptionSetValue>("al_casestatus");
             var input = new CaseAccessInput
@@ -112,8 +119,11 @@ namespace OutcomeTesting.Plugins
                 // the case is the one who can sign it off.
                 var adviserEmail = outcomeCase.GetAttributeValue<string>("al_adviseremail");
                 input.ResolvedAdviser = lookups.AdviserFor(adviserEmail);
-                // A manager an admin chose for this case wins over the mapping (requirements log row 4).
-                input.ResolvedSupervisor = TcManagerRouting.ChosenFor(outcomeCase) ?? lookups.SupervisorFor(adviserEmail);
+                // A manager an admin chose for this case replaces the mapping (requirements log row 4).
+                var chosen = TcManagerRouting.ChosenFor(outcomeCase);
+                input.ResolvedSupervisors = chosen != null
+                    ? new List<EntityReference> { chosen }
+                    : lookups.SupervisorsFor(adviserEmail);
             }
 
             var decided = CaseAccess.Decide(input);
@@ -125,6 +135,19 @@ namespace OutcomeTesting.Plugins
             SetIfChanged(update, changed, outcomeCase, QueueAccountAttr, decided.QueueAccount);
             SetIfChanged(update, changed, outcomeCase, AdviserAttr, decided.Adviser);
             SetIfChanged(update, changed, outcomeCase, SupervisorAttr, decided.Supervisor);
+
+            // The adviser status OTIS holds, onto open cases only: a closed case keeps the
+            // status its adviser had when it was checked.
+            if (input.CaseStatus != CaseLifecycle.Closed && input.CaseStatus != CaseLifecycle.NoCheckRequired)
+            {
+                var held = lookups.StatusFor(outcomeCase.GetAttributeValue<string>("al_adviseremail"));
+                var has = outcomeCase.GetAttributeValue<OptionSetValue>(AdviserStatus.Attr);
+                if (held.HasValue && (has == null || has.Value != held.Value))
+                {
+                    update[AdviserStatus.Attr] = new OptionSetValue(held.Value);
+                    changed.Add(AdviserStatus.Attr);
+                }
+            }
 
             var queuedOn = outcomeCase.GetAttributeValue<DateTime?>(QueuedOnAttr);
             if (queuedOn != decided.QueuedOn)
@@ -142,12 +165,24 @@ namespace OutcomeTesting.Plugins
             Share(service, target, taxTeam, decided.ShareWithTaxTeam);
             Share(service, target, aqsTeam, decided.ShareWithAqsTeam);
 
+            int removed;
+            var added = LinkSupervisors(service, caseId, decided.Supervisors, out removed);
+
+            // Who has not heard of this case: newly linked, and not the one manager the single
+            // column already named - cases from before the links existed are linked on their
+            // first reconcile, and their manager was told long ago.
+            var before = outcomeCase.GetAttributeValue<EntityReference>(SupervisorAttr);
+            var newcomers = added.FindAll(m => before == null || m.Id != before.Id);
+
             return new CaseAccessChange
             {
                 ChangedColumns = changed,
+                AddedSupervisors = added,
+                NewSupervisors = newcomers,
+                RemovedSupervisors = removed,
                 Released = released,
                 AdviserUnmatched = released && decided.Adviser == null,
-                SupervisorUnmatched = released && decided.Supervisor == null,
+                SupervisorUnmatched = released && decided.Supervisors.Count == 0,
             };
         }
 
@@ -192,27 +227,80 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// The T&amp;C Manager mapped to this adviser (AD-162), on the same email key the
-        /// portal's sign-off gate reads. None or two means nobody: never guessed.
+        /// Makes the case's linked managers exactly <paramref name="wanted"/>, associating and
+        /// disassociating only the difference (a duplicate Associate faults the transaction).
+        /// Returns the managers newly linked, who are the ones to tell about a waiting sign-off.
         /// </summary>
-        internal static EntityReference SupervisorFor(IOrganizationService service, string adviserEmail)
+        public static List<EntityReference> LinkSupervisors(
+            IOrganizationService service, Guid caseId, IList<EntityReference> wanted, out int removedCount)
         {
-            if (string.IsNullOrWhiteSpace(adviserEmail))
+            var current = LinkedSupervisors(service, caseId);
+            var add = new EntityReferenceCollection();
+            var added = new List<EntityReference>();
+            foreach (var manager in wanted)
             {
-                return null;
+                if (!current.Contains(manager.Id) && !added.Exists(m => m.Id == manager.Id))
+                {
+                    add.Add(new EntityReference("contact", manager.Id));
+                    added.Add(manager);
+                }
             }
 
-            var query = new QueryExpression("al_advisermapping")
+            var remove = new EntityReferenceCollection();
+            foreach (var id in current)
             {
-                ColumnSet = new ColumnSet("al_tcmanagerid"),
-                TopCount = 2,
+                var kept = false;
+                foreach (var manager in wanted)
+                {
+                    kept |= manager.Id == id;
+                }
+
+                if (!kept)
+                {
+                    remove.Add(new EntityReference("contact", id));
+                }
+            }
+
+            removedCount = remove.Count;
+            var relationship = new Relationship(SupervisorsRelationship);
+            if (add.Count > 0)
+            {
+                service.Associate(CaseEntity, caseId, relationship, add);
+            }
+
+            if (remove.Count > 0)
+            {
+                service.Disassociate(CaseEntity, caseId, relationship, remove);
+            }
+
+            return added;
+        }
+
+        /// <summary>The contacts linked to the case as its managers, read from the intersect table.</summary>
+        public static HashSet<Guid> LinkedSupervisors(IOrganizationService service, Guid caseId)
+        {
+            var query = new QueryExpression(SupervisorsRelationship)
+            {
+                ColumnSet = new ColumnSet("contactid"),
                 Criteria = new FilterExpression(),
             };
-            query.Criteria.AddCondition("al_adviseremail", ConditionOperator.Equal, adviserEmail.Trim());
-            query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
+            query.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseId);
 
-            var rows = service.RetrieveMultiple(query).Entities;
-            return rows.Count == 1 ? rows[0].GetAttributeValue<EntityReference>("al_tcmanagerid") : null;
+            var ids = new HashSet<Guid>();
+            foreach (var row in CommandHelpers.RetrieveAll(service, query))
+            {
+                var raw = row.Contains("contactid") ? row["contactid"] : null;
+                if (raw is Guid)
+                {
+                    ids.Add((Guid)raw);
+                }
+                else if (raw is EntityReference)
+                {
+                    ids.Add(((EntityReference)raw).Id);
+                }
+            }
+
+            return ids;
         }
 
         /// <summary>The AQS Team account whose contacts read the AQS queue. Throws if it is missing.</summary>
@@ -282,7 +370,7 @@ namespace OutcomeTesting.Plugins
     /// <summary>
     /// What <see cref="CaseAccessReconciler"/> reads that does not depend on the case: the
     /// product name, the Tax and AQS teams, the AQS queue account, and the contact and T&amp;C
-    /// supervisor an adviser email resolves to. Each is read on first use and kept, so one
+    /// supervisors an adviser email resolves to. Each is read on first use and kept, so one
     /// instance shared across the cases of a single transaction reads each once.
     ///
     /// Scoped to one transaction, never kept between plug-in runs: nothing here notices a
@@ -301,8 +389,8 @@ namespace OutcomeTesting.Plugins
         private readonly IOrganizationService _service;
         private readonly Dictionary<string, EntityReference> _advisers =
             new Dictionary<string, EntityReference>(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, EntityReference> _supervisors =
-            new Dictionary<string, EntityReference>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, List<EntityReference>> _supervisors =
+            new Dictionary<string, List<EntityReference>>(StringComparer.OrdinalIgnoreCase);
         private string _product;
         private EntityReference _taxTeam;
         private EntityReference _aqsTeam;
@@ -366,24 +454,48 @@ namespace OutcomeTesting.Plugins
             return contact;
         }
 
-        /// <summary>The T&amp;C Manager mapped to this adviser email, or null for none or two.</summary>
-        public EntityReference SupervisorFor(string adviserEmail)
+        private readonly Dictionary<string, int?> _statuses =
+            new Dictionary<string, int?>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>The adviser status OTIS holds for this email, or null for none; read with the managers.</summary>
+        public int? StatusFor(string adviserEmail)
+        {
+            SupervisorsFor(adviserEmail);
+            return _statuses[CasePeople.Clean(adviserEmail) ?? string.Empty];
+        }
+
+        /// <summary>Every T&amp;C Manager mapped to this adviser email (AD-162); empty for none.</summary>
+        public List<EntityReference> SupervisorsFor(string adviserEmail)
         {
             var key = CasePeople.Clean(adviserEmail) ?? string.Empty;
-            EntityReference supervisor;
-            if (!_supervisors.TryGetValue(key, out supervisor))
+            List<EntityReference> supervisors;
+            if (!_supervisors.TryGetValue(key, out supervisors))
             {
-                supervisor = CaseAccessReconciler.SupervisorFor(_service, CaseAdviser.EmailFor(adviserEmail));
-                _supervisors[key] = supervisor;
+                int? status;
+                supervisors = TcManagerRouting.ManagersFor(_service, CaseAdviser.EmailFor(adviserEmail), out status);
+                _supervisors[key] = supervisors;
+                _statuses[key] = status;
             }
 
-            return supervisor;
+            return supervisors;
         }
     }
 
     public sealed class CaseAccessChange
     {
         public List<string> ChangedColumns { get; set; } = new List<string>();
+
+        /// <summary>Managers linked to the case by this run.</summary>
+        public List<EntityReference> AddedSupervisors { get; set; } = new List<EntityReference>();
+
+        /// <summary>
+        /// The added managers who have never had the case: not the one the single column named
+        /// before. These are the ones to tell about a waiting sign-off.
+        /// </summary>
+        public List<EntityReference> NewSupervisors { get; set; } = new List<EntityReference>();
+
+        /// <summary>How many managers this run unlinked from the case.</summary>
+        public int RemovedSupervisors { get; set; }
 
         public bool Released { get; set; }
 

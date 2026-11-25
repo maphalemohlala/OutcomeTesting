@@ -129,6 +129,12 @@ public static class WebRoleSeed
             yield return (role, "case.amendoutcome", AccessEdit);
             yield return (role, "case.reassignmanager", AccessEdit);
         }
+
+        // An adviser's status, which OTIS follows over IO: system administrators only (client, 2026-11-25).
+        foreach (var admin in new[] { PortalAdministrator, Administrators })
+        {
+            yield return (admin, "adviser.status", AccessEdit);
+        }
     }
 
     public static int Run(IOrganizationService svc)

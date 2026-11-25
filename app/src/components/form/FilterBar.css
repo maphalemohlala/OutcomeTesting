@@ -1,56 +1,104 @@
 .filter-bar {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-3);
-  margin-bottom: var(--space-3);
-  background: var(--colour-surface-sunken);
-  border: 1px solid var(--colour-border);
-  border-radius: var(--radius);
+  margin-bottom: var(--space-4);
 }
 
 .filter-bar__controls {
   display: flex;
+  /* Takes the free width, so pills wrap only when the row is really full. */
+  flex: 1 1 auto;
   flex-wrap: wrap;
-  gap: var(--space-3);
+  gap: var(--space-2);
+  /* A flex item is as wide as its content unless told otherwise; a long adviser name
+     would otherwise push the row past a phone screen. */
+  min-width: 0;
+  max-width: 100%;
 }
 
 .filter-bar__field {
+  position: relative;
   display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: 100%;
+  min-height: 2.75rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
+  background: var(--colour-surface);
+}
+
+.filter-bar__field:hover {
+  border-color: var(--colour-border-strong);
+}
+
+.filter-bar__field:focus-within {
+  border-color: var(--colour-action);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--colour-focus) 35%, transparent);
 }
 
 .filter-bar__field label {
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  flex: none;
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+  white-space: nowrap;
+}
+
+/* The control is borderless: the pill draws the box. */
+.filter-bar__field select,
+.filter-bar__field input:not([type='checkbox'], [type='radio']) {
+  min-width: 0;
+  max-width: 100%;
+  min-height: 2.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--colour-text);
+  font: inherit;
+  font-weight: 500;
+  outline: none;
+}
+
+.filter-bar__field select {
+  cursor: pointer;
+  /* Only as wide as the chosen value, like the pills in the design. */
+  field-sizing: content;
+}
+
+.filter-bar__field--search {
+  min-width: min(16rem, 100%);
+}
+
+.filter-bar__field--search input:not([type='checkbox'], [type='radio']) {
+  flex: 1;
+  font-weight: 400;
+}
+
+.filter-bar__search-icon {
   color: var(--colour-text-muted);
 }
 
-.filter-bar__field select,
-.filter-bar__field input {
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--colour-border);
-  border-radius: var(--radius);
-  background: var(--colour-surface);
-  color: var(--colour-text);
-  font: inherit;
-  min-width: 9rem;
-}
-
-.filter-bar__field select:focus-visible,
-.filter-bar__field input:focus-visible {
-  outline: 2px solid var(--colour-focus);
-  outline-offset: 1px;
+.filter-bar__field input:is([type='checkbox'], [type='radio']) {
+  order: -1;
+  min-width: 0;
+  width: 1.125rem;
+  height: 1.125rem;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--colour-action);
 }
 
 .filter-bar__meta {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  /* Stays at the right edge, even when the pills wrap onto a second line. */
+  margin-left: auto;
 }
 
 .filter-bar__summary {
@@ -60,16 +108,17 @@
 
 .filter-bar__clear {
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--colour-border-strong);
+  border: 1px solid transparent;
   border-radius: var(--radius);
-  background: var(--colour-surface);
+  background: transparent;
   color: var(--colour-text);
   font: inherit;
+  font-weight: 600;
   cursor: pointer;
 }
 
 .filter-bar__clear:hover:not(:disabled) {
-  background: var(--colour-surface-sunken);
+  border-color: var(--colour-border-strong);
 }
 
 .filter-bar__clear:disabled {

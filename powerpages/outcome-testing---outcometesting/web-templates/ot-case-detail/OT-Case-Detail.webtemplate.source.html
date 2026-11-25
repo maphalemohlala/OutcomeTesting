@@ -1,4 +1,36 @@
 ﻿{% extends 'OT Layout' %}
+{% comment %}
+  The header blocks (2026-11-24 redesign). They render before the content block, so each reads
+  what it needs for itself, behind the same shape check the content block applies to `id`
+  (F48, below): an id that is not a GUID draws the page's own title and nothing else. Each
+  read is a loop, never entities[0]; a case the reader cannot see leaves the page title.
+{% endcomment %}
+{% block breadcrumb %}
+{% assign ot_bk_id = request.params['id'] | default: '' %}{% assign ot_bk_hex = ot_bk_id | downcase | replace: '-','' | replace: '{','' | replace: '}','' %}{% assign ot_bk_len = ot_bk_hex | size %}{% assign ot_bk_rest = ot_bk_hex | replace: '0','' | replace: '1','' | replace: '2','' | replace: '3','' | replace: '4','' | replace: '5','' | replace: '6','' | replace: '7','' | replace: '8','' | replace: '9','' | replace: 'a','' | replace: 'b','' | replace: 'c','' | replace: 'd','' | replace: 'e','' | replace: 'f','' %}{% assign ot_crumb_ref = '' %}
+{% if ot_bk_len == 32 and ot_bk_rest == '' %}
+  {% fetchxml ot_crumb %}
+  <fetch top="1">
+    <entity name="al_outcomecase">
+      <attribute name="al_casereference" />
+      <filter type="and">
+        <condition attribute="al_outcomecaseid" operator="eq" value="{{ ot_bk_id | xml_escape }}" />
+      </filter>
+    </entity>
+  </fetch>
+  {% endfetchxml %}
+  {% for r in ot_crumb.results.entities %}{% assign ot_crumb_ref = r.al_casereference | default: '' %}{% endfor %}
+{% endif %}
+<a href="/cases">Cases</a>
+<span class="ot-breadcrumb__sep" aria-hidden="true"></span>
+<span aria-current="page">{% if ot_crumb_ref != '' %}{{ ot_crumb_ref | escape }}{% else %}{{ page.title | escape }}{% endif %}</span>
+{% endblock %}
+{% block title %}{% assign ot_bk_id = request.params['id'] | default: '' %}{% assign ot_bk_hex = ot_bk_id | downcase | replace: '-','' | replace: '{','' | replace: '}','' %}{% assign ot_bk_len = ot_bk_hex | size %}{% assign ot_bk_rest = ot_bk_hex | replace: '0','' | replace: '1','' | replace: '2','' | replace: '3','' | replace: '4','' | replace: '5','' | replace: '6','' | replace: '7','' | replace: '8','' | replace: '9','' | replace: 'a','' | replace: 'b','' | replace: 'c','' | replace: 'd','' | replace: 'e','' | replace: 'f','' %}{% assign ot_title_ref = '' %}{% if ot_bk_len == 32 and ot_bk_rest == '' %}{% fetchxml ot_title_case %}<fetch top="1"><entity name="al_outcomecase"><attribute name="al_casereference" /><filter type="and"><condition attribute="al_outcomecaseid" operator="eq" value="{{ ot_bk_id | xml_escape }}" /></filter></entity></fetch>{% endfetchxml %}{% for r in ot_title_case.results.entities %}{% assign ot_title_ref = r.al_casereference | default: '' %}{% endfor %}{% endif %}{% if ot_title_ref != '' %}Case {{ ot_title_ref | escape }}{% else %}{{ page.title | escape }}{% endif %}{% endblock %}
+{% comment %}
+  Save as PDF, offered only once a review on the case has been submitted (the reason is given
+  where the content block wires the button up). The same test as the content block's count of
+  submitted reviews: any review on the case with a submission date.
+{% endcomment %}
+{% block actions %}{% assign ot_bk_id = request.params['id'] | default: '' %}{% assign ot_bk_hex = ot_bk_id | downcase | replace: '-','' | replace: '{','' | replace: '}','' %}{% assign ot_bk_len = ot_bk_hex | size %}{% assign ot_bk_rest = ot_bk_hex | replace: '0','' | replace: '1','' | replace: '2','' | replace: '3','' | replace: '4','' | replace: '5','' | replace: '6','' | replace: '7','' | replace: '8','' | replace: '9','' | replace: 'a','' | replace: 'b','' | replace: 'c','' | replace: 'd','' | replace: 'e','' | replace: 'f','' %}{% if ot_bk_len == 32 and ot_bk_rest == '' %}{% fetchxml ot_act_submitted %}<fetch top="1"><entity name="al_reviewinstance"><attribute name="al_reviewinstanceid" /><filter type="and"><condition attribute="al_outcomecaseid" operator="eq" value="{{ ot_bk_id | xml_escape }}" /><condition attribute="al_submittedon" operator="not-null" /></filter></entity></fetch>{% endfetchxml %}{% if ot_act_submitted.results.entities.size > 0 %}<button type="button" class="ot-btn ot-print-action" data-ot-print><span class="ot-case-print__icon" aria-hidden="true"></span>Save as PDF</button>{% endif %}{% endif %}{% endblock %}
 {% block content %}
 {% assign ot_product = settings['OT/ProductName'] | default: 'Outcome Testing' %}
 {% comment %}
@@ -46,6 +78,7 @@
       <attribute name="al_outcomecaseid" />
       <attribute name="al_casereference" />
       <attribute name="al_ioreference" />
+      <attribute name="al_servicecaseref" />
       <attribute name="al_casestatus" />
       <attribute name="al_casetype" />
       <attribute name="al_priority" />
@@ -68,6 +101,7 @@
       <attribute name="al_vulnerableclientid" />
       <attribute name="al_taxcheckrequired" />
       <attribute name="al_taxteamdisposition" />
+      <attribute name="al_taxoutcome" />
       <attribute name="al_taxcheckername" />
       <attribute name="al_aqscheckername" />
       <attribute name="al_checklistitems" />
@@ -187,9 +221,25 @@
     {% endfetchxml %}
 
     {% comment %}
-      Sign-offs and the outcome are read only by the remediation block below, which is drawn
-      only for a case with actions, so a case with none does not ask for them.
+      Sign-offs are read only by the remediation block below, which is drawn only for a case
+      with actions, so a case with none does not ask for them. The outcome is read for every
+      case: the summary card at the top shows the grade (2026-11-24 redesign).
     {% endcomment %}
+    {% fetchxml case_outcomes %}
+    <fetch top="1">
+      <entity name="al_outcome">
+        <attribute name="al_initialoutcome" />
+        <attribute name="al_finaloutcome" />
+        <attribute name="al_finalisedon" />
+        <attribute name="al_regradedon" />
+        <filter type="and">
+          <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_id | xml_escape }}" />
+        </filter>
+        <order attribute="createdon" descending="true" />
+      </entity>
+    </fetch>
+    {% endfetchxml %}
+
     {% if actions.results.entities.size > 0 %}
     {% fetchxml case_signoffs %}
     <fetch>
@@ -206,20 +256,6 @@
       </entity>
     </fetch>
     {% endfetchxml %}
-
-    {% fetchxml case_outcomes %}
-    <fetch top="1">
-      <entity name="al_outcome">
-        <attribute name="al_finaloutcome" />
-        <attribute name="al_finalisedon" />
-        <attribute name="al_regradedon" />
-        <filter type="and">
-          <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_id | xml_escape }}" />
-        </filter>
-        <order attribute="createdon" descending="true" />
-      </entity>
-    </fetch>
-    {% endfetchxml %}
     {% endif %}
 
     {% comment %}
@@ -227,7 +263,7 @@
       from a case whose checks are still being answered is a draft with no submission date
       on it, indistinguishable once printed from the record of a finished check.
 
-      Above the document rather than inside it, which is where the review page puts its own
+      Outside the document rather than inside it, which is where the review page puts its own
       print action: the sheet carries the record, the page around it carries the controls.
     {% endcomment %}
     {% comment %}
@@ -311,11 +347,8 @@
       {% if r.al_submittedon %}{% assign submitted_reviews = submitted_reviews | plus: 1 %}{% if r.al_reviewtype.value == 120910201 %}{% assign has_submitted_aqs = true %}{% endif %}{% endif %}
     {% endfor %}
 
+    {% comment %}The button itself is drawn top right of the page, in the actions block above.{% endcomment %}
     {% if submitted_reviews > 0 %}
-      <p class="ot-print-action">
-        <button type="button" class="ot-btn" data-ot-print>Save as PDF</button>
-      </p>
-
       <script>
         (function () {
           'use strict';
@@ -328,9 +361,10 @@
 
     {% comment %}
       The case drawn as the document (project owner, 2026-09-12), the same way the review
-      and remediation forms are. .ot-checklist is the V8 sheet - Calibri, every cell ruled,
-      grey label and header bands - so the three pages read as one family instead of this
-      one being the odd card-and-definition-list page among them.
+      and remediation forms are. .ot-checklist is the V8 sheet - the same fields, grid and
+      numbered tables, drawn in the site's soft card style on screen (2026-11-24 redesign) and
+      as the ruled black-on-white paper record in print - so the pages read as one family
+      instead of this one being the odd card-and-definition-list page among them.
 
       Presentation only. Nothing here reads or writes anything it did not before: the page
       is as read-only as it was, every fetchxml and every condition is unchanged, and the
@@ -338,7 +372,41 @@
       meta table replaces the definition lists because .ot-dl inside .ot-checklist is a
       flowing list, not a ruled block, and the sheet rules everything.
     {% endcomment %}
-    <div class="ot-checklist">
+    {% comment %}
+      The case at a glance, above the document (2026-11-24 redesign), drawn as the Remediation
+      page's summary card so the two case pages read alike. Every value here is also in the
+      document below, which is what prints; this card is the screen's summary and is left off
+      the paper. The checkers and route use the case list's components and wording.
+    {% endcomment %}
+    <div class="ot-page--full"></div>
+    {% assign sum_stage = c.al_casestatus.label | default: '' %}
+    {% assign sum_route = '' %}
+    {% if hdr_rt %}{% assign sum_route = hdr_rt.al_name | default: '' %}{% endif %}
+    {% assign sum_outcome = null %}
+    {% for row in case_outcomes.results.entities %}{% if sum_outcome == null %}{% assign sum_outcome = row %}{% endif %}{% endfor %}
+    <section class="ot-card ot-rem-summary ot-case-summary" aria-label="Case summary">
+      <dl class="ot-rem-summary__list">
+        <div>
+          <dt>Case</dt>
+          <dd><span class="ot-rem-summary__ref">{{ c.al_casereference | default: 'Case' | escape }}</span>
+            {% include 'OT Status Badge' status: c.al_casestatus.label %}</dd>
+        </div>
+        <div><dt>Client</dt><dd>{{ c.al_clientname | default: '—' | escape }}</dd></div>
+        <div><dt>Adviser</dt><dd>{{ c.al_advisername | default: '—' | escape }}</dd></div>
+        <div><dt>Route</dt><dd>{% case sum_route %}{% when 'Tax then AQS' %}<span class="ot-route"><span class="ot-route__step">Tax</span><span class="ot-route__arrow" aria-hidden="true"></span><span class="ot-visually-hidden"> then </span><span class="ot-route__step">AQS</span></span>{% when 'Tax only' %}<span class="ot-route"><span class="ot-route__step">Tax</span><span class="ot-visually-hidden"> only</span></span>{% when 'AQS only' %}<span class="ot-route"><span class="ot-route__step">AQS</span><span class="ot-visually-hidden"> only</span></span>{% else %}{{ sum_route | default: 'Not routed' | escape }}{% endcase %}</dd></div>
+        <div class="ot-case-summary__checkers"><dt>Checkers</dt><dd>
+          <ul class="ot-people">
+            <li><span class="ot-people__role">Tax</span>{% if tax_checker == 'No check of this type' %}<span class="ot-checker ot-checker--na">No check of this type</span>{% elsif tax_checker == 'Not yet allocated' %}<span class="ot-checker ot-unallocated">Not yet allocated</span>{% else %}<span class="ot-avatar" data-ot-initials="{{ tax_checker | escape }}" aria-hidden="true"></span>{{ tax_checker | escape }}{% endif %}</li>
+            <li><span class="ot-people__role">AQS</span>{% if aqs_checker == 'No check of this type' %}<span class="ot-checker ot-checker--na">No check of this type</span>{% elsif aqs_checker == 'Not yet allocated' %}<span class="ot-checker ot-unallocated">Not yet allocated</span>{% else %}<span class="ot-avatar" data-ot-initials="{{ aqs_checker | escape }}" aria-hidden="true"></span>{{ aqs_checker | escape }}{% endif %}</li>
+          </ul>
+        </dd></div>
+        {% comment %}The case list's Outcome cell: the advice grade (a regrade first), else the Tax check's own grade.{% endcomment %}
+        <div><dt>Outcome</dt><dd>{% capture sum_grade %}{% include 'OT Outcome Label' final: sum_outcome.al_finaloutcome initial: sum_outcome.al_initialoutcome %}{% endcapture %}{% assign sum_grade = sum_grade | strip %}{% if sum_grade != '' %}{% include 'OT Status Badge' status: sum_grade %}{% elsif c.al_taxoutcome %}{% assign sum_tax = c.al_taxoutcome.label %}{% if sum_tax == null or sum_tax == '' %}{% assign sum_traw = c.al_taxoutcome.value | default: c.al_taxoutcome | integer %}{% case sum_traw %}{% when 120910300 %}{% assign sum_tax = 'Pass' %}{% when 120910301 %}{% assign sum_tax = 'Fail' %}{% when 120910302 %}{% assign sum_tax = 'Pass with issues' %}{% endcase %}{% endif %}{% if sum_tax and sum_tax != '' %}{% capture sum_taxlabel %}Tax: {{ sum_tax }}{% endcapture %}{% include 'OT Status Badge' status: sum_taxlabel %}{% else %}<span class="ot-badge ot-badge--none">Not yet graded</span>{% endif %}{% else %}<span class="ot-badge ot-badge--none">Not yet graded</span>{% endif %}</dd></div>
+        <div><dt>Due</dt><dd class="ot-case-summary__due">{{ c.al_duedate | date: 'dd MMM yyyy' | default: '—' }}{% if c.al_duedate %}{% unless sum_stage contains 'Closed' or sum_stage contains 'No Check' %}<span class="ot-overdue" data-ot-overdue="{{ c.al_duedate | date: 'yyyy-MM-dd' }}"></span>{% endunless %}{% endif %}</dd></div>
+      </dl>
+    </section>
+
+    <div class="ot-checklist ot-case-doc">
     <div class="doc-footer">{{ ot_product | escape }} — Case record | V8</div>
     <h1>
       {{ c.al_casereference | default: 'Case' | escape }}
@@ -449,6 +517,10 @@
           <tr>
             <td class="lbl">Client name / initials</td><td class="val">{{ c.al_clientname | default: '—' | escape }}</td>
             <td class="lbl">IO reference</td><td class="val">{{ c.al_ioreference | default: '—' | escape }}</td>
+          </tr>
+          <tr>
+            <td class="lbl">Case reference</td><td class="val">{{ c.al_casereference | escape }}</td>
+            <td class="lbl">Service case reference</td><td class="val">{{ c.al_servicecaseref | default: '—' | escape }}</td>
           </tr>
           <tr>
             <td class="lbl">Pre or post check</td><td class="val">{% if c.al_preorpostcheckid.name %}{{ c.al_preorpostcheckid.name | escape }}{% else %}{{ c.al_preorpostcheck.label | default: '—' | escape }}{% endif %}</td>
@@ -642,6 +714,10 @@
           Read across every action rather than off the first, so a case whose Tax and AQS reviews
           both raised remediation names both. The same block is in OT Remediation.
         {% endcomment %}
+        {% comment %}The description is written once at submit; an amended advice grade (newest outcome) replaces its grade half. "Tax check: ..." is never amended.{% endcomment %}
+        {% assign ot_grade = '' %}
+        {% for o in case_outcomes.results.entities %}{% if o.al_initialoutcome %}{% capture ot_grade %}{% include 'OT Outcome Label' initial: o.al_initialoutcome %}{% endcapture %}{% assign ot_grade = ot_grade | strip %}{% endif %}{% endfor %}
+        {% assign ot_seen = '' %}
         {% assign ot_outcome = '' %}
         {% for a in case_actions %}
           {% if a.al_description contains 'submitted (' %}
@@ -653,19 +729,27 @@
             {% assign ot_closes = ot_tail | split: ')' %}
             {% for piece in ot_closes %}{% unless ot_taken %}{% assign ot_reason = piece | strip %}{% assign ot_taken = true %}{% endunless %}{% endfor %}
             {% if ot_reason != '' %}
-              {% unless ot_outcome contains ot_reason %}
-                {% if ot_outcome == '' %}
-                  {% assign ot_outcome = ot_reason %}
-                {% else %}
-                  {% assign ot_outcome = ot_outcome | append: '; ' | append: ot_reason %}
-                {% endif %}
-              {% endunless %}
+              {% assign ot_parts = ot_reason | split: ';' %}
+              {% for part in ot_parts %}
+                {% assign ot_piece = part | strip %}
+                {% unless ot_piece contains 'Tax check' or ot_grade == '' %}{% assign ot_piece = ot_grade %}{% endunless %}
+                {% assign ot_key = '|' | append: ot_piece | append: '|' %}
+                {% if ot_piece != '' %}{% unless ot_seen contains ot_key %}
+                  {% assign ot_seen = ot_seen | append: ot_key %}
+                  {% if ot_outcome == '' %}
+                    {% assign ot_outcome = ot_piece %}
+                  {% else %}
+                    {% assign ot_outcome = ot_outcome | append: '; ' | append: ot_piece %}
+                  {% endif %}
+                {% endunless %}{% endif %}
+              {% endfor %}
             {% endif %}
           {% endif %}
         {% endfor %}
         <table class="meta">
           <tbody>
-            <tr><td class="lbl">Outcome</td><td class="val" colspan="3">{{ ot_outcome | default: '—' | escape }}</td></tr>
+            {% comment %}Each grade as the grade mark OT Status Badge draws, as the Remediation page's summary shows it.{% endcomment %}
+            <tr><td class="lbl">Outcome</td><td class="val ot-case-doc__grades" colspan="3">{% if ot_outcome != '' %}{% assign ot_outcome_parts = ot_outcome | split: ';' %}{% for ot_op in ot_outcome_parts %}{% assign ot_op_label = ot_op | strip %}{% include 'OT Status Badge' status: ot_op_label %}{% endfor %}{% else %}—{% endif %}</td></tr>
           </tbody>
         </table>
 
@@ -833,7 +917,7 @@
                         <td>{{ rest | escape }}</td>
                         {% if ot_shown == 1 %}
                           {% if a.al_remedialaction %}
-                            <td rowspan="{{ ot_count }}">{{ a.al_remedialaction | escape | newline_to_br }}</td>
+                            <td rowspan="{{ ot_count }}">{% assign ot_ra = a.al_remedialaction | strip %}{% assign ot_ra_probe = '[[ot]]' | append: ot_ra %}{% if ot_ra_probe contains '[[ot]]<' %}<div class="ot-rte__read">{{ ot_ra }}</div>{% else %}{{ ot_ra | escape | newline_to_br }}{% endif %}</td>
                             <td rowspan="{{ ot_count }}">{{ a.al_actionperformed.label | default: '—' | escape }}{% if a.al_adviserresponse %}<br /><span class="ot-remedial-form__note">{{ a.al_adviserresponse | escape | newline_to_br }}</span>{% endif %}{% assign ot_hist = a.al_responsehistory | default: '' | strip %}{% if ot_hist != '' %}<div class="ot-remedial-form__note ot-response-history"><strong>Earlier responses</strong><br />{{ ot_hist | escape | newline_to_br }}</div>{% endif %}</td>
                           {% else %}
                             <td rowspan="{{ ot_count }}">{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}{% assign ot_hist = a.al_responsehistory | default: '' | strip %}{% if ot_hist != '' %}<div class="ot-remedial-form__note ot-response-history"><strong>Earlier responses</strong><br />{{ ot_hist | escape | newline_to_br }}</div>{% endif %}</td>
@@ -874,7 +958,7 @@
                     <td>{{ row_no }}</td>
                     <td>—</td>
                     {% if a.al_remedialaction %}
-                      <td>{{ a.al_remedialaction | escape | newline_to_br }}</td>
+                      <td>{% assign ot_ra = a.al_remedialaction | strip %}{% assign ot_ra_probe = '[[ot]]' | append: ot_ra %}{% if ot_ra_probe contains '[[ot]]<' %}<div class="ot-rte__read">{{ ot_ra }}</div>{% else %}{{ ot_ra | escape | newline_to_br }}{% endif %}</td>
                       <td>{{ a.al_actionperformed.label | default: '—' | escape }}{% if a.al_adviserresponse %}<br /><span class="ot-remedial-form__note">{{ a.al_adviserresponse | escape | newline_to_br }}</span>{% endif %}{% assign ot_hist = a.al_responsehistory | default: '' | strip %}{% if ot_hist != '' %}<div class="ot-remedial-form__note ot-response-history"><strong>Earlier responses</strong><br />{{ ot_hist | escape | newline_to_br }}</div>{% endif %}</td>
                     {% else %}
                       <td>{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}{% assign ot_hist = a.al_responsehistory | default: '' | strip %}{% if ot_hist != '' %}<div class="ot-remedial-form__note ot-response-history"><strong>Earlier responses</strong><br />{{ ot_hist | escape | newline_to_br }}</div>{% endif %}</td>
@@ -917,13 +1001,13 @@
                 <th scope="row" colspan="2">Client contact required?</th>
                 <td colspan="2">{{ form_source.al_clientcontactrequired.label | default: '—' | escape }}</td>
                 <th scope="row" colspan="2">Recheck required?</th>
-                <td colspan="2">{{ form_source.al_recheckrequired.label | default: '—' | escape }}</td>
+                <td colspan="3">{{ form_source.al_recheckrequired.label | default: '—' | escape }}</td>
               </tr>
               <tr>
                 <th scope="row" colspan="2">Do the remedial actions change the advice?</th>
                 <td colspan="2">{{ form_source.al_changesadvice.label | default: '—' | escape }}</td>
                 <th scope="row" colspan="2">All remedial actions checked and approved?</th>
-                <td colspan="2">{% if all_approved %}Yes{% elsif any_rejected %}No{% else %}—{% endif %}</td>
+                <td colspan="3">{% if all_approved %}Yes{% elsif any_rejected %}No{% else %}—{% endif %}</td>
               </tr>
             </tbody>
           </table>

@@ -15,6 +15,7 @@ function caseRow(overrides: Partial<CaseSummary>): CaseSummary {
   return {
     id: 'case-1',
     caseReference: 'IO-1',
+    serviceCaseRef: null,
     route: null,
     status: 'Assigned',
     owner: null,

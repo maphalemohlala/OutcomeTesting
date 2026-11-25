@@ -24,10 +24,17 @@ import {
   type PersonRole,
 } from './peopleDirectory';
 import { matchesRole } from './peopleFilters';
-import { RoleAssignment } from './RoleAssignmentCell';
+import { canWithdraw } from './roleAssignment';
+import { NotInDirectory, RoleAssignment } from './RoleAssignmentCell';
+import { Icon } from '../../components/icons/Icon';
+import { Avatar } from '../../components/people/Avatar';
+import { Pager } from '../../components/navigation/Pager';
+import { usePaged } from '../../components/navigation/paging';
+import { useProductName } from '../../app/product/useProductName';
 import { CreatePersonModal, EditPersonModal } from './PersonModals';
 import './PeoplePage.css';
 import './PeopleAdmin.css';
+import { Skeleton } from '../../components/feedback/Skeleton';
 
 const EXPORT_HEADERS = [
   'Name',
@@ -73,6 +80,11 @@ function zeroes(): Record<string, number> {
   return Object.fromEntries(OUTCOMES.map((outcome) => [outcome, 0]));
 }
 
+/** No role to work with yet, or named on cases but not in the directory. */
+function needsAttention(row: PersonRow): boolean {
+  return row.user === null || (row.active && row.roles.length === 0);
+}
+
 /** Where a person's cases live: their first position, since that route is per-position. */
 function drillTo(load: PersonCaseload | null): string | null {
   const role: PersonRole | undefined = load?.roles[0];
@@ -109,6 +121,8 @@ export function PeoplePage() {
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>('all');
   const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [attentionOnly, setAttentionOnly] = useState(false);
+  const product = useProductName();
   const [banner, setBanner] = useState<Banner>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<DirectoryUser | null>(null);
@@ -196,13 +210,16 @@ export function PeoplePage() {
       if (activeFilter === 'active' && !row.active) return false;
       if (activeFilter === 'inactive' && row.active) return false;
       if (!matchesRole(row.roles, roleFilter)) return false;
+      if (attentionOnly && !needsAttention(row)) return false;
       const haystack = `${row.name} ${row.email} ${row.user?.staffCode ?? ''} ${row.roles.join(' ')}`;
       if (term && !haystack.toLowerCase().includes(term)) {
         return false;
       }
       return true;
     });
-  }, [rows, search, activeFilter, roleFilter]);
+  }, [rows, search, activeFilter, roleFilter, attentionOnly]);
+
+  const paged = usePaged(filtered);
 
   const exportRows = useMemo(
     () =>
@@ -226,8 +243,11 @@ export function PeoplePage() {
     [filtered],
   );
 
-  const isFiltered = search.trim() !== '' || activeFilter !== 'all' || roleFilter !== 'all';
+  const isFiltered =
+    search.trim() !== '' || activeFilter !== 'all' || roleFilter !== 'all' || attentionOnly;
   const unregisteredCount = rows.filter((row) => row.user === null).length;
+  const attentionCount = rows.filter(needsAttention).length;
+  const anyUnwithdrawable = rows.some((row) => row.roles.some((role) => !canWithdraw(role, grantable)));
 
   function reload() {
     setReloadKey((k) => k + 1);
@@ -297,7 +317,7 @@ export function PeoplePage() {
     <>
       <PageIntro
         title="People"
-        purpose="The people known to the application, their roles and their employee codes. Sourced from Contacts and keyed on work email. A role here grants access to this application; changes are enforced server-side and recorded in the audit trail."
+        purpose={`Everyone who can be given a role in ${product}, and the roles they hold now.`}
         actions={
           <>
             {filtered.length > 0 ? (
@@ -313,13 +333,14 @@ export function PeoplePage() {
             {canManage ? (
               <button
                 type="button"
-                className="users__btn"
+                className="button-primary"
                 onClick={() => {
                   setBanner(null);
                   setCreateOpen(true);
                 }}
               >
-                Add person
+                <Icon name="userPlus" />
+                Add a person
               </button>
             ) : null}
           </>
@@ -329,7 +350,7 @@ export function PeoplePage() {
       {banner ? <Notice tone={banner.tone}>{banner.message}</Notice> : null}
 
       {directory.status === 'loading' || cases.status === 'loading' ? (
-        <p role="status">Loading people…</p>
+        <Skeleton label="Loading people…" rows={6} />
       ) : null}
 
       {directory.status === 'unavailable' ? (
@@ -341,21 +362,6 @@ export function PeoplePage() {
 
       {directory.status === 'ready' ? (
         <>
-          <p className="people__note">
-            The directory is the Contacts in this environment. Caseload is joined by the email
-            recorded on the case, or the name where it holds none: adviser and paraplanner come
-            from the upload, and checkers from allocation.
-            {canManage ? (
-              <>
-                {' '}
-                Roles are Power Pages web roles; assign and configure them under{' '}
-                <Link to="/admin/security">Security configuration</Link>.
-              </>
-            ) : null}
-            {unregisteredCount > 0
-              ? ` ${unregisteredCount} name${unregisteredCount === 1 ? '' : 's'} on cases ${unregisteredCount === 1 ? 'is' : 'are'} not in the directory, and cannot be allocated work until added.`
-              : ''}
-          </p>
 
           <FilterBar
             summary={`${filtered.length} of ${rows.length} people`}
@@ -363,15 +369,20 @@ export function PeoplePage() {
               setSearch('');
               setActiveFilter('all');
               setRoleFilter('all');
+              setAttentionOnly(false);
+              paged.setPage(1);
             }}
             clearDisabled={!isFiltered}
           >
-            <FilterField label="Search" htmlFor="people-search">
+            <FilterField label="Search" htmlFor="people-search" search>
               <input
                 id="people-search"
                 type="search"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  paged.setPage(1);
+                }}
                 placeholder="Name, email or code"
               />
             </FilterField>
@@ -379,7 +390,10 @@ export function PeoplePage() {
               <select
                 id="people-active"
                 value={activeFilter}
-                onChange={(e) => setActiveFilter(e.target.value as ActiveFilter)}
+                onChange={(e) => {
+                  setActiveFilter(e.target.value as ActiveFilter);
+                  paged.setPage(1);
+                }}
               >
                 <option value="all">All</option>
                 <option value="active">Active</option>
@@ -390,7 +404,10 @@ export function PeoplePage() {
               <select
                 id="people-role"
                 value={roleFilter}
-                onChange={(event) => setRoleFilter(event.target.value)}
+                onChange={(event) => {
+                  setRoleFilter(event.target.value);
+                  paged.setPage(1);
+                }}
               >
                 <option value="all">All roles</option>
                 {grantable.map((role) => (
@@ -400,85 +417,146 @@ export function PeoplePage() {
                 ))}
               </select>
             </FilterField>
+            {attentionCount > 0 || attentionOnly ? (
+              <button
+                type="button"
+                className="people__attention"
+                aria-pressed={attentionOnly}
+                title="People with no role yet, and names on cases who are not in the directory"
+                onClick={() => {
+                  setAttentionOnly((on) => !on);
+                  paged.setPage(1);
+                }}
+              >
+                <Icon name="warning" />
+                Needs attention
+                <span className="people__attention-count">{attentionCount}</span>
+              </button>
+            ) : null}
           </FilterBar>
 
-          <div className="people__scroll">
-            <table className="people">
-              <caption className="visually-hidden">
-                People in the directory and named on cases, busiest first
-              </caption>
-              <thead>
-                <tr>
-                  <th scope="col">Name</th>
-                  <th scope="col">Work email</th>
-                  <th scope="col">Role</th>
-                  <th scope="col">Employee code</th>
-                  {canManage ? <th scope="col">Actions</th> : null}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.length === 0 ? (
+          <div className="people__card">
+            <div className="people__scroll">
+              <table className="people">
+                <caption className="visually-hidden">
+                  People in the directory and named on cases, busiest first
+                </caption>
+                <thead>
                   <tr>
-                    <td colSpan={4 + (canManage ? 1 : 0)} className="people__empty">
-                      No people match your current filters.
-                    </td>
+                    <th scope="col">Person</th>
+                    <th scope="col">Roles</th>
+                    <th scope="col">Employee code</th>
+                    {canManage ? (
+                      <th scope="col">
+                        <span className="visually-hidden">Actions</span>
+                      </th>
+                    ) : null}
                   </tr>
-                ) : (
-                  filtered.map((row) => {
-                    const to = drillTo(row.load);
-                    return (
-                      <tr key={row.key}>
-                        <th scope="row">{to ? <Link to={to}>{row.name}</Link> : row.name}</th>
-                        <td>{row.email || '—'}</td>
-                        <td>
-                          <RoleAssignment
-                            email={row.email}
-                            roles={row.roles}
-                            mappings={security.status === 'ready' ? security.mappings : []}
-                            grantable={grantable}
-                            canManage={canManage && row.user !== null}
-                            busy={roleBusy === row.email}
-                            onGrant={onGrantRole}
-                            onWithdraw={onWithdrawRole}
-                          />
-                        </td>
-                        <td>{row.user?.staffCode ?? '—'}</td>
-                        {canManage ? (
-                          <td className="users__actions">
+                </thead>
+                <tbody>
+                  {filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan={3 + (canManage ? 1 : 0)} className="people__empty">
+                        No people match your current filters.
+                      </td>
+                    </tr>
+                  ) : (
+                    paged.rows.map((row) => {
+                      const to = drillTo(row.load);
+                      return (
+                        <tr key={row.key}>
+                          <th scope="row">
+                            <span className="people__person">
+                              <Avatar name={row.name} />
+                              <span className="people__person-text">
+                                {to ? <Link to={to}>{row.name}</Link> : <span>{row.name}</span>}
+                                <span className="people__person-email">
+                                  {row.email || 'No work email'}
+                                </span>
+                              </span>
+                            </span>
+                          </th>
+                          <td>
                             {row.user ? (
-                              <>
-                                <button
-                                  type="button"
-                                  className="users__link"
-                                  onClick={() => {
-                                    setBanner(null);
-                                    setEditing(row.user);
-                                  }}
-                                >
-                                  Edit
-                                </button>
-                                {row.active && isSignedInPerson(row.email, signedInEmail) ? null : (
-                                  <button
-                                    type="button"
-                                    className="users__link"
-                                    onClick={() => onToggleActive(row.user!)}
-                                  >
-                                    {row.active ? 'Deactivate' : 'Reactivate'}
-                                  </button>
-                                )}
-                              </>
+                              <RoleAssignment
+                                email={row.email}
+                                roles={row.roles}
+                                mappings={security.status === 'ready' ? security.mappings : []}
+                                grantable={grantable}
+                                canManage={canManage}
+                                busy={roleBusy === row.email}
+                                onGrant={onGrantRole}
+                                onWithdraw={onWithdrawRole}
+                              />
                             ) : (
-                              '—'
+                              <NotInDirectory />
                             )}
                           </td>
-                        ) : null}
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                          <td>
+                            {row.user?.staffCode ? (
+                              row.user.staffCode
+                            ) : (
+                              <span className="people__muted">Not set</span>
+                            )}
+                          </td>
+                          {canManage ? (
+                            <td className="users__actions">
+                              {row.user ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="button-secondary"
+                                    onClick={() => {
+                                      setBanner(null);
+                                      setEditing(row.user);
+                                    }}
+                                  >
+                                    Edit
+                                    <span className="visually-hidden"> {row.name}</span>
+                                  </button>
+                                  {row.active && isSignedInPerson(row.email, signedInEmail) ? null : (
+                                    <button
+                                      type="button"
+                                      className="button-quiet"
+                                      onClick={() => onToggleActive(row.user!)}
+                                    >
+                                      {row.active ? 'Deactivate' : 'Reactivate'}
+                                      <span className="visually-hidden"> {row.name}</span>
+                                    </button>
+                                  )}
+                                </>
+                              ) : null}
+                            </td>
+                          ) : null}
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <Pager {...paged} label="people" />
           </div>
+
+          <p className="people__note">
+            The directory is the Contacts in this environment. Caseload is joined by the email
+            recorded on the case, or the name where it holds none: adviser and paraplanner come
+            from the upload, and checkers from allocation.
+            {canManage ? (
+              <>
+                {' '}
+                A role here grants access to this application; changes are enforced server-side
+                and recorded in the audit trail. Roles are Power Pages web roles; assign and
+                configure them under <Link to="/admin/security">Security configuration</Link>.
+                {anyUnwithdrawable
+                  ? ' A role shown without a × is one this page cannot grant back, so it is managed there too.'
+                  : ''}
+              </>
+            ) : null}
+            {unregisteredCount > 0
+              ? ` ${unregisteredCount} name${unregisteredCount === 1 ? '' : 's'} on cases ${unregisteredCount === 1 ? 'is' : 'are'} not in the directory, and cannot be allocated work until added.`
+              : ''}
+          </p>
         </>
       ) : null}
 

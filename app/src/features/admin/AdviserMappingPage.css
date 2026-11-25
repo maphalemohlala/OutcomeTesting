@@ -1,5 +1,7 @@
 .advisers {
   display: grid;
+  /* A grid item is as wide as its content unless told otherwise; the table scrolls in its card instead. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
 }
 
@@ -7,45 +9,260 @@
   padding: var(--space-4);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
 }
 
-.advisers__add {
-  justify-self: start;
+/* Table on the left, the summary rail on the right; the rail drops below on a narrow screen. */
+.advisers__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20rem;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+@media (max-width: 75rem) {
+  .advisers__layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.advisers__main {
+  min-width: 0;
+}
+
+.advisers__card {
+  /* Holds the hidden header labels, so they scroll with the table instead of widening the page. */
+  position: relative;
+  overflow-x: auto;
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
 }
 
 .advisers__table {
   width: 100%;
-  border-collapse: collapse;
-  background: var(--colour-surface);
-  border: 1px solid var(--colour-border);
+  min-width: 40rem;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
 .advisers__table th,
 .advisers__table td {
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-4) var(--space-3);
   text-align: left;
+  vertical-align: middle;
   border-bottom: 1px solid var(--colour-border);
 }
 
 .advisers__table thead th {
-  background: var(--colour-surface-sunken);
+  padding-block: var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--colour-text-muted);
 }
 
 .advisers__table tbody tr:last-child td {
   border-bottom: none;
 }
 
-/* The adviser's name above the email the mapping is keyed by; the email alone when no
-   contact carries it. */
-.advisers__name {
-  display: block;
+.advisers__table tbody tr:hover {
+  background: var(--colour-surface-hover);
+}
+
+.advisers__arrow {
+  width: 1px;
+  color: var(--colour-text-muted);
+  font-size: 1.125rem;
+}
+
+.advisers__table td:first-child {
+  min-width: 15rem;
+}
+
+.advisers__manager-name {
+  white-space: nowrap;
+}
+
+.advisers__manager {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.advisers__manager-name {
   font-weight: 600;
 }
 
-.advisers__email {
-  display: block;
+.advisers__self {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius-pill);
+  background: var(--colour-warn-bg);
+  color: var(--colour-warn-text);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* A table cell: display flex would take it out of the table and break the row rules. */
+/* An adviser's managers, one line each: an adviser may have several (owner, 2026-11-24). */
+.advisers__pairs {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.advisers__pair {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+}
+
+.advisers__pair-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+
+.advisers__row-actions {
+  width: 1px;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.advisers__row-actions > * + * {
+  margin-left: var(--space-2);
+}
+
+.advisers__remove {
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  vertical-align: middle;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
   color: var(--colour-text-muted);
-  overflow-wrap: anywhere;
+  font-size: 1.125rem;
+  cursor: pointer;
+}
+
+.advisers__remove:hover {
+  color: var(--colour-danger-text);
+  background: var(--colour-danger-bg);
+}
+
+.advisers__inline {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--colour-action);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.advisers__rail {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.advisers__warning {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-lg);
+  background: var(--colour-warn-bg);
+  color: var(--colour-text);
+}
+
+.advisers__warning > .icon {
+  margin-top: 0.2rem;
+  color: var(--colour-warn-text);
+  font-size: 1.125rem;
+}
+
+.advisers__warning p {
+  margin: 0;
+  color: var(--colour-text-muted);
+}
+
+.advisers__warning .advisers__warning-title {
+  font-weight: 600;
+  color: var(--colour-text);
+}
+
+.advisers__managers {
+  padding: var(--space-5);
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
+}
+
+.advisers__managers header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.advisers__managers h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+
+.advisers__managers header span {
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
+
+.advisers__managers ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.advisers__managers li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+}
+
+.advisers__managers li + li {
+  border-top: 1px solid var(--colour-border);
+}
+
+.advisers__managers-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.advisers__managers-name {
+  font-weight: 600;
+}
+
+.advisers__managers-covers {
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
+
+.advisers__managers-count {
+  font-size: 1.75rem;
 }
 
 /* A mapping with no manager routes nothing, so it is marked rather than left looking
@@ -91,6 +308,7 @@
 
 .advisers__actions {
   display: flex;
+  justify-content: flex-end;
   gap: var(--space-3);
   margin-top: var(--space-2);
 }
@@ -139,11 +357,12 @@
    side by side read as two primary buttons. */
 .advisers__btn--ghost {
   color: var(--colour-action);
-  background: transparent;
+  background: var(--colour-surface);
   border-color: var(--colour-border-strong);
 }
 
 .advisers__btn--ghost:hover:not(:disabled) {
-  color: var(--colour-action-text);
-  background: var(--colour-action-hover);
+  color: var(--colour-action);
+  background: var(--colour-surface-hover);
+  border-color: var(--colour-action);
 }

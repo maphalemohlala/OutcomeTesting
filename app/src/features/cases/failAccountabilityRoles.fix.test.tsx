@@ -105,16 +105,17 @@ describe('who can be named as carrying a fail', () => {
     // Someone who has left still carries a past fail, so the server accepts them and so must the picker.
     for (const picker of pickers) expect(picker.includeInactive).toBe(true);
     expect(html).not.toContain('Nobody is assigned');
-    // One administrator picker per outcome, offered to anyone.
-    expect(administratorPickers()).toHaveLength(2);
+    // The administrator is a tick, not a picker (2026-11-25).
+    expect(administratorPickers()).toHaveLength(0);
   });
 
-  it('offers the administrator picker even when nobody holds either role', () => {
+  it('offers the administrator as a tick, with no names, even when nobody holds either role', () => {
     security = { status: 'ready', mappings: [], permissions: [] };
     const html = render([outcome('a')]);
 
-    expect(administratorPickers()).toHaveLength(1);
-    expect(html).toContain('administrator at fault');
+    expect(administratorPickers()).toHaveLength(0);
+    expect(html).toContain('File Quality: an administrator');
+    expect(html).toMatch(/<input type="checkbox"[^>]*\/?><span>File Quality: an administrator<\/span>/);
     expect(html).toContain('not written to the export');
   });
 

@@ -1,11 +1,13 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
 namespace OutcomeTesting.Plugins
 {
     /// <summary>
-    /// Who the T&amp;C Manager is for a case, for ROUTING only (Fixes 5, AD-162).
+    /// Who the T&amp;C Managers are for a case, for ROUTING only (Fixes 5, AD-162).
     ///
     /// <para>
     /// <b>This type still decides nothing.</b> It answers "who is the T&amp;C Manager for this
@@ -32,13 +34,19 @@ namespace OutcomeTesting.Plugins
     /// case carries it from the extract. Both people on a case are identified by email
     /// (AD-228).
     /// </para>
+    /// <para>
+    /// <b>An adviser may have several managers, all equal (owner, 2026-11-24)</b>, so that one
+    /// being away never holds a sign-off up. Every active mapping row for the adviser names
+    /// one of them; each is told, and any of them may attest. A manager chosen for one case
+    /// (<see cref="OverrideAttr"/>) still replaces them all for that case.
+    /// </para>
     /// </summary>
     public static class TcManagerRouting
     {
         /// <summary>The mapping table, keyed on adviser email.</summary>
         public const string MappingEntity = "al_advisermapping";
 
-        /// <summary>The adviser's work email on the mapping, and the alternate key.</summary>
+        /// <summary>The adviser's work email on the mapping; with the manager, the alternate key.</summary>
         public const string MappingEmailAttr = "al_adviseremail";
 
         /// <summary>The T&amp;C Manager contact the mapping points at.</summary>
@@ -64,24 +72,34 @@ namespace OutcomeTesting.Plugins
             /// <summary>No mapping exists for that adviser.</summary>
             NoMapping,
 
-            /// <summary>A mapping exists but its T&amp;C Manager has no work email.</summary>
+            /// <summary>Managers are mapped but none of them has a work email.</summary>
             ManagerNotReachable,
 
-            /// <summary>A mapped T&amp;C Manager with a work email.</summary>
+            /// <summary>At least one mapped T&amp;C Manager has a work email.</summary>
             Matched,
         }
 
-        /// <summary>The outcome of routing a case to its T&amp;C Manager, with words for a log.</summary>
+        /// <summary>One manager who can be written to.</summary>
+        public sealed class Recipient
+        {
+            /// <summary>The T&amp;C Manager contact.</summary>
+            public EntityReference Manager { get; set; }
+
+            /// <summary>Their work email.</summary>
+            public string Email { get; set; }
+        }
+
+        /// <summary>The outcome of routing a case to its T&amp;C Managers, with words for a log.</summary>
         public sealed class Routing
         {
             /// <summary>What happened.</summary>
             public RoutingKind Kind { get; set; }
 
-            /// <summary>The T&amp;C Manager contact, set whenever a mapping was found.</summary>
-            public EntityReference Manager { get; set; }
+            /// <summary>Every manager the case resolves to, reachable or not. Empty when none.</summary>
+            public List<EntityReference> Managers { get; set; } = new List<EntityReference>();
 
-            /// <summary>Their work email, set only when <see cref="IsRouted"/>.</summary>
-            public string Email { get; set; }
+            /// <summary>The managers with a work email, in the same order.</summary>
+            public List<Recipient> Recipients { get; set; } = new List<Recipient>();
 
             /// <summary>One sentence naming the value that failed, for the trace log.</summary>
             public string Reason { get; set; }
@@ -91,10 +109,16 @@ namespace OutcomeTesting.Plugins
             {
                 get { return Kind == RoutingKind.Matched; }
             }
+
+            /// <summary>Whether <paramref name="contactId"/> is one of the case's managers.</summary>
+            public bool Includes(Guid contactId)
+            {
+                return Managers.Any(m => m.Id == contactId);
+            }
         }
 
         /// <summary>
-        /// The T&amp;C Manager for this case, or why there is none.
+        /// The T&amp;C Managers for this case, or why there are none.
         ///
         /// <para>
         /// Never throws and never guesses. A case whose adviser has no mapping is a
@@ -117,19 +141,11 @@ namespace OutcomeTesting.Plugins
             // The stored adviser email only (AD-228). The name is never used to find one.
             var row = service.Retrieve(CaseEntity, caseRef.Id, new ColumnSet(CaseAdviserEmailAttr, OverrideAttr));
 
-            // A manager chosen for this case alone (requirements log row 4) wins over the mapping.
+            // A manager chosen for this case alone (requirements log row 4) replaces the mapping.
             var chosen = row.GetAttributeValue<EntityReference>(OverrideAttr);
             if (chosen != null)
             {
-                var email = NotificationOutbox.ContactEmail(service, chosen);
-                return string.IsNullOrWhiteSpace(email)
-                    ? new Routing
-                    {
-                        Kind = RoutingKind.ManagerNotReachable,
-                        Manager = chosen,
-                        Reason = "The T&C Manager chosen for this case has no work email.",
-                    }
-                    : new Routing { Kind = RoutingKind.Matched, Manager = chosen, Email = email };
+                return Reach(service, new List<EntityReference> { chosen }, "the T&C Manager chosen for this case");
             }
 
             return ForAdviserEmail(service, CaseAdviser.EmailFor(row.GetAttributeValue<string>(CaseAdviserEmailAttr)));
@@ -141,7 +157,7 @@ namespace OutcomeTesting.Plugins
             return caseRow == null ? null : caseRow.GetAttributeValue<EntityReference>(OverrideAttr);
         }
 
-        /// <summary>The T&amp;C Manager mapped to this adviser email, or why there is none.</summary>
+        /// <summary>The T&amp;C Managers mapped to this adviser email, or why there are none.</summary>
         public static Routing ForAdviserEmail(IOrganizationService service, string adviserEmail)
         {
             if (string.IsNullOrWhiteSpace(adviserEmail))
@@ -154,21 +170,8 @@ namespace OutcomeTesting.Plugins
             }
 
             var trimmed = adviserEmail.Trim();
-
-            var query = new QueryExpression(MappingEntity)
-            {
-                ColumnSet = new ColumnSet(ManagerAttr),
-                // One, not two: al_adviseremail is the table's alternate key, so a second
-                // row of the same email cannot exist to be ambiguous about. That is the
-                // whole reason the key is on the table rather than only in a comment.
-                TopCount = 1,
-                Criteria = new FilterExpression(),
-            };
-            query.Criteria.AddCondition(MappingEmailAttr, ConditionOperator.Equal, trimmed);
-            query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
-
-            var found = service.RetrieveMultiple(query).Entities;
-            if (found.Count == 0)
+            var managers = ManagersFor(service, trimmed);
+            if (managers.Count == 0)
             {
                 return new Routing
                 {
@@ -177,19 +180,81 @@ namespace OutcomeTesting.Plugins
                 };
             }
 
-            var manager = found[0].GetAttributeValue<EntityReference>(ManagerAttr);
-            var email = NotificationOutbox.ContactEmail(service, manager);
-            if (string.IsNullOrWhiteSpace(email))
+            return Reach(service, managers, "the T&C Managers mapped to " + trimmed);
+        }
+
+        /// <summary>
+        /// Every manager an ACTIVE mapping row names for this adviser email, once each, oldest
+        /// mapping first so the order never changes under a reader. Empty for a blank email.
+        /// </summary>
+        public static List<EntityReference> ManagersFor(IOrganizationService service, string adviserEmail)
+        {
+            int? status;
+            return ManagersFor(service, adviserEmail, out status);
+        }
+
+        /// <summary>
+        /// The same read, also returning the adviser status OTIS holds on those rows
+        /// (<see cref="AdviserStatus"/>), so one query answers both.
+        /// </summary>
+        public static List<EntityReference> ManagersFor(IOrganizationService service, string adviserEmail, out int? status)
+        {
+            var managers = new List<EntityReference>();
+            status = null;
+            if (string.IsNullOrWhiteSpace(adviserEmail))
             {
-                return new Routing
-                {
-                    Kind = RoutingKind.ManagerNotReachable,
-                    Manager = manager,
-                    Reason = "The T&C Manager mapped to " + trimmed + " has no work email.",
-                };
+                return managers;
             }
 
-            return new Routing { Kind = RoutingKind.Matched, Manager = manager, Email = email };
+            var query = new QueryExpression(MappingEntity)
+            {
+                ColumnSet = new ColumnSet(ManagerAttr, AdviserStatus.Attr),
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition(MappingEmailAttr, ConditionOperator.Equal, adviserEmail.Trim());
+            query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
+            query.AddOrder("createdon", OrderType.Ascending);
+
+            foreach (var row in CommandHelpers.RetrieveAll(service, query))
+            {
+                var held = row.GetAttributeValue<OptionSetValue>(AdviserStatus.Attr);
+                if (status == null && held != null)
+                {
+                    status = held.Value;
+                }
+
+                var manager = row.GetAttributeValue<EntityReference>(ManagerAttr);
+                if (manager != null && !managers.Any(m => m.Id == manager.Id))
+                {
+                    managers.Add(manager);
+                }
+            }
+
+            return managers;
+        }
+
+        /// <summary>The managers with their work emails; one with none is kept but not written to.</summary>
+        private static Routing Reach(IOrganizationService service, List<EntityReference> managers, string who)
+        {
+            var routing = new Routing { Managers = managers };
+            foreach (var manager in managers)
+            {
+                var email = NotificationOutbox.ContactEmail(service, manager);
+                if (!string.IsNullOrWhiteSpace(email))
+                {
+                    routing.Recipients.Add(new Recipient { Manager = manager, Email = email });
+                }
+            }
+
+            routing.Kind = routing.Recipients.Count > 0 ? RoutingKind.Matched : RoutingKind.ManagerNotReachable;
+            if (routing.Recipients.Count < managers.Count)
+            {
+                routing.Reason = routing.Recipients.Count == 0
+                    ? "None of " + who + " has a work email."
+                    : (managers.Count - routing.Recipients.Count) + " of " + who + " has no work email.";
+            }
+
+            return routing;
         }
     }
 }

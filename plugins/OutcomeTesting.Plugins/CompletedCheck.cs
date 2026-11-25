@@ -48,6 +48,27 @@ namespace OutcomeTesting.Plugins
         /// <summary>Tick-grid widths: the test point, then the tick columns share the rest.</summary>
         private const double GridLabel = 0.55;
 
+        /// <summary>
+        /// The narrowest a tick column may be: wide enough for "Insufficient" in the bold
+        /// heading face, so a five-column scale's headings wrap between words, not inside
+        /// them ("Insuffici / ent", 2026-11-24). The test point gives up the difference.
+        /// </summary>
+        public const double MinTickColumn = 0.115;
+
+        /// <summary>A grid's column widths: the test point first, then one per option.</summary>
+        public static double[] GridWidths(int optionCount)
+        {
+            var tick = Math.Max((1 - GridLabel) / optionCount, MinTickColumn);
+            var widths = new double[optionCount + 1];
+            widths[0] = 1 - (tick * optionCount);
+            for (var i = 1; i <= optionCount; i++)
+            {
+                widths[i] = tick;
+            }
+
+            return widths;
+        }
+
         private const string CaseEntity = "al_outcomecase";
 
         /// <summary>"Tax check" or "AQS check".</summary>
@@ -104,10 +125,10 @@ namespace OutcomeTesting.Plugins
                         "al_paraplanner", "al_products", "al_casetype", "al_casetypeid",
                         "al_advicedate", "al_productsolutiontype", "al_producttypeid",
                         "al_samplesource", "al_samplesourceid", "al_taxcheckername",
-                        "al_aqscheckername", "al_checkdate", "al_ioreference",
+                        "al_aqscheckername", "al_checkdate", "al_ioreference", "al_servicecaseref",
                         "al_preorpostcheck", "al_preorpostcheckid", "al_vulnerableclient", "al_vulnerableclientid",
                         "al_taxcheckrequired", "al_taxteamdisposition", "al_checklistitems",
-                        CaseHeaderRules.BusinessUnitAttribute));
+                        CaseHeaderRules.BusinessUnitAttribute, "al_reviewrouteid"));
                 }
                 catch (Exception)
                 {
@@ -129,7 +150,15 @@ namespace OutcomeTesting.Plugins
 
             var submitted = review.GetAttributeValue<DateTime?>("al_submittedon");
             var items = Items(service, review, submitted ?? DateTime.UtcNow);
-            var reasons = FailReasons(service, reviewId);
+
+            // On a Tax review of a case that still owes an AQS check, File Quality Outcome is
+            // AQS's: the page draws it hidden and records it unseen, so it is left out here too
+            // (UAT, 2026-11-25).
+            if (isTax && RouteRequiresAqs(service, row))
+            {
+                items.RemoveAll(item => item.SectionCode == "S-FQTAX");
+            }
+            var reasons = FailReasons(service, reviewId, isTax);
 
             Draw(blocks, items, reasons, isTax);
 
@@ -259,6 +288,10 @@ namespace OutcomeTesting.Plugins
                 PdfCell.Label("Business Unit"), PdfCell.Of(Choice(CaseHeaderRules.BusinessUnitAttribute)));
             table.Add(PdfCell.Label("Client name / initials"), PdfCell.Of(Text("al_clientname")),
                 PdfCell.Label("IO reference"), PdfCell.Of(Text("al_ioreference")));
+            // Both references, side by side: the TaskID keys the case, and the service case
+            // reference is the one people quote but two tasks can share (client, 2026-11-24).
+            table.Add(PdfCell.Label("Case reference"), PdfCell.Of(Text("al_casereference")),
+                PdfCell.Label("Service case reference"), PdfCell.Of(Text("al_servicecaseref")));
             table.Add(PdfCell.Label("Pre or post check"), PdfCell.Of(Lookup("al_preorpostcheckid", "al_preorpostcheck")),
                 PdfCell.Label("Vulnerable client?"), PdfCell.Of(Lookup("al_vulnerableclientid", "al_vulnerableclient")));
             table.Add(PdfCell.Label("Tax check required\n(Tax team to complete)"), PdfCell.Of(Choice("al_taxcheckrequired")),
@@ -574,15 +607,16 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// Every fail reason in display order, ticked where this review recorded it through
-        /// the response-keyed intersect (AD-025). Empty when the list cannot be read.
+        /// Every fail reason of the review's team in display order, ticked where this review
+        /// recorded it through the response-keyed intersect (AD-025). Empty when the list
+        /// cannot be read.
         /// </summary>
-        private static List<FailReasonItem> FailReasons(IOrganizationService service, Guid reviewId)
+        private static List<FailReasonItem> FailReasons(IOrganizationService service, Guid reviewId, bool isTax)
         {
             var reasons = new List<FailReasonItem>();
             try
             {
-                var all = new QueryExpression("al_failreason") { ColumnSet = new ColumnSet("al_name", "al_displayorder", "statecode") };
+                var all = new QueryExpression("al_failreason") { ColumnSet = new ColumnSet("al_name", "al_displayorder", "statecode", "al_category") };
                 all.AddOrder("al_displayorder", OrderType.Ascending);
                 var rows = new List<Entity>(CommandHelpers.RetrieveAll(service, all));
                 if (rows.Count == 0)
@@ -610,6 +644,14 @@ namespace OutcomeTesting.Plugins
                         continue;
                     }
 
+                    // Tax file quality points are the Tax team's alone and every other point is
+                    // AQS's (client decision, 2026-11-06), as the review page draws them; a point
+                    // this review ticked is printed whatever its category.
+                    if (!ticked.Contains(row.Id) && IsTaxFailPoint(row) != isTax)
+                    {
+                        continue;
+                    }
+
                     var name = row.GetAttributeValue<string>("al_name");
                     reasons.Add(new FailReasonItem
                     {
@@ -624,6 +666,34 @@ namespace OutcomeTesting.Plugins
             }
 
             return reasons;
+        }
+
+        /// <summary>Whether the case's route still owes an AQS check; false when it cannot be read.</summary>
+        private static bool RouteRequiresAqs(IOrganizationService service, Entity row)
+        {
+            var route = row?.GetAttributeValue<EntityReference>("al_reviewrouteid");
+            if (route == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                return service.Retrieve("al_reviewroute", route.Id, new ColumnSet("al_requiresaqsreview"))
+                    .GetAttributeValue<bool?>("al_requiresaqsreview") == true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        /// <summary>al_failreason.al_category "Tax file quality".</summary>
+        public const int TaxFileQualityCategory = 120910404;
+
+        private static bool IsTaxFailPoint(Entity reason)
+        {
+            return reason.GetAttributeValue<OptionSetValue>("al_category")?.Value == TaxFileQualityCategory;
         }
 
         // ================================================================== drawing the form
@@ -751,15 +821,7 @@ namespace OutcomeTesting.Plugins
         {
             var options = ChecklistDocument.GridOptions(scale, isTax);
             var columns = options.Count + 1;
-
-            var widths = new double[columns];
-            widths[0] = GridLabel;
-            for (var i = 1; i < columns; i++)
-            {
-                widths[i] = (1 - GridLabel) / options.Count;
-            }
-
-            var table = new PdfTable(widths);
+            var table = new PdfTable(GridWidths(options.Count));
 
             var head = new List<PdfCell> { PdfCell.Head(block.ColumnHeading ?? "Check") };
             foreach (var option in options)
@@ -972,11 +1034,12 @@ namespace OutcomeTesting.Plugins
                     return PdfCell.Of(Day(item.Date));
 
                 case ResponseRules.AnswerColumn.RichText:
-                    return Written(PlainText(item.Rich));
+                    // Formatted as written (2026-11-23), not reduced to PlainText.
+                    return Written(PdfCell.FromMarkup((item.Rich ?? string.Empty).Trim()));
 
                 default:
                     return item.ResponseType == ResponseRules.TypeMultilineText
-                        ? Written(item.Text)
+                        ? Written(PdfCell.Of((item.Text ?? string.Empty).Trim()))
                         : PdfCell.Of(item.Text ?? string.Empty);
             }
         }
@@ -985,9 +1048,8 @@ namespace OutcomeTesting.Plugins
         /// A written answer, given the three lines of room the page's text box gives it, so
         /// an empty Case Notes reads as a box nobody wrote in rather than a missing row.
         /// </summary>
-        private static PdfCell Written(string text)
+        private static PdfCell Written(PdfCell cell)
         {
-            var cell = PdfCell.Of((text ?? string.Empty).Trim());
             var lines = 1;
             foreach (var run in cell.Runs)
             {

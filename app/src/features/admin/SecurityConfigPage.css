@@ -14,7 +14,7 @@
   padding: var(--space-4);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
 }
 
 .security__panel h2 {
@@ -35,6 +35,8 @@
 
 .security__panel .security__table {
   margin-top: var(--space-3);
+  border: none;
+  border-radius: 0;
 }
 
 .security__hint {
@@ -43,21 +45,34 @@
   color: var(--colour-text-muted);
 }
 
+.security__hint a {
+  color: var(--colour-action);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.security__hint a:hover {
+  text-decoration: underline;
+}
+
 .security__form-actions {
   display: flex;
   gap: var(--space-2);
   justify-content: flex-end;
 }
 
-.security__btn--ghost {
+/* Doubled class: this rule sits above .security__btn, which would otherwise win and draw
+   every Cancel as a primary button. */
+.security__btn.security__btn--ghost {
   color: var(--colour-action);
-  background: transparent;
+  background: var(--colour-surface);
   border-color: var(--colour-border-strong);
 }
 
-.security__btn--ghost:hover:not(:disabled) {
-  color: var(--colour-action-text);
-  background: var(--colour-action-hover);
+.security__btn.security__btn--ghost:hover:not(:disabled) {
+  color: var(--colour-action);
+  background: var(--colour-surface-hover);
+  border-color: var(--colour-action);
 }
 
 .security__form {
@@ -115,6 +130,7 @@
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
   font-size: var(--text-sm);
+  border-radius: var(--radius-lg);
 }
 
 .security__notice--ok {
@@ -127,20 +143,28 @@
 
 .security__table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: var(--text-sm);
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
+}
+
+.security__table tbody tr:last-child td {
+  border-bottom: none;
 }
 
 .security__table th,
 .security__table td {
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
   text-align: left;
   border-bottom: 1px solid var(--colour-border);
 }
 
 .security__table th {
   color: var(--colour-text-muted);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .security__table tr[data-inactive='true'] td {
@@ -160,12 +184,13 @@
   color: var(--colour-action);
   background: none;
   border: none;
-  text-decoration: underline;
+  text-decoration: none;
   cursor: pointer;
 }
 
 .security__link-btn:hover:not(:disabled) {
   color: var(--colour-action-hover);
+  text-decoration: underline;
 }
 
 .security__link-btn:disabled {
@@ -178,5 +203,282 @@
   padding: var(--space-4);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
+}
+
+/* Mock 8: the role matrix. */
+.security__filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.security__filters .filter-bar {
+  flex: 1 1 auto;
+  margin-bottom: 0;
+}
+
+.security__people-hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
+
+.security__people-hint a {
+  color: var(--colour-text);
+}
+
+.security__roles-pick {
+  position: relative;
+}
+
+.security__roles-pick summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.75rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
+  background: var(--colour-surface);
+  font-weight: 500;
+  cursor: pointer;
+  list-style: none;
+}
+
+.security__roles-pick summary::-webkit-details-marker {
+  display: none;
+}
+
+.security__roles-pick summary:hover {
+  border-color: var(--colour-border-strong);
+}
+
+.security__pill-label {
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--colour-text-muted);
+}
+
+.security__roles-pick fieldset {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  display: grid;
+  gap: var(--space-2);
+  min-width: 16rem;
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
+  background: var(--colour-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.security__roles-pick label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.security__roles-pick input {
+  accent-color: var(--colour-action);
+}
+
+.security__card {
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.security__card .security__table {
+  border: none;
+  border-radius: 0;
+}
+
+/* Wide tables scroll inside the card, not the page. */
+.security__scroll {
+  position: relative;
+  overflow-x: auto;
+}
+
+.security__matrix {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.security__matrix th,
+.security__matrix td {
+  padding: var(--space-4) var(--space-3);
+  border-bottom: 1px solid var(--colour-border);
+}
+
+.security__matrix thead th {
+  vertical-align: bottom;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--colour-text-muted);
+  text-align: center;
+  min-width: 5rem;
+}
+
+.security__matrix thead th:not(:first-child),
+.security__matrix .security__cell {
+  padding-left: var(--space-2);
+  padding-right: var(--space-2);
+}
+
+.security__matrix thead th:first-child,
+.security__matrix tbody th {
+  text-align: left;
+  padding-left: var(--space-5);
+  font-weight: 400;
+}
+
+.security__matrix .person-cell__detail {
+  overflow-wrap: normal;
+  white-space: nowrap;
+}
+
+.security__matrix thead th[data-privileged] {
+  color: var(--colour-danger-text);
+}
+
+.security__matrix [data-privileged] {
+  background: color-mix(in srgb, var(--colour-danger-bg) 45%, var(--colour-surface));
+}
+
+.security__matrix tbody tr:last-child > * {
+  border-bottom: none;
+}
+
+.security__cell {
+  text-align: center;
+}
+
+.security__matrix td.security__held {
+  padding-right: var(--space-5);
+  min-width: 6.5rem;
+  text-align: right;
+  color: var(--colour-text-muted);
+}
+
+.security__empty {
+  text-align: center;
+  color: var(--colour-text-muted);
+}
+
+.security__retired {
+  font-weight: 400;
+}
+
+.security__toggle {
+  display: inline-grid;
+  place-items: center;
+  width: 1.875rem;
+  height: 1.875rem;
+  padding: 0;
+  border: 1.5px solid var(--colour-border-strong);
+  border-radius: 50%;
+  background: var(--colour-surface);
+  color: var(--colour-text-inverse);
+  font-size: 0.9rem;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+button.security__toggle:hover:not(:disabled) {
+  border-color: var(--colour-action);
+}
+
+.security__toggle[data-state='held'] {
+  border-color: var(--colour-action);
+  background: var(--colour-action);
+}
+
+.security__toggle[data-state='withdrawn'] {
+  border-style: dashed;
+  background: repeating-linear-gradient(
+    135deg,
+    var(--colour-border-strong) 0 1.5px,
+    transparent 1.5px 4px
+  );
+}
+
+button.security__toggle:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.security__legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--colour-border);
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
+
+.security__legend ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.security__legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.security__legend .security__toggle {
+  width: 1.25rem;
+  height: 1.25rem;
+  font-size: 0.7rem;
+  cursor: default;
+}
+
+.security__danger {
+  background: var(--colour-danger-text);
+  border-color: var(--colour-danger-text);
+}
+
+.security__danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--colour-danger-text) 85%, black);
+  border-color: color-mix(in srgb, var(--colour-danger-text) 85%, black);
+}
+
+/* On a phone the person stays pinned while the role columns scroll beside them. */
+@media (max-width: 40rem) {
+  .security__matrix thead th:first-child,
+  .security__matrix tbody th {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    max-width: 9.5rem;
+    padding-left: var(--space-3);
+    background: var(--colour-surface);
+  }
+
+  .security__matrix .person-cell__detail {
+    display: none;
+  }
+
+  .security__matrix .avatar {
+    display: none;
+  }
 }

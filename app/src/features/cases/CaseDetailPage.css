@@ -1,155 +1,286 @@
 .case-detail__back {
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-3);
   font-size: var(--text-sm);
 }
 
 .case-detail__back a {
-  color: var(--colour-action);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--colour-text-muted);
   text-decoration: none;
 }
 
 .case-detail__back a:hover {
+  color: var(--colour-action);
   text-decoration: underline;
 }
 
-.case-detail__summary {
+/* The case's own page heading: reference and stage on one line, actions to the right. */
+.case-detail__intro {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-5);
-  padding: var(--space-4);
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
   margin-bottom: var(--space-5);
-  background: var(--colour-surface);
-  border: 1px solid var(--colour-border);
 }
 
-.case-detail__summary-item {
+.case-detail__intro > div:first-child {
+  min-width: 0;
+}
+
+.case-detail__title {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
 }
 
-.case-detail__summary-label {
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--colour-text-muted);
-}
-
-.case-detail__summary-value {
-  font-size: var(--text-base);
-  font-weight: 600;
-}
-
-/*
- * The case header, drawn as the Checker Checklist draws it: a ruled table, two label/value
- * pairs to a row (project owner, 2026-09-13). Replaced a four-panel auto-fit grid, whose
- * themed groups the document has no trace of.
- *
- * Ruled on every cell rather than only between rows, because on the paper form the rules are
- * what pair a label with its value across a wide row - without them the eye loses which
- * value belongs to which label at the right-hand end.
- */
-.case-detail__header {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--text-sm);
-  table-layout: fixed;
-}
-
-.case-detail__header th,
-.case-detail__header td {
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--colour-border);
-  text-align: left;
-  vertical-align: top;
+.case-detail__title h1 {
+  margin: 0;
   overflow-wrap: anywhere;
 }
 
-.case-detail__header th {
-  width: 22%;
-  font-weight: 600;
-  color: var(--colour-text);
-  background: var(--colour-surface-muted, transparent);
-}
-
-.case-detail__header td {
-  width: 28%;
-  font-weight: 400;
-}
-
-.case-detail__header td[data-empty='true'] {
-  font-style: italic;
+.case-detail__purpose {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-lg);
   color: var(--colour-text-muted);
 }
 
-/* The odd field's filler cells carry no rule, so the table does not end on an empty box. */
-.case-detail__header th[aria-hidden='true'],
-.case-detail__header td[aria-hidden='true'] {
-  border: 0;
-  background: none;
+.case-detail__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
-/*
- * Stacks on a narrow viewport: four fixed columns at phone width squeezes every value to a
- * character or two. Each cell becomes a full-width row, label above value, which is the
- * order the document reads anyway.
- */
-@media (max-width: 45rem) {
-  .case-detail__header,
-  .case-detail__header tbody,
-  .case-detail__header tr,
-  .case-detail__header th,
-  .case-detail__header td {
-    display: block;
-    width: auto;
-  }
+/* Main column and a right rail, as the mock-ups lay out both tabs. */
+.case-detail__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2.5fr) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-5);
+}
 
-  .case-detail__header tr {
-    margin-bottom: var(--space-3);
-  }
+.case-detail__main,
+.case-detail__rail {
+  display: grid;
+  /* One shrinkable track: an auto track would grow to the widest card's content (the
+     accountability table) and clip every card at phone width. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+  min-width: 0;
+}
 
-  .case-detail__header th {
-    border-bottom: 0;
+@media (max-width: 64rem) {
+  .case-detail__layout {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
-.case-detail__panel {
-  padding: var(--space-4);
+/* A white card with a title row; shared by the panels this page draws. */
+.case-card {
+  min-width: 0;
+  padding: var(--space-5);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
 }
 
-.case-detail__panel h2 {
-  margin-bottom: var(--space-3);
-  padding-bottom: var(--space-2);
+.case-card h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
   font-size: var(--text-lg);
+}
+
+.case-card h3 {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-base);
+}
+
+.case-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.case-card__head > h2:only-child {
+  margin-bottom: 0;
+}
+
+.case-card > h2 {
+  margin-bottom: var(--space-4);
+}
+
+.case-card__icon {
+  color: var(--colour-text-muted);
+}
+
+.case-card__aside {
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
+
+.case-card__note {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
+
+/* Label above value, as many to a row as fit. */
+.case-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: var(--space-4) var(--space-5);
+  margin: 0;
+}
+
+.case-fields--strip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-4) var(--space-5);
+}
+
+.case-fields__item {
+  min-width: 0;
+}
+
+.case-fields dt,
+.case-fields__label {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
+
+.case-fields dd {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.case-fields dd[data-empty='true'],
+.case-fields__empty {
+  font-weight: 400;
+  color: var(--colour-text-subtle);
+}
+
+.case-detail__people {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-4) var(--space-5);
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-4);
   border-bottom: 1px solid var(--colour-border);
 }
 
-.case-detail__lineage {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-3);
+/* The checks table scrolls on its own rather than widening the page. */
+.case-detail__scroll {
+  position: relative;
+  overflow-x: auto;
   margin-top: var(--space-4);
-  padding: var(--space-3) var(--space-4);
-  background: var(--colour-surface-sunken);
-  border: 1px solid var(--colour-border);
+}
+
+.case-detail__checks-table {
+  width: 100%;
   font-size: var(--text-sm);
+  border-collapse: collapse;
+}
+
+.case-detail__checks-table th,
+.case-detail__checks-table td {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--colour-border);
+}
+
+.case-detail__checks-table thead th {
+  color: var(--colour-text-muted);
+  font-weight: 500;
+}
+
+.case-detail__checks-table tbody th {
+  font-weight: 600;
+}
+
+.case-detail__checks-table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+/* The IO task's ticked items, each a tinted row: they are why the case is being checked. */
+.case-detail__flags {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.case-detail__flags li {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  background: var(--colour-warn-bg);
+  color: var(--colour-warn-text);
+  font-weight: 600;
+}
+
+.case-detail__dates {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0 0 0 var(--space-4);
+  list-style: none;
+  border-left: 2px solid var(--colour-border);
+}
+
+.case-detail__dates li {
+  display: grid;
+  gap: 2px;
+}
+
+.case-detail__dates span {
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
+
+.case-detail__danger-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
 }
 
 .case-detail__related {
-  margin-top: var(--space-5);
+  margin: calc(-1 * var(--space-2)) 0 0;
   font-size: var(--text-sm);
 }
 
 .case-detail__related a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   color: var(--colour-action);
-  text-decoration: none;
   font-weight: 600;
+  text-decoration: none;
 }
 
 .case-detail__related a:hover {
   text-decoration: underline;
+}
+
+.case-detail__notice {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--colour-warn-bg);
+  color: var(--colour-warn-text);
 }
 
 .case-detail__unavailable {
@@ -157,6 +288,7 @@
   padding: var(--space-4);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
 }
 
 .case-detail__unavailable h2 {
@@ -164,78 +296,183 @@
   font-size: var(--text-lg);
 }
 
-.case-detail__checks {
-  margin-top: var(--space-5);
-  padding: var(--space-4);
-  background: var(--colour-surface);
-  border: 1px solid var(--colour-border);
-}
-
-.case-detail__checks h2 {
-  margin-bottom: var(--space-3);
-  padding-bottom: var(--space-2);
-  font-size: var(--text-lg);
-  border-bottom: 1px solid var(--colour-border);
-}
-
-.case-detail__checks-note {
-  font-size: var(--text-sm);
-  color: var(--colour-text-muted);
-}
-
-/* The remedial actions table below it is styled by the same rules, so the two tables on the
-   page read as one family (2026-10-05). */
-.case-detail__checks-table,
-.case-detail__remedial-table {
-  width: 100%;
-  font-size: var(--text-sm);
-  border-collapse: collapse;
-}
-
-.case-detail__checks-table th,
-.case-detail__checks-table td,
-.case-detail__remedial-table th,
-.case-detail__remedial-table td {
-  padding: var(--space-2) var(--space-3);
-  text-align: left;
-  vertical-align: top;
-  border-bottom: 1px solid var(--colour-border);
-}
-
-.case-detail__checks-table thead th,
-.case-detail__remedial-table thead th {
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--colour-text-muted);
-}
-
-/* What the adviser and the supervisor wrote, beside their answer - as the remediation page. */
-.case-detail__remedial-note {
-  display: block;
-  font-style: italic;
-}
-
-.case-detail__checks-table tbody th {
-  font-weight: 600;
-}
-
-/* Delete case sits apart from the everyday edit actions, at the end of the panel. */
-.case-detail__delete {
-  display: flex;
-  justify-content: flex-end;
-  margin-block: var(--space-2) var(--space-4);
-}
-
-/* Under the grades it amends (requirements log row 39). */
-.case-detail__tcmanager .case-detail__checks-note {
-  margin-bottom: var(--space-2);
-}
-
+/* The amend button and, after a save, what it did. */
 .case-detail__amend {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
-  margin-block: var(--space-2) var(--space-4);
+}
+
+/* The T&C manager card: who holds the case, then the hand-over form under a rule. */
+.case-detail__handover {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--colour-border);
+}
+
+.case-detail__handover .case-card__note {
+  margin: 0;
+}
+
+.case-detail__handover .case-edit__actions {
+  margin-top: 0;
+}
+
+/* Remedial actions: one row per action, its fail points numbered straight through. */
+.remedial__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin: calc(-1 * var(--space-2)) 0 var(--space-4);
+  color: var(--colour-text-muted);
+}
+
+.remedial__meta strong {
+  color: var(--colour-text);
+}
+
+.remedial__list {
+  margin: 0 calc(-1 * var(--space-5)) calc(-1 * var(--space-5));
+  padding: 0;
+  list-style: none;
+}
+
+.remedial__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) auto;
+  gap: var(--space-5);
+  padding: var(--space-5);
+  border-top: 1px solid var(--colour-border);
+}
+
+@media (max-width: 48rem) {
+  .remedial__row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+  }
+}
+
+.remedial__points {
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+}
+
+.remedial__point {
+  display: flex;
+  gap: var(--space-4);
+}
+
+.remedial__number {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background: var(--colour-surface-sunken);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.remedial__point-text {
+  display: grid;
+  gap: 2px;
+}
+
+.remedial__label {
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
+
+.remedial__line {
+  margin: 0 0 0 calc(1.75rem + var(--space-4));
+  font-size: var(--text-sm);
+}
+
+/* The adviser's answer behind a rule in its own colour: green done, amber not done. */
+.remedial__response {
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+  padding-left: var(--space-4);
+  border-left: 3px solid var(--colour-border-strong);
+}
+
+.remedial__response[data-performed='Yes'] {
+  border-left-color: var(--colour-outcome-pass);
+}
+
+.remedial__response[data-performed='No'] {
+  border-left-color: var(--colour-outcome-issues);
+}
+
+.remedial__answer {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 600;
+}
+
+.remedial__response[data-performed='Yes'] .remedial__answer {
+  color: var(--colour-outcome-pass);
+}
+
+.remedial__response[data-performed='No'] .remedial__answer {
+  color: var(--colour-outcome-issues);
+}
+
+.remedial__answer--none {
+  font-weight: 400;
+  color: var(--colour-text-muted);
+}
+
+.remedial__note {
+  font-size: var(--text-sm);
+}
+
+.remedial__state {
+  display: grid;
+  justify-items: end;
+  align-content: start;
+  gap: var(--space-2);
+  text-align: right;
+}
+
+@media (max-width: 48rem) {
+  .remedial__state {
+    justify-items: start;
+    text-align: left;
+  }
+}
+
+.remedial__status {
+  padding: 2px var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--colour-surface-sunken);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.remedial__status[data-status='Completed'] {
+  background: #eaf5ee;
+  color: var(--colour-outcome-pass);
+}
+
+.remedial__decision {
+  max-width: 14rem;
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
+
+/* An adviser may have several T&C Managers; the panel lists each. */
+.case-detail__tcmanagers {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }

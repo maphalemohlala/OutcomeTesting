@@ -16,6 +16,20 @@ namespace OutcomeTesting.Plugins
         public enum AnswerColumn { Text, Date, Choice, Choices, RichText }
 
         // al_questionversion.al_responsetype
+        /// <summary>al_response.al_answertext's MaxLength; a longer write fails in the platform with no plain reason.</summary>
+        public const int AnswerTextMaxLength = 4000;
+
+        /// <summary>Why a written answer is too long to save, or null.</summary>
+        public static string AnswerTextRefusal(string text)
+        {
+            return text == null || text.Length <= AnswerTextMaxLength
+                ? null
+                : "This answer is " + text.Length.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)
+                    + " characters long and can be at most "
+                    + AnswerTextMaxLength.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)
+                    + ". Shorten it and it will save.";
+        }
+
         public const int TypeText = 120910000;
         public const int TypeMultilineText = 120910001;
         public const int TypeDate = 120910002;
@@ -57,6 +71,17 @@ namespace OutcomeTesting.Plugins
         /// al_answerchoice gives them, so MI reads one number for one cause either way.
         /// </summary>
         public const int TypeMultiSelectRootCause = 120910013;
+
+        /// <summary>
+        /// Pass, Pass with issues, Insufficient evidence, Potential harm - exactly those four,
+        /// left to right (project owner, 2026-11-24, for the Consumer Duty outcomes). Its own
+        /// type rather than <see cref="TypeGrade"/>, because the advice grade question is found
+        /// by that type, and rather than <see cref="TypePassFailInsufficientNa"/>, which offers
+        /// N/A and stores Potential harm as Fail and feeds the grade-consistency rule. Potential
+        /// harm is stored as <see cref="ChoicePotentialHarm"/>, so MI reads it by its own name.
+        /// Record-only for grading: SubmitReview's consistency rule does not read it.
+        /// </summary>
+        public const int TypeOutcomeScale = 120910014;
 
         // al_response.al_answerchoice
         public const int ChoicePass = 120910300;
@@ -113,6 +138,7 @@ namespace OutcomeTesting.Plugins
                 case TypeYesNoNa:
                 case TypeYesNoInsufficient:
                 case TypeGrade:
+                case TypeOutcomeScale:
                     return AnswerColumn.Choice;
                 default:
                     throw new ArgumentOutOfRangeException(
@@ -144,6 +170,7 @@ namespace OutcomeTesting.Plugins
                 case TypeYesNoInsufficient:
                     return new[] { ChoiceYes, ChoiceNo, ChoiceInsufficient };
                 case TypeGrade:
+                case TypeOutcomeScale:
                     // BR-005 order: Pass, Pass with issues, Insufficient evidence, Potential harm.
                     return new[] { ChoicePass, ChoicePassWithIssues, ChoiceInsufficient, ChoicePotentialHarm };
                 case TypeSingleSelect:

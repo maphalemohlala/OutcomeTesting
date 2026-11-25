@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Notice } from '../../components/feedback/Notice';
 import { UserPicker } from '../../components/form/UserPicker';
+import { PersonCell } from '../../components/people/Avatar';
 import { PermissionGate } from '../../app/permissions/PermissionGate';
 import { useIntentKeys, type IntentKeys } from '../../hooks/useIntentKey';
 import { messageForFailure } from '../../services/errors';
 import { reassignTcManager } from '../../services/commands/reassignTcManager';
-import { Al_outcomecasesService } from '../../generated';
+import { Al_advisermappingsService, Al_outcomecasesService } from '../../generated';
 import { useSecurityConfig } from '../admin/useSecurityConfig';
 import { lookupLabel } from './lookupLabel';
+import { Skeleton } from '../../components/feedback/Skeleton';
 
 const SUPERVISOR_ROLE = 'al portal - t&c supervisor';
 
@@ -50,11 +52,27 @@ export async function runReassignment(
 
 interface Current {
   chosen: string | null;
-  manager: string | null;
+  /** Every manager mapped to the case's adviser; an adviser may have several (owner, 2026-11-24). */
+  managers: string[];
+}
+
+/** The OData filter for an adviser's active mappings; quotes doubled, as OData escapes them. */
+// eslint-disable-next-line react-refresh/only-export-components -- exported for its test
+export function mappingFilter(adviserEmail: string): string {
+  return `al_adviseremail eq '${adviserEmail.trim().replace(/'/g, "''")}' and statecode eq 0`;
+}
+
+/** The case's mapped managers by name, once each, in the order the mappings came. */
+async function mappedManagers(adviserEmail: string): Promise<string[]> {
+  if (adviserEmail.trim() === '') return [];
+  const result = await Al_advisermappingsService.getAll({ filter: mappingFilter(adviserEmail), orderBy: ['createdon asc'] });
+  if (!result.success || !result.data) throw new Error('mappings unavailable');
+  const names = result.data.map((row) => lookupLabel(row, 'al_tcmanagerid', undefined) ?? 'A manager on record');
+  return [...new Set(names)];
 }
 
 /**
- * Hands this one case to another T&C Manager while the mapped one is away (requirements log
+ * Hands this one case to another T&C Manager while the mapped ones are away (requirements log
  * row 4). Changing the adviser mapping would move every case of that adviser.
  */
 export function CaseTcManagerPanel({ caseId, onSaved }: { caseId: string; onSaved: () => void }) {
@@ -83,19 +101,21 @@ function Panel({ caseId, onSaved }: { caseId: string; onSaved: () => void }) {
   useEffect(() => {
     let cancelled = false;
     void loadKey;
-    Al_outcomecasesService.get(caseId, { select: ['_al_tcmanageroverrideid_value', '_al_tcsupervisorcontactid_value'] })
-      .then((result) => {
+    Al_outcomecasesService.get(caseId, { select: ['_al_tcmanageroverrideid_value', 'al_adviseremail'] })
+      .then(async (result) => {
         if (cancelled) return;
         if (!result.success || !result.data) {
           setCurrent('unavailable');
           return;
         }
         const row = result.data;
+        const managers = await mappedManagers(row.al_adviseremail ?? '');
+        if (cancelled) return;
         setCurrent({
           chosen: row._al_tcmanageroverrideid_value
             ? lookupLabel(row, 'al_tcmanageroverrideid', row.al_tcmanageroverrideidname) ?? 'Someone'
             : null,
-          manager: lookupLabel(row, 'al_tcsupervisorcontactid', row.al_tcsupervisorcontactidname),
+          managers,
         });
       })
       .catch(() => {
@@ -125,30 +145,50 @@ function Panel({ caseId, onSaved }: { caseId: string; onSaved: () => void }) {
 
   const loaded = current !== null && current !== 'unavailable' ? current : null;
 
+  // Who holds the case now: the person chosen for it, else every manager mapped to the adviser.
+  const onCase = loaded ? (loaded.chosen ? [loaded.chosen] : loaded.managers) : [];
+
   return (
-    <section className="case-detail__panel case-detail__tcmanager" aria-labelledby="panel-tcmanager">
+    <section className="case-card case-detail__tcmanager" aria-labelledby="panel-tcmanager">
       <h2 id="panel-tcmanager">T&amp;C Manager for this case</h2>
-      {current === null ? <p role="status">Loading…</p> : null}
+      {current === null ? <Skeleton label="Loading the T&C Supervisor…" rows={1} /> : null}
       {current === 'unavailable' ? (
-        <p className="case-detail__checks-note">The case&apos;s T&amp;C Manager could not be loaded.</p>
+        <p className="case-card__note">The case&apos;s T&amp;C Manager could not be loaded.</p>
       ) : null}
       {loaded ? (
-        <p className="case-detail__checks-note">
-          {loaded.chosen
-            ? `${loaded.chosen}, chosen for this case in place of the manager mapped to its adviser.`
-            : loaded.manager
-              ? `${loaded.manager}, the manager mapped to its adviser.`
-              : 'The manager mapped to its adviser. The case shows a name here once it reaches remediation.'}
-        </p>
+        onCase.length > 0 ? (
+          <ul className="case-detail__tcmanagers">
+            {onCase.map((name) => (
+              <li key={name}>
+                <PersonCell
+                  name={name}
+                  detail={
+                    loaded.chosen
+                      ? 'Chosen for this case in place of the mapped managers'
+                      : onCase.length > 1
+                        ? 'Mapped to its adviser; any of them can sign off'
+                        : 'The manager mapped to its adviser'
+                  }
+                />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="case-card__note">
+            No T&amp;C Manager is mapped to this case&apos;s adviser yet, so nobody can sign it off.
+            Map one on the Adviser mapping page, or hand the case to someone below.
+          </p>
+        )
       ) : null}
-      <p className="case-detail__checks-note">
-        Hand this case to someone else while its manager is away. They see it in the portal, sign it
-        off and get its emails; if a sign-off is already waiting they are told now. Every other case
-        of this adviser stays with the mapped manager.
-      </p>
-      {error ? <Notice tone="error">{error}</Notice> : null}
-      {done ? <Notice tone="success">{done}</Notice> : null}
-      <div className="case-edit__grid">
+      <div className="case-detail__handover">
+        <h3>Hand this case to someone else</h3>
+        <p className="case-card__note">
+          While its managers are away, the person you choose sees it in the portal, signs it off and gets
+          its emails, in place of all of them. If a sign-off is already waiting they are told now. Every
+          other case of this adviser stays with the mapped managers.
+        </p>
+        {error ? <Notice tone="error">{error}</Notice> : null}
+        {done ? <Notice tone="success">{done}</Notice> : null}
         <label className="case-edit__field" htmlFor="case-tcmanager-picker">
           <span>New T&amp;C Manager</span>
           <UserPicker
@@ -157,33 +197,39 @@ function Panel({ caseId, onSaved }: { caseId: string; onSaved: () => void }) {
             value={managerId}
             onChange={setManagerId}
             onlyEmails={holders}
-            placeholder={security.status === 'loading' ? 'Loading T&C Supervisors…' : 'Choose a T&C Supervisor'}
+            placeholder={security.status === 'loading' ? 'Loading T&C Supervisors…' : 'Choose a manager'}
           />
         </label>
         <label className="case-edit__field" htmlFor="case-tcmanager-reason">
           <span>Reason</span>
-          <textarea id="case-tcmanager-reason" value={reason} onChange={(e) => setReason(e.target.value)} />
+          <textarea
+            id="case-tcmanager-reason"
+            rows={3}
+            value={reason}
+            placeholder="Why the case is moving"
+            onChange={(e) => setReason(e.target.value)}
+          />
         </label>
-      </div>
-      <div className="case-edit__actions">
-        {loaded?.chosen ? (
+        <div className="case-edit__actions">
+          {loaded?.chosen ? (
+            <button
+              type="button"
+              className="button-quiet"
+              disabled={saving || reason.trim() === ''}
+              onClick={() => hand('')}
+            >
+              Hand back to the mapped managers
+            </button>
+          ) : null}
           <button
             type="button"
-            className="case-edit__cancel"
-            disabled={saving || reason.trim() === ''}
-            onClick={() => hand('')}
+            className="button-secondary"
+            disabled={saving || managerId === '' || reason.trim() === ''}
+            onClick={() => hand(managerId)}
           >
-            Hand back to the mapped manager
+            {saving ? 'Saving…' : 'Hand over case'}
           </button>
-        ) : null}
-        <button
-          type="button"
-          className="case-edit__save"
-          disabled={saving || managerId === '' || reason.trim() === ''}
-          onClick={() => hand(managerId)}
-        >
-          {saving ? 'Saving…' : 'Hand to this manager'}
-        </button>
+        </div>
       </div>
     </section>
   );

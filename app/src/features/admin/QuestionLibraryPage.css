@@ -1,33 +1,53 @@
+/* minmax(0, 1fr): a grid column is as wide as its widest content otherwise, and the
+   remediation table would push every card past a phone screen instead of scrolling. */
 .library {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
 }
 
 .library__section {
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
 }
 
 .library__section-head {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  background: var(--colour-surface-sunken);
+  padding: var(--space-5) var(--space-5) var(--space-4);
   border-bottom: 1px solid var(--colour-border);
 }
 
+.library__section-title,
+.library__section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  min-width: 0;
+}
+
+.library__section-actions {
+  gap: var(--space-2);
+}
+
+/* A section title reads as a chapter of the checklist, so it takes the display serif. */
 .library__section-head h2 {
-  font-size: var(--text-lg);
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 500;
 }
 
 .library__section-meta {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-3);
-  font-size: var(--text-xs);
+  gap: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
 }
 
 .library__owner {
@@ -36,11 +56,236 @@
 }
 
 .library__flag {
-  padding: 0 var(--space-2);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  padding: 0.125rem 0.625rem;
+  border-radius: var(--radius-pill);
+  background: var(--colour-chip);
+  color: var(--colour-chip-text);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.library__flag--warn {
+  background: var(--colour-warn-bg);
+  color: var(--colour-warn-text);
+}
+
+.library__flag--muted {
+  background: var(--colour-surface-sunken);
   color: var(--colour-text-muted);
-  border: 1px solid var(--colour-border-strong);
+}
+
+/* The lock line above the sections: which questions cannot be retired, and why, said once. */
+.library__info {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm);
+}
+
+.library__info .icon {
+  margin-top: 0.15em;
+  font-size: 1.125rem;
+  color: var(--colour-text-muted);
+}
+
+/* One question: wording and code, then fixed columns so type, requirement and version line up down the section. */
+.library__question.library__question--grid {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) 15rem 6rem 2.5rem 10rem 10.5rem;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.library__question-text {
+  min-width: 0;
+}
+
+.library__question--grid .library__wording {
+  font-weight: 600;
+}
+
+.library__flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.library__system {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--colour-chip-text);
+  white-space: nowrap;
+}
+
+.library__actions {
+  display: inline-flex;
+  white-space: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.library__actions .button-secondary {
+  margin-right: var(--space-2);
+}
+
+.library__icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--colour-text);
+  font-size: 1.125rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.library__icon-btn::-webkit-details-marker {
+  display: none;
+}
+
+.library__icon-btn:hover {
+  background: var(--colour-surface-hover);
+  color: var(--colour-text);
+}
+
+.library__more {
+  position: relative;
+}
+
+.library__more-slot {
+  width: 2.25rem;
+}
+
+.library__menu {
+  position: absolute;
+  right: 0;
+  z-index: 5;
+  min-width: 9rem;
+  padding: var(--space-1);
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+}
+
+.library__menu button {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+/* Remediation areas: each area's two questions on one row, inside the section card. */
+.library__areas {
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  border-top: 1px solid var(--colour-border);
+}
+
+.library__questions + .library__areas {
+  border-top: none;
+}
+
+.library__areas-intro {
+  margin: 0 0 var(--space-3);
+}
+
+.library__areas-intro .library__muted {
+  margin-left: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.library__areas-scroll {
+  position: relative;
+  overflow-x: auto;
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
+}
+
+.library__areas-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.library__areas-table th,
+.library__areas-table td {
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  border-bottom: 1px solid var(--colour-border);
+}
+
+.library__areas-table thead th {
+  background: var(--colour-surface-sunken);
+  font-weight: 500;
+  color: var(--colour-text-muted);
+}
+
+.library__areas-table tbody th {
+  font-size: var(--text-base);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.library__areas-table tbody tr:last-child > * {
+  border-bottom: none;
+}
+
+.library__area-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  white-space: nowrap;
+}
+
+.library__count {
+  display: inline-block;
+  min-width: 1.5rem;
+  margin-left: var(--space-2);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--colour-surface-sunken);
+  color: var(--colour-text);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.library__empty {
+  padding: var(--space-4) var(--space-5);
+}
+
+/* Narrow: wording on its own line, then type, requirement, version and actions flowing after it. */
+@media (max-width: 75rem) {
+  .library__question.library__question--grid {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+  }
+
+  .library__question--grid .library__question-text {
+    flex: 1 1 100%;
+  }
+
+  .library__question--grid .library__actions {
+    margin-left: auto;
+  }
+
+  .library__question--grid > :empty {
+    display: none;
+  }
 }
 
 .library__muted {
@@ -59,7 +304,7 @@
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--colour-border);
 }
 
@@ -68,24 +313,34 @@
 }
 
 .library__wording {
-  flex: 1 1 28rem;
-  font-size: var(--text-sm);
+  flex: 1 1 16rem;
+  font-size: var(--text-base);
+  font-weight: 500;
 }
 
 .library__question-meta {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-3);
-  font-size: var(--text-xs);
+  gap: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
 }
 
 .library__response {
-  padding: 0 var(--space-2);
-  color: var(--colour-text-muted);
+  display: inline-block;
+  padding: 0.125rem 0.625rem;
   border: 1px solid var(--colour-border);
+  border-radius: var(--radius-pill);
+  color: var(--colour-text);
+  font-size: var(--text-sm);
+}
+
+.library__area-cell .library__response {
+  white-space: nowrap;
 }
 
 .library__requirement {
+  font-size: var(--text-sm);
   font-weight: 600;
 }
 
@@ -103,6 +358,7 @@
   padding: var(--space-4);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
 }
 
 .library__unavailable h2 {
@@ -181,13 +437,14 @@
    primary buttons. */
 .library__btn--ghost {
   color: var(--colour-action);
-  background: transparent;
+  background: var(--colour-surface);
   border-color: var(--colour-border-strong);
 }
 
 .library__btn--ghost:hover:not(:disabled) {
-  color: var(--colour-action-text);
-  background: var(--colour-action-hover);
+  color: var(--colour-action);
+  background: var(--colour-surface-hover);
+  border-color: var(--colour-action);
 }
 
 .library__error {
@@ -220,8 +477,9 @@
 }
 
 .library__code {
-  font-family: var(--font-mono, monospace);
-  font-size: var(--text-xs);
+  display: block;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
   color: var(--colour-text-muted);
 }
 
@@ -235,10 +493,21 @@
   text-decoration: line-through;
 }
 
+.library__area-cell .library__code {
+  display: inline;
+}
+
+.library__section .library__retired {
+  border-top: 1px solid var(--colour-border);
+}
+
+.library__section .library__retired > summary {
+  padding: var(--space-4) var(--space-5);
+}
+
 .library__retired > summary {
   cursor: pointer;
-  font-size: var(--text-sm);
-  color: var(--colour-text-muted);
+  color: var(--colour-text);
   padding: var(--space-2) 0;
 }
 
@@ -359,10 +628,8 @@
 }
 
 .history__change dt {
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: var(--colour-text-muted);
 }
 
@@ -389,4 +656,9 @@
 
 .history__note {
   margin: 0 0 var(--space-3);
+}
+
+/* The three dots draw as points, so they need a heavier stroke to be seen. */
+.library__more .icon {
+  stroke-width: 3;
 }

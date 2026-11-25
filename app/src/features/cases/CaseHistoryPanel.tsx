@@ -1,5 +1,8 @@
 import { useCaseHistory } from './useCaseHistory';
 import './CaseHistoryPanel.css';
+import { Skeleton } from '../../components/feedback/Skeleton';
+import { Pager } from '../../components/navigation/Pager';
+import { usePaged } from '../../components/navigation/paging';
 
 /**
  * Read-only audit trail for one case (FR-033). Audit Events are immutable (BR-012), so this
@@ -7,9 +10,10 @@ import './CaseHistoryPanel.css';
  */
 export function CaseHistoryPanel({ caseId, reloadKey }: { caseId: string; reloadKey: number }) {
   const state = useCaseHistory(caseId, reloadKey);
+  const page = usePaged(state.status === 'ready' ? state.entries : []);
 
   if (state.status === 'loading') {
-    return <p role="status">Loading history…</p>;
+    return <Skeleton label="Loading history…" />;
   }
 
   if (state.status === 'unavailable') {
@@ -26,6 +30,7 @@ export function CaseHistoryPanel({ caseId, reloadKey }: { caseId: string; reload
   }
 
   return (
+    <>
     <table className="case-history__table">
       <thead>
         <tr>
@@ -38,7 +43,7 @@ export function CaseHistoryPanel({ caseId, reloadKey }: { caseId: string; reload
         </tr>
       </thead>
       <tbody>
-        {state.entries.map((entry) => (
+        {page.rows.map((entry) => (
           <tr key={entry.id}>
             <td>{entry.occurredOn ?? '—'}</td>
             <th scope="row">{entry.command}</th>
@@ -50,5 +55,7 @@ export function CaseHistoryPanel({ caseId, reloadKey }: { caseId: string; reload
         ))}
       </tbody>
     </table>
+    <Pager {...page} label="entries" />
+    </>
   );
 }

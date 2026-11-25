@@ -1,7 +1,24 @@
 import { useRemediation } from '../remediation/useRemediation';
+import { RemedialText } from '../remediation/RemedialText';
 import { groupIssues } from '../remediation/remediationIssues';
 import { signoffCell, signoffNotes } from '../remediation/remediationForm';
 import type { RemediationActionRow, SignoffRow } from '../remediation/remediationMapping';
+import { Icon } from '../../components/icons/Icon';
+
+/** "3 of 3 completed, 1 not performed": the card's one-line standing. */
+// eslint-disable-next-line react-refresh/only-export-components -- exported for its test
+export function remedialSummary(actions: readonly RemediationActionRow[]): string {
+  const done = actions.filter((action) => action.completedOn).length;
+  const notPerformed = actions.filter((action) => action.actionPerformed === 'No').length;
+  const base = `${done} of ${actions.length} completed`;
+  return notPerformed > 0 ? `${base}, ${notPerformed} not performed` : base;
+}
+
+/** Each distinct value once, in the order met: one check or owner reads as itself, two as both. */
+function distinct(values: (string | null)[]): string {
+  const seen = values.filter((value, index): value is string => !!value && values.indexOf(value) === index);
+  return seen.length > 0 ? seen.join(', ') : '—';
+}
 
 /**
  * The case's remedial actions on its details page (project owner, 2026-10-05: "Include the
@@ -36,56 +53,76 @@ export function CaseRemedialActions({
   }
 
   return (
-    <section className="case-detail__remedial" aria-labelledby="panel-remedial">
-      <h2 id="panel-remedial">Remedial actions</h2>
-      <table className="case-detail__remedial-table">
-        <thead>
-          <tr>
-            <th scope="col">No.</th>
-            <th scope="col">Check</th>
-            <th scope="col">Fail point</th>
-            <th scope="col">Remedial action</th>
-            <th scope="col">Action performed</th>
-            <th scope="col">Owner</th>
-            <th scope="col">Target date</th>
-            <th scope="col">Status</th>
-            <th scope="col">Sign-off</th>
-          </tr>
-        </thead>
-        <tbody>
-          {groupIssues(live).flatMap(({ action, lines }) =>
-            lines.map((line, index) => (
-              <tr key={`${action.id}-${line.number}`}>
-                <td>{line.number}</td>
-                {index === 0 ? (
-                  <>
-                    <td rowSpan={lines.length}>{action.triggeredBy ?? '—'}</td>
-                    <td>{line.issue}</td>
-                    <td rowSpan={lines.length}>{action.remedialAction ?? '—'}</td>
-                    <td rowSpan={lines.length}>
-                      {action.actionPerformed ?? '—'}
-                      {action.adviserNote ? (
-                        <span className="case-detail__remedial-note"> {action.adviserNote}</span>
-                      ) : null}
-                    </td>
-                    <td rowSpan={lines.length}>{action.assignedTo ?? adviserName ?? 'Nobody assigned'}</td>
-                    <td rowSpan={lines.length}>{action.dueOn ?? '—'}</td>
-                    <td rowSpan={lines.length}>{action.status}</td>
-                    <td rowSpan={lines.length}>
-                      {signoffCell(action, signoffs, caseStatus)}
-                      {signoffNotes(action, signoffs) ? (
-                        <span className="case-detail__remedial-note"> {signoffNotes(action, signoffs)}</span>
-                      ) : null}
-                    </td>
-                  </>
+    <section className="case-card case-detail__remedial" aria-labelledby="panel-remedial">
+      <div className="case-card__head">
+        <h2 id="panel-remedial">Remedial actions</h2>
+        <span className="case-card__aside">{remedialSummary(live)}</span>
+      </div>
+      <p className="remedial__meta">
+        <span>
+          Check <strong>{distinct(live.map((action) => action.triggeredBy))}</strong>
+        </span>
+        <span>
+          Owner{' '}
+          <strong>{distinct(live.map((action) => action.assignedTo ?? adviserName ?? 'Nobody assigned'))}</strong>
+        </span>
+        <span>
+          Target date <strong>{distinct(live.map((action) => action.dueOn))}</strong>
+        </span>
+      </p>
+      <ol className="remedial__list">
+        {groupIssues(live).map(({ action, lines }) => {
+          const notes = signoffNotes(action, signoffs);
+          const decision = signoffCell(action, signoffs, caseStatus);
+          return (
+            <li key={action.id} className="remedial__row">
+              <div className="remedial__points">
+                {lines.map((line) => (
+                  <div key={line.number} className="remedial__point">
+                    <span className="remedial__number">{line.number}</span>
+                    <span className="remedial__point-text">
+                      <span className="remedial__label">Fail point</span>
+                      <strong>{line.issue}</strong>
+                    </span>
+                  </div>
+                ))}
+                <p className="remedial__line">
+                  <span className="remedial__label">Remedial action:</span>{' '}
+                  <RemedialText text={action.remedialAction} />
+                </p>
+                {notes ? (
+                  <p className="remedial__line">
+                    <span className="remedial__label">Sign-off note:</span> {notes}
+                  </p>
+                ) : null}
+              </div>
+              <div className="remedial__response" data-performed={action.actionPerformed ?? 'none'}>
+                <span className="remedial__label">Adviser response</span>
+                {action.actionPerformed === 'Yes' ? (
+                  <span className="remedial__answer">
+                    <Icon name="check" />
+                    Action performed
+                  </span>
+                ) : action.actionPerformed === 'No' ? (
+                  <span className="remedial__answer">
+                    <Icon name="warning" />
+                    Not performed
+                  </span>
                 ) : (
-                  <td>{line.issue}</td>
+                  <span className="remedial__answer remedial__answer--none">No response yet</span>
                 )}
-              </tr>
-            )),
-          )}
-        </tbody>
-      </table>
+                {action.adviserNote ? <em className="remedial__note">{action.adviserNote}</em> : null}
+              </div>
+              <div className="remedial__state">
+                <span className="remedial__status" data-status={action.status}>
+                  {action.status}
+                </span>
+                {decision !== '—' ? <span className="remedial__decision">{decision}</span> : null}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
     </section>
   );
 }

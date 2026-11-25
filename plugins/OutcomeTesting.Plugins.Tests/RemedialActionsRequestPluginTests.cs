@@ -107,6 +107,43 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
+        public void Formatted_words_are_cleaned_and_limited_by_what_reads_not_by_the_markup()
+        {
+            var svc = Service(ContactId);
+            var words = new string('x', RemedialActions.MaxLength - 10);
+
+            RemedialActionsRequestPlugin.Apply(svc, ContactId, Payload(
+                "First: Fail", "<p><strong>" + words + "</strong><script>alert(1)</script></p>",
+                "Second: No", "<p><br></p>"));
+
+            var parked = RemedialActions.Parse(
+                svc.Row("al_reviewinstance", ReviewId).GetAttributeValue<string>(RemedialActions.PendingAttr));
+            Assert.Equal("<p><strong>" + words + "</strong></p>", parked["First: Fail"]);
+            Assert.False(parked.ContainsKey("Second: No"));
+
+            var tooLong = Assert.Throws<InvalidPluginExecutionException>(() => RemedialActionsRequestPlugin.Apply(
+                Service(ContactId), ContactId, Payload("First: Fail", "<p>" + new string('x', RemedialActions.MaxLength + 1) + "</p>")));
+            Assert.Contains("'First: Fail'", tooLong.Message);
+        }
+
+        [Fact]
+        public void Markup_too_large_to_store_is_refused_by_name()
+        {
+            var bulky = new System.Text.StringBuilder();
+            for (var i = 0; i < 2000; i++)
+            {
+                bulky.Append("<u><strong>x</strong></u>");
+            }
+
+            var thrown = Assert.Throws<InvalidPluginExecutionException>(() => RemedialActionsRequestPlugin.Apply(
+                Service(ContactId), ContactId, Payload("First: Fail", "<p>" + bulky + "</p>")));
+
+            Assert.Equal(
+                "VALIDATION: The formatting in the remedial action for 'First: Fail' makes it too long to store. Remove some of the formatting.",
+                thrown.Message);
+        }
+
+        [Fact]
         public void Emptying_every_box_clears_the_parked_map()
         {
             var svc = Service(ContactId);

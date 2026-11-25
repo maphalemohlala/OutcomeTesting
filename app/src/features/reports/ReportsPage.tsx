@@ -11,6 +11,7 @@ import { CompletedCaseReport } from './CompletedCaseReport';
 import { aggregate } from './reportAggregate';
 import { useReports } from './useReports';
 import './ReportsPage.css';
+import { Skeleton } from '../../components/feedback/Skeleton';
 
 export function ReportsPage() {
   const worklist = useCaseWorklist();
@@ -48,13 +49,13 @@ export function ReportsPage() {
         title="Management reporting"
         purpose="Outcome volumes, remediation ageing and sign-off accountability, read from live case data."
         actions={
-          <Link className="reports__link" to="/exports">
+          <Link className="button-secondary" to="/exports">
             Go to Trail Light exports
           </Link>
         }
       />
 
-      {state.status === 'loading' ? <p role="status">Loading management reporting…</p> : null}
+      {state.status === 'loading' ? <Skeleton label="Loading management reporting…" rows={6} /> : null}
 
       {state.status === 'unavailable' ? (
         <section className="reports__unavailable" aria-labelledby="reports-unavailable">

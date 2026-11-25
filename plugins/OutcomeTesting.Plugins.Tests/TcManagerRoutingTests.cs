@@ -39,8 +39,8 @@ namespace OutcomeTesting.Plugins.Tests
             var routing = TcManagerRouting.ForCase(service, Case());
 
             Assert.True(routing.IsRouted);
-            Assert.Equal("pat@example.com", routing.Email);
-            Assert.Equal(manager.Id, routing.Manager.Id);
+            Assert.Equal("pat@example.com", Assert.Single(routing.Recipients).Email);
+            Assert.Equal(manager.Id, Assert.Single(routing.Managers).Id);
         }
 
         [Fact]
@@ -98,7 +98,8 @@ namespace OutcomeTesting.Plugins.Tests
 
             // The manager is still reported, because knowing WHICH contact needs an email
             // is the actionable half.
-            Assert.NotNull(routing.Manager);
+            Assert.Single(routing.Managers);
+            Assert.Empty(routing.Recipients);
         }
 
         [Fact]
@@ -148,7 +149,7 @@ namespace OutcomeTesting.Plugins.Tests
             var properties = typeof(TcManagerRouting.Routing).GetProperties();
 
             Assert.Equal(
-                new[] { "Email", "IsRouted", "Kind", "Manager", "Reason" },
+                new[] { "IsRouted", "Kind", "Managers", "Reason", "Recipients" },
                 Array.ConvertAll(properties, p => p.Name).OrderBy());
         }
 

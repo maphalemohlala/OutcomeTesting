@@ -29,6 +29,43 @@
           "required": true,
           "x-ms-keyType": "primary"
         },
+        "al_adviserstatus": {
+          "type": "string",
+          "title": "Adviser status",
+          "x-ms-dataverse-attribute": "al_adviserstatus",
+          "x-ms-dataverse-type": "PicklistType",
+          "x-ms-schema-name": "al_AdviserStatus",
+          "enum": [
+            "PreCAS",
+            "CAS",
+            "Enhanced",
+            "Watchlist"
+          ],
+          "x-ms-enum-values": [
+            120910500,
+            120910501,
+            120910502,
+            120910503
+          ],
+          "Color": [
+            null,
+            null,
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "6c7c237f-ede8-f111-84e9-70a8a5b3561e",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "Adviser status",
+          "x-ms-optionSetType": "Picklist"
+        },
+        "al_adviserstatusname": {
+          "type": "string",
+          "title": "al_adviserstatusname",
+          "x-ms-dataverse-attribute": "al_adviserstatusname",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "al_adviserstatusName",
+          "x-ms-read-only": true
+        },
         "al_name": {
           "type": "string",
           "title": "Name",

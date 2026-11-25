@@ -15,34 +15,51 @@
   --brand-white: #ffffff;
   --brand-black: #000000;
 
+  /* The sidebar's ink and the gold that marks where you are in it. */
+  --brand-ink: #11363a;
+  --brand-ink-raised: #1c4a4f;
+  --brand-gold: #d6a840;
+
   /* Neutrals derived from Dark Teal so greys stay in the brand family */
   --colour-surface: var(--brand-white);
-  --colour-surface-sunken: #f4f7f7;
+  --colour-surface-sunken: #f2f4f3;
   --colour-surface-raised: var(--brand-white);
-  --colour-surface-inverse: var(--brand-teal-dark);
-  --colour-border: #d3dcdc;
-  --colour-border-strong: #a8b8b8;
+  --colour-surface-inverse: var(--brand-ink);
+  --colour-surface-hover: #f6f8f7;
+  --colour-border: #e1e6e5;
+  --colour-border-strong: #c9d2d1;
 
   /* Text */
-  --colour-text: var(--brand-teal-dark);
-  --colour-text-muted: #4f6b6b;
+  --colour-text: #12292b;
+  --colour-text-muted: #5b6e6f;
+  --colour-text-subtle: #687977;
   --colour-text-inverse: var(--brand-white);
-  --colour-text-on-inverse-accent: var(--brand-green-highlight);
+  --colour-text-inverse-muted: #a9bdbd;
+  --colour-text-on-inverse-accent: var(--brand-gold);
 
   /* Action */
-  --colour-action: var(--brand-teal);
+  --colour-action: var(--brand-ink);
   --colour-action-hover: var(--brand-teal-dark);
   --colour-action-text: var(--brand-white);
-  --colour-focus: var(--brand-teal-dark);
+  --colour-focus: var(--brand-teal);
+
+  /* Tinted chips: a role held, a warning, a privileged role */
+  --colour-chip: #e4efed;
+  --colour-chip-text: #1d4a4f;
+  --colour-warn-bg: #fbf0d9;
+  --colour-warn-text: #8a5a0b;
+  --colour-danger-bg: #fbe5e2;
+  --colour-danger-text: #b23a2e;
 
   /*
-   * Outcome hues for BR-005. Pass and Insufficient evidence use brand values.
-   * Amber and red have no brand equivalent and await brand owner sign-off.
+   * Outcome hues for BR-005. Insufficient evidence uses the brand purple. Pass is a deeper
+   * green than the brand #00a800, which is cleared for large text only. Amber and red have
+   * no brand equivalent and await brand owner sign-off.
    */
-  --colour-outcome-pass: var(--brand-green-accessible);
-  --colour-outcome-issues: #b87a3d;
+  --colour-outcome-pass: #1a7d44;
+  --colour-outcome-issues: #b8741c;
   --colour-outcome-insufficient: var(--brand-purple);
-  --colour-outcome-harm: #b65a52;
+  --colour-outcome-harm: #c0392b;
   --colour-outcome-none: var(--colour-border-strong);
 
   /* Lifecycle stages */
@@ -51,17 +68,21 @@
   --colour-stage-blocked: var(--colour-outcome-harm);
   --colour-stage-closed: var(--colour-text-muted);
 
-  /* Typography */
-  --font-heading: 'Outfit Variable', Arial, sans-serif;
-  --font-body: 'Inter Variable', Arial, sans-serif;
+  /* Typography: a serif for titles and headline numbers, a sans for everything read at work. */
+  --font-display: 'Source Serif 4 Variable', Georgia, serif;
+  /* Power Apps' own type (owner, 2026-11-24): Segoe UI, the Fluent fallback stack after it. */
+  --font-heading: 'Segoe UI', 'Segoe UI Web (West European)', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif;
+  --font-body: var(--font-heading);
 
-  --text-xs: 0.75rem;
-  --text-sm: 0.8125rem;
-  --text-base: 0.875rem;
-  --text-lg: 1rem;
-  --text-xl: 1.25rem;
-  --text-2xl: 1.5rem;
-  --text-3xl: 2.25rem;
+  /* Set against the 14px root in base.css, so 1rem is Power Apps' 14px body text. */
+  --text-xs: 0.7857rem; /* 11px */
+  --text-sm: 0.8571rem; /* 12px */
+  --text-base: 1rem; /* 14px */
+  --text-lg: 1.0714rem; /* 15px */
+  --text-xl: 1.1429rem; /* 16px */
+  --text-2xl: 1.4286rem; /* 20px */
+  --text-3xl: 2rem; /* 28px */
+  --text-display: 2rem; /* 28px */
 
   /* Spacing tuned for operational density */
   --space-1: 0.25rem;
@@ -70,8 +91,12 @@
   --space-4: 1rem;
   --space-5: 1.5rem;
   --space-6: 2rem;
+  --space-7: 2.5rem;
 
-  --radius: 2px;
-  --rail-width: 15rem;
-  --header-height: 3.25rem;
+  --radius: 6px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+  --shadow-card: 0 1px 2px rgb(17 54 58 / 0.04);
+  --rail-width: 15.5rem;
+  --header-height: 3.75rem;
 }

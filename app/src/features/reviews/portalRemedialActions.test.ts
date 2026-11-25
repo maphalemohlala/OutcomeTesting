@@ -29,6 +29,7 @@ const PASS_FAIL_INSUFFICIENT = '120910006';
 const YES_NO_NA = '120910008';
 const YES_NO_INSUFFICIENT = '120910009';
 const YES_NO = '120910007';
+const OUTCOME_SCALE = '120910014';
 
 const answer = (code: string, type: string, text: string, value: string): Answer => ({ code, type, text, value });
 
@@ -72,6 +73,27 @@ describe('the fail points the page lists', () => {
     expect(result.items).toEqual([]);
   });
 
+  it('lists a Consumer Duty outcome below Pass under its own grade, and leaves a Pass out', () => {
+    const result = items(
+      [
+        answer('Q-CD-01', OUTCOME_SCALE, 'Products and services', '120910303'),
+        answer('Q-CD-02', OUTCOME_SCALE, 'Price and value', '120910302'),
+        answer('Q-CD-03', OUTCOME_SCALE, 'Consumer understanding', '120910304'),
+        answer('Q-CD-04', OUTCOME_SCALE, 'Consumer support', '120910300'),
+      ],
+      [],
+      false,
+    );
+
+    expect(result.items).toEqual([
+      'Products and services: Pass with issues',
+      'Price and value: Insufficient evidence',
+      'Consumer understanding: Potential harm',
+    ]);
+    // An item alone does not make remediation owed; the grade and the flag decide that.
+    expect(result.owed).toBe(false);
+  });
+
   it('keeps the characters Liquid escapes, so the key matches the server', () => {
     const result = items([answer('Q-X', PASS_FAIL_INSUFFICIENT, 'Fees & "charges" <agreed>', '120910301')], [], false);
     expect(result.items).toEqual(['Fees & "charges" <agreed>: Fail']);
@@ -89,6 +111,36 @@ describe('the fail points the page lists', () => {
     expect(items([answer('Q-FQTAX-03', YES_NO, 'Remedial action required?', '120910305')], [], true).owed).toBe(true);
     expect(items([answer('Q-TAX-02', PASS_FAIL_INSUFFICIENT, 'Tax check outcome', '120910300')], [], true).owed).toBe(false);
   });
+
+  it('gives each Tax category answered Yes its own row, after the fail points, as the server lists them', () => {
+    const result = items(
+      [
+        answer('Q-TAX-02', PASS_FAIL_INSUFFICIENT, 'Tax check outcome', '120910301'),
+        answer('Q-TAX-11', YES_NO, 'Other: remediation required?', '120910305'),
+        answer('Q-TAX-05', YES_NO, 'Calculations: remediation required?', '120910306'),
+        answer('Q-TAX-07', YES_NO, 'Wording: remediation required?', '120910305'),
+        // Retired at UAT (2026-11-25): a Yes left on Omissions is no longer a row.
+        answer('Q-TAX-09', YES_NO, 'Omissions: remediation required?', '120910305'),
+      ],
+      ['No OEL'],
+      true,
+    );
+
+    expect(result.owed).toBe(true);
+    expect(result.items).toEqual(['No OEL', 'Wording', 'Other']);
+  });
+
+  it('shows the card whenever remediation is owed, categories being rows of it', () => {
+    expect(template).toContain('root.hidden = !result.owed;');
+  });
+
+  it('draws File Quality Outcome hidden on a Tax check an AQS check follows, so a submitted one shows no empty heading', () => {
+    expect(template).toContain("{% if blk == 'S-FQ' and tax_fq_excused %}{% assign blk_hidden = ' hidden' %}{% endif %}");
+    expect(template).toContain('<h2{{ blk_hidden }}>{{ blk_title | escape }}');
+    expect(template).toContain('<table class="meta"{{ blk_hidden }}>');
+    // The script still shows it again when the checker returns the case as Tax only.
+    expect(template).toContain('table.hidden = !alone;');
+  });
 });
 
 describe('the outcome rules on the page', () => {
@@ -101,6 +153,12 @@ describe('the outcome rules on the page', () => {
   const point = (value: string) => ({ code: 'Q-E1-01', type: '120910012', text: 'A point', value });
   const aml = (value: string) => ({ code: 'Q-AML-01', type: '120910008', text: 'ID', value });
   const grade = (value: string) => ({ code: 'Q-GR-01', type: '120910010', text: 'Grade', value });
+
+  it('does not let a Consumer Duty outcome restrict the grade (record-only, 2026-11-24)', () => {
+    const cd = (value: string) => ({ code: 'Q-CD-01', type: OUTCOME_SCALE, text: 'Products', value });
+    expect(grading([cd('120910304'), cd('120910303')], []).grades).toBeNull();
+    expect(grading([aml('120910305'), point('120910300'), cd('120910304')], []).grades).toEqual(['120910300']);
+  });
 
   it('reads all Pass or N/A as a Pass with nothing to put right', () => {
     expect(grading([aml('120910305'), point('120910300'), point('120910307')], [])).toEqual({
@@ -168,7 +226,7 @@ describe('the card on the page', () => {
 
   it('keeps a row\'s words when its fail point is unticked, so ticking it again brings them back', () => {
     // Rows are redrawn from the map on every change; nothing removes an entry from it.
-    expect(template).toContain("box.value = texts[keys[i]] || '';");
+    expect(template).toContain("area.innerHTML = otRemedialMarkup(texts[key] || '');");
     expect(template).not.toContain('delete texts[');
   });
 
@@ -282,6 +340,51 @@ describe('the card after a reload inside the cache window', () => {
     );
     expect(canonical([{ item: 'A', text: 'one' }])).not.toBe(canonical([{ item: 'A', text: 'changed' }]));
     expect(canonical(null)).toBe(canonical([]));
+    // The server rebuilds formatted markup; the same words in other tags are the same map.
+    expect(canonical([{ item: 'A', text: '<b>one</b> two' }])).toBe(canonical([{ item: 'A', text: '<p><strong>one</strong> two</p>' }]));
+  });
+
+  it('opens words written before the editor as escaped text, and formatted words as they were stored', () => {
+    const start = template.indexOf('/* ot-remedial-canonical:start */');
+    const end = template.indexOf('/* ot-remedial-canonical:end */');
+    const markup = new Function(`${template.slice(start, end)}; return otRemedialMarkup;`)() as (text: unknown) => string;
+
+    expect(markup('Line one\nA <script> & more')).toBe('<p>Line one<br>A &lt;script&gt; &amp; more</p>');
+    expect(markup('<p><strong>Bold</strong></p>')).toBe('<p><strong>Bold</strong></p>');
+    expect(markup('   ')).toBe('');
+    expect(markup(null)).toBe('');
+  });
+
+  it('stores what the editor holds as markup that starts with a tag, so it is never read back as plain text', () => {
+    // TEST 2026-11-23: a first line typed before any Enter has no <p>, so "Recalculate&nbsp;"
+    // was stored, read back as plain text and shown with a literal "&nbsp;".
+    const start = template.indexOf('/* ot-remedial-canonical:start */');
+    const end = template.indexOf('/* ot-remedial-canonical:end */');
+    const stored = new Function(`${template.slice(start, end)}; return otRemedialStored;`)() as (html: string, words: string) => string;
+
+    expect(stored('Recalculate&nbsp;', 'Recalculate ')).toBe('<p>Recalculate&nbsp;</p>');
+    expect(stored('Recalculate <b>the CGT</b><p>next</p><ul><li>one</li></ul>', 'x')).toBe(
+      '<p>Recalculate <b>the CGT</b></p><p>next</p><ul><li>one</li></ul>',
+    );
+    expect(stored('<b>Bold</b> start', 'Bold start')).toBe('<p><b>Bold</b> start</p>');
+    expect(stored('<p>Already</p>', 'Already')).toBe('<p>Already</p>');
+    expect(stored('<ul><li>one</li></ul>', 'one')).toBe('<ul><li>one</li></ul>');
+    expect(stored('<br>', '  ')).toBe('');
+  });
+
+  it('saves through that function', () => {
+    expect(cardScript()).toContain("otRemedialStored(area.innerHTML, area.textContent || '')");
+  });
+
+  it('gives each remedial action the formatting editor, counted against the column', () => {
+    const card = cardScript();
+    expect(card).toContain("area.setAttribute('data-ot-maxlength', '4000');");
+    expect(card).toContain("['bold', 'Bold', '<strong>B</strong>']");
+    expect(card).toContain("['underline', 'Underline', '<u>U</u>']");
+    expect(card).toContain("['insertUnorderedList', 'Bulleted list', '&bull; List']");
+    expect(card).toContain("document.execCommand('defaultParagraphSeparator', false, 'p');");
+    expect(card).not.toContain("createElement('textarea')");
+    expect(layoutTemplate).toContain("document.querySelectorAll('textarea[maxlength], [data-ot-maxlength]')");
   });
 });
 
@@ -298,7 +401,8 @@ describe('the card once the review is submitted', () => {
     expect(lock).toContain('window.clearTimeout(timer);');
     expect(lock).toContain('locked = true;');
     expect(lock).toMatch(/boxes\[b\]\.disabled = true;/);
-    expect(card).toContain('box.disabled = locked;');
+    expect(card).toContain("area.contentEditable = locked ? 'false' : 'true';");
+    expect(lock).toContain("editors[e].contentEditable = 'false';");
     expect(card).toMatch(/window\.otRemedial = \{[\s\S]*?lock: lock,/);
   });
 });

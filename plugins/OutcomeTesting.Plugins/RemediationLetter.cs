@@ -35,6 +35,7 @@ namespace OutcomeTesting.Plugins
                 case OutcomeRules.OutcomePassWithIssues:
                     return NotificationTemplates.RemediationPassWithIssues;
                 case OutcomeRules.OutcomeInsufficient:
+                    return NotificationTemplates.RemediationInsufficient;
                 case OutcomeRules.OutcomePotentialHarm:
                     return NotificationTemplates.RemediationHarm;
                 default:
@@ -42,10 +43,7 @@ namespace OutcomeTesting.Plugins
             }
         }
 
-        /// <summary>
-        /// How the letter names the grading. Insufficient evidence and Potential harm share
-        /// a phrase, as they share a letter.
-        /// </summary>
+        /// <summary>How the letter names the grading.</summary>
         public static string GradingPhrase(int? outcome)
         {
             if (!outcome.HasValue)
@@ -58,8 +56,9 @@ namespace OutcomeTesting.Plugins
                 case OutcomeRules.OutcomePassWithIssues:
                     return "a pass with issues grading";
                 case OutcomeRules.OutcomeInsufficient:
+                    return "an insufficient evidence grading";
                 case OutcomeRules.OutcomePotentialHarm:
-                    return "an insufficient evidence/ potential harm grading";
+                    return "a potential harm grading";
                 default:
                     return string.Empty;
             }

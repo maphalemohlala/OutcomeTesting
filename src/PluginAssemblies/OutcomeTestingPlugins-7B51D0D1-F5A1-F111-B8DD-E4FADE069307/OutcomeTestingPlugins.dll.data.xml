@@ -59,9 +59,6 @@
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.CompleteRequestPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="329656ff-c0a6-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.CompleteRequestPlugin">
       <FriendlyName>OutcomeTesting.Plugins.CompleteRequestPlugin</FriendlyName>
     </PluginType>
-    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.CreateExportBatchPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="f499b5af-20a2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.CreateExportBatchPlugin">
-      <FriendlyName>OutcomeTesting.Plugins.CreateExportBatchPlugin</FriendlyName>
-    </PluginType>
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.CreateRolePlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="b8cb408b-35a2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.CreateRolePlugin">
       <FriendlyName>OutcomeTesting.Plugins.CreateRolePlugin</FriendlyName>
     </PluginType>

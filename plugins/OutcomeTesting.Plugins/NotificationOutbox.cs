@@ -602,8 +602,20 @@ namespace OutcomeTesting.Plugins
                 var reviewRef = NotificationRecipients.ReviewOf(targetTable, targetId);
                 var tokens = NotificationTemplateRows.CaseTokens(service, caseRef);
 
+                // Read only when a letter is limited to some gradings.
+                int? grade = null;
+                if (templates.Exists(t => t.Gradings.Count > 0))
+                {
+                    grade = NotificationTemplateRows.AqsGrading(service, caseRef);
+                }
+
                 foreach (var template in templates)
                 {
+                    if (!NotificationTemplateRows.SendsFor(template.Gradings, grade))
+                    {
+                        continue;
+                    }
+
                     var customSubject = NotificationTemplates.Substitute(
                         template.Subject, tokens, escape: false);
                     // The marker has no value, so Substitute would print it (see Render).

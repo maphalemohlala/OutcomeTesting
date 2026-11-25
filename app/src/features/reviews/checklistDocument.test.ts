@@ -62,6 +62,12 @@ import {
  * 9. E2's outcome lens row has no tick box. The document draws one, and Q-E2-LENS was built
  *    to match it; it is now retired in the seed (effective-to 2026-10-05), so the lens text
  *    stays and the box goes. Asserted below as the document's one tick, removed by name.
+ *
+ * And one from the project owner's direction of 2026-11-24:
+ *
+ * 10. The Consumer Duty outcomes are answered Pass, Pass with issues, Insufficient evidence or
+ *     Potential harm, where the document heads them Yes / No / Insufficient evidence. The
+ *     seed's Q-CD versions carry the new scale (120910014); no N/A.
  */
 
 // ---------------------------------------------------------------------------------------
@@ -260,7 +266,7 @@ function form(ownerRole: string) {
   // filtered on is also the discipline of the review that would be answering it. The
   // inline path reads that flag to decide whether 120910302 is the tax check's "Pass with
   // issues" or the scale's "Insufficient evidence".
-  return formBlocks(sections, failPoints(seedFailReasons, new Set()), ownerRole === TAX);
+  return formBlocks(sections, failPoints(seedFailReasons, new Set(), false, ownerRole === TAX), ownerRole === TAX);
 }
 
 const AQS = '120910101';
@@ -307,13 +313,16 @@ describe('the checklist the app draws matches the reference document', () => {
     );
 
     // Differences 7 and 8: Suitability and CRP take an N/A column, and from 2026-11-06 read
-    // Pass, Pass with issues, Potential harm, Insufficient evidence (client decisions).
+    // Pass, Pass with issues, Insufficient evidence, Potential harm, N/A (client, 2026-11-24).
     const suitability = new Set(['Suitability test point', 'Centralised Retirement Proposition test point']);
+    // Difference 10: the Consumer Duty outcomes read Pass to Potential harm, no N/A (owner, 2026-11-24).
     expect(grids).toEqual(
       documentGridHeadings.map((heading) =>
         suitability.has(heading[0])
-          ? [heading[0], 'Pass', 'Pass with issues', 'Potential harm', 'Insufficient evidence', 'N/A']
-          : heading,
+          ? [heading[0], 'Pass', 'Pass with issues', 'Insufficient evidence', 'Potential harm', 'N/A']
+          : heading[0] === 'Outcome'
+            ? [heading[0], 'Pass', 'Pass with issues', 'Insufficient evidence', 'Potential harm']
+            : heading,
       ),
     );
   });
@@ -458,9 +467,10 @@ describe('the checklist the app draws matches the reference document', () => {
     expect(block.title).toBe(documentHeadings[2]);
     expect(block.points.map((point) => point.label)).toEqual(documentFailReasons);
 
-    // Both disciplines pick from the one undivided list (AD-100).
+    // The Tax form lists the Tax file quality points alone (client decision, 2026-11-06,
+    // replacing AD-100's one undivided list). Those are administered, not in the V8 seed.
     const tax = form(TAX).find((candidate) => candidate.kind === 'failpoints');
-    if (tax?.kind !== 'failpoints') throw new Error('No fail points on the Tax form');
-    expect(tax.points.map((point) => point.label)).toEqual(documentFailReasons);
+    const taxLabels = tax?.kind === 'failpoints' ? tax.points.map((point) => point.label) : [];
+    expect(taxLabels.filter((label) => documentFailReasons.includes(label))).toEqual([]);
   });
 });

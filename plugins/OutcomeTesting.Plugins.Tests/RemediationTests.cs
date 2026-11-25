@@ -454,6 +454,11 @@ namespace OutcomeTesting.Plugins.Tests
         [InlineData(ResponseRules.TypeYesNoInsufficient, ResponseRules.ChoiceNo, true)]
         [InlineData(ResponseRules.TypeYesNoInsufficient, ResponseRules.ChoiceInsufficient, true)]
         [InlineData(ResponseRules.TypeYesNoInsufficient, ResponseRules.ChoiceYes, false)]
+        // The Consumer Duty outcomes from 2026-11-24: anything below Pass is owed an action.
+        [InlineData(ResponseRules.TypeOutcomeScale, ResponseRules.ChoicePassWithIssues, true)]
+        [InlineData(ResponseRules.TypeOutcomeScale, ResponseRules.ChoiceInsufficient, true)]
+        [InlineData(ResponseRules.TypeOutcomeScale, ResponseRules.ChoicePotentialHarm, true)]
+        [InlineData(ResponseRules.TypeOutcomeScale, ResponseRules.ChoicePass, false)]
         [InlineData(ResponseRules.TypeGrade, ResponseRules.ChoicePotentialHarm, false)]
         public void Counts_only_a_non_pass_on_a_remediable_scale(int responseType, int choice, bool expected)
         {
@@ -834,10 +839,10 @@ namespace OutcomeTesting.Plugins.Tests
                 new List<string> { "First issue" },
                 null,
                 Monday,
-                new List<string> { new string('x', RemedialActions.MaxLength + 10) });
+                new List<string> { new string('x', RemedialActions.StoredMaxLength + 10) });
 
             Assert.Equal(
-                RemedialActions.MaxLength,
+                RemedialActions.StoredMaxLength,
                 Assert.Single(service.Creates).GetAttributeValue<string>(RemedialActions.ActionAttr).Length);
         }
 

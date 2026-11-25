@@ -1,4 +1,26 @@
 ﻿{% extends 'OT Layout' %}
+{% comment %}
+  The header blocks (2026-11-24 redesign): Home > Tax reviews (or AQS reviews) > the case
+  reference, the title "Tax review <reference>", and top right the way back to the queue, the
+  full case record and, on a submitted review, Save as PDF. They render before the content
+  block, so each reads the review for itself, behind the same shape check the content block
+  applies (F48, below) and by the same two routes: a well-formed id, or a well-formed case
+  with the signed-in reader's open review on it (the claim). A type that is not one of the two
+  review types reads nothing. Each read is a loop, never entities[0]; a review the reader
+  cannot see leaves the page's own title and no actions.
+{% endcomment %}
+{% block breadcrumb %}
+{% assign ot_bk_id = request.params['id'] | default: '' %}{% assign ot_bk_hex = ot_bk_id | downcase | replace: '-','' | replace: '{','' | replace: '}','' %}{% assign ot_bk_len = ot_bk_hex | size %}{% assign ot_bk_rest = ot_bk_hex | replace: '0','' | replace: '1','' | replace: '2','' | replace: '3','' | replace: '4','' | replace: '5','' | replace: '6','' | replace: '7','' | replace: '8','' | replace: '9','' | replace: 'a','' | replace: 'b','' | replace: 'c','' | replace: 'd','' | replace: 'e','' | replace: 'f','' %}{% assign ot_bk_case = request.params['case'] | default: '' %}{% assign ot_bk_chex = ot_bk_case | downcase | replace: '-','' | replace: '{','' | replace: '}','' %}{% assign ot_bk_clen = ot_bk_chex | size %}{% assign ot_bk_crest = ot_bk_chex | replace: '0','' | replace: '1','' | replace: '2','' | replace: '3','' | replace: '4','' | replace: '5','' | replace: '6','' | replace: '7','' | replace: '8','' | replace: '9','' | replace: 'a','' | replace: 'b','' | replace: 'c','' | replace: 'd','' | replace: 'e','' | replace: 'f','' %}{% assign ot_bk_type = request.params['type'] | default: '' %}{% assign ot_bk_by = '' %}{% if ot_bk_len == 32 and ot_bk_rest == '' %}{% assign ot_bk_by = 'id' %}{% elsif user and ot_bk_clen == 32 and ot_bk_crest == '' %}{% if ot_bk_type == '' or ot_bk_type == '120910200' or ot_bk_type == '120910201' %}{% assign ot_bk_by = 'case' %}{% endif %}{% endif %}{% assign ot_hd_found = false %}{% assign ot_hd_tax = false %}{% assign ot_hd_label = '' %}{% assign ot_hd_ref = '' %}{% assign ot_hd_case = '' %}{% assign ot_hd_sub = false %}{% if ot_bk_by != '' %}{% fetchxml ot_hd_rv %}<fetch top="1"><entity name="al_reviewinstance"><attribute name="al_reviewtype" /><attribute name="al_submittedon" /><filter type="and">{% if ot_bk_by == 'id' %}<condition attribute="al_reviewinstanceid" operator="eq" value="{{ ot_bk_id | xml_escape }}" />{% else %}<condition attribute="al_outcomecaseid" operator="eq" value="{{ ot_bk_case | xml_escape }}" /><condition attribute="al_assignedcontactid" operator="eq" value="{{ user.id }}" /><condition attribute="al_submittedon" operator="null" />{% if ot_bk_type != '' %}<condition attribute="al_reviewtype" operator="eq" value="{{ ot_bk_type }}" />{% endif %}{% endif %}</filter><order attribute="createdon" descending="true" /><link-entity name="al_outcomecase" from="al_outcomecaseid" to="al_outcomecaseid" link-type="outer" alias="case"><attribute name="al_outcomecaseid" /><attribute name="al_casereference" /></link-entity></entity></fetch>{% endfetchxml %}{% for r in ot_hd_rv.results.entities %}{% assign ot_hd_found = true %}{% if r.al_reviewtype.value == 120910200 %}{% assign ot_hd_tax = true %}{% endif %}{% assign ot_hd_label = r.al_reviewtype.label | default: '' %}{% assign ot_hd_ref = r['case.al_casereference'] | default: '' %}{% assign ot_hd_case = r['case.al_outcomecaseid'] | default: '' %}{% if r.al_submittedon %}{% assign ot_hd_sub = true %}{% endif %}{% endfor %}{% endif %}
+{% if ot_hd_found %}<a href="{% if ot_hd_tax %}/tax-reviews{% else %}/aqs-reviews{% endif %}">{% if ot_hd_tax %}Tax reviews{% else %}AQS reviews{% endif %}</a>
+<span class="ot-breadcrumb__sep" aria-hidden="true"></span>
+{% endif %}<span aria-current="page">{% if ot_hd_ref != '' %}{{ ot_hd_ref | escape }}{% else %}{{ page.title | escape }}{% endif %}</span>
+{% endblock %}
+{% block title %}{% assign ot_bk_id = request.params['id'] | default: '' %}{% assign ot_bk_hex = ot_bk_id | downcase | replace: '-','' | replace: '{','' | replace: '}','' %}{% assign ot_bk_len = ot_bk_hex | size %}{% assign ot_bk_rest = ot_bk_hex | replace: '0','' | replace: '1','' | replace: '2','' | replace: '3','' | replace: '4','' | replace: '5','' | replace: '6','' | replace: '7','' | replace: '8','' | replace: '9','' | replace: 'a','' | replace: 'b','' | replace: 'c','' | replace: 'd','' | replace: 'e','' | replace: 'f','' %}{% assign ot_bk_case = request.params['case'] | default: '' %}{% assign ot_bk_chex = ot_bk_case | downcase | replace: '-','' | replace: '{','' | replace: '}','' %}{% assign ot_bk_clen = ot_bk_chex | size %}{% assign ot_bk_crest = ot_bk_chex | replace: '0','' | replace: '1','' | replace: '2','' | replace: '3','' | replace: '4','' | replace: '5','' | replace: '6','' | replace: '7','' | replace: '8','' | replace: '9','' | replace: 'a','' | replace: 'b','' | replace: 'c','' | replace: 'd','' | replace: 'e','' | replace: 'f','' %}{% assign ot_bk_type = request.params['type'] | default: '' %}{% assign ot_bk_by = '' %}{% if ot_bk_len == 32 and ot_bk_rest == '' %}{% assign ot_bk_by = 'id' %}{% elsif user and ot_bk_clen == 32 and ot_bk_crest == '' %}{% if ot_bk_type == '' or ot_bk_type == '120910200' or ot_bk_type == '120910201' %}{% assign ot_bk_by = 'case' %}{% endif %}{% endif %}{% assign ot_hd_found = false %}{% assign ot_hd_tax = false %}{% assign ot_hd_label = '' %}{% assign ot_hd_ref = '' %}{% assign ot_hd_case = '' %}{% assign ot_hd_sub = false %}{% if ot_bk_by != '' %}{% fetchxml ot_hd_rv %}<fetch top="1"><entity name="al_reviewinstance"><attribute name="al_reviewtype" /><attribute name="al_submittedon" /><filter type="and">{% if ot_bk_by == 'id' %}<condition attribute="al_reviewinstanceid" operator="eq" value="{{ ot_bk_id | xml_escape }}" />{% else %}<condition attribute="al_outcomecaseid" operator="eq" value="{{ ot_bk_case | xml_escape }}" /><condition attribute="al_assignedcontactid" operator="eq" value="{{ user.id }}" /><condition attribute="al_submittedon" operator="null" />{% if ot_bk_type != '' %}<condition attribute="al_reviewtype" operator="eq" value="{{ ot_bk_type }}" />{% endif %}{% endif %}</filter><order attribute="createdon" descending="true" /><link-entity name="al_outcomecase" from="al_outcomecaseid" to="al_outcomecaseid" link-type="outer" alias="case"><attribute name="al_outcomecaseid" /><attribute name="al_casereference" /></link-entity></entity></fetch>{% endfetchxml %}{% for r in ot_hd_rv.results.entities %}{% assign ot_hd_found = true %}{% if r.al_reviewtype.value == 120910200 %}{% assign ot_hd_tax = true %}{% endif %}{% assign ot_hd_label = r.al_reviewtype.label | default: '' %}{% assign ot_hd_ref = r['case.al_casereference'] | default: '' %}{% assign ot_hd_case = r['case.al_outcomecaseid'] | default: '' %}{% if r.al_submittedon %}{% assign ot_hd_sub = true %}{% endif %}{% endfor %}{% endif %}{% if ot_hd_found %}{% if ot_hd_label != '' %}{{ ot_hd_label | escape }}{% elsif ot_hd_tax %}Tax{% else %}AQS{% endif %} review{% if ot_hd_ref != '' %} {{ ot_hd_ref | escape }}{% endif %}{% else %}{{ page.title | escape }}{% endif %}{% endblock %}
+{% comment %}
+  Back to your queue is also at the foot of the form, where a checker finishes. Save as PDF
+  only on a submitted review (the reason is given where the content block wires it up).
+{% endcomment %}
+{% block actions %}{% assign ot_bk_id = request.params['id'] | default: '' %}{% assign ot_bk_hex = ot_bk_id | downcase | replace: '-','' | replace: '{','' | replace: '}','' %}{% assign ot_bk_len = ot_bk_hex | size %}{% assign ot_bk_rest = ot_bk_hex | replace: '0','' | replace: '1','' | replace: '2','' | replace: '3','' | replace: '4','' | replace: '5','' | replace: '6','' | replace: '7','' | replace: '8','' | replace: '9','' | replace: 'a','' | replace: 'b','' | replace: 'c','' | replace: 'd','' | replace: 'e','' | replace: 'f','' %}{% assign ot_bk_case = request.params['case'] | default: '' %}{% assign ot_bk_chex = ot_bk_case | downcase | replace: '-','' | replace: '{','' | replace: '}','' %}{% assign ot_bk_clen = ot_bk_chex | size %}{% assign ot_bk_crest = ot_bk_chex | replace: '0','' | replace: '1','' | replace: '2','' | replace: '3','' | replace: '4','' | replace: '5','' | replace: '6','' | replace: '7','' | replace: '8','' | replace: '9','' | replace: 'a','' | replace: 'b','' | replace: 'c','' | replace: 'd','' | replace: 'e','' | replace: 'f','' %}{% assign ot_bk_type = request.params['type'] | default: '' %}{% assign ot_bk_by = '' %}{% if ot_bk_len == 32 and ot_bk_rest == '' %}{% assign ot_bk_by = 'id' %}{% elsif user and ot_bk_clen == 32 and ot_bk_crest == '' %}{% if ot_bk_type == '' or ot_bk_type == '120910200' or ot_bk_type == '120910201' %}{% assign ot_bk_by = 'case' %}{% endif %}{% endif %}{% assign ot_hd_found = false %}{% assign ot_hd_tax = false %}{% assign ot_hd_label = '' %}{% assign ot_hd_ref = '' %}{% assign ot_hd_case = '' %}{% assign ot_hd_sub = false %}{% if ot_bk_by != '' %}{% fetchxml ot_hd_rv %}<fetch top="1"><entity name="al_reviewinstance"><attribute name="al_reviewtype" /><attribute name="al_submittedon" /><filter type="and">{% if ot_bk_by == 'id' %}<condition attribute="al_reviewinstanceid" operator="eq" value="{{ ot_bk_id | xml_escape }}" />{% else %}<condition attribute="al_outcomecaseid" operator="eq" value="{{ ot_bk_case | xml_escape }}" /><condition attribute="al_assignedcontactid" operator="eq" value="{{ user.id }}" /><condition attribute="al_submittedon" operator="null" />{% if ot_bk_type != '' %}<condition attribute="al_reviewtype" operator="eq" value="{{ ot_bk_type }}" />{% endif %}{% endif %}</filter><order attribute="createdon" descending="true" /><link-entity name="al_outcomecase" from="al_outcomecaseid" to="al_outcomecaseid" link-type="outer" alias="case"><attribute name="al_outcomecaseid" /><attribute name="al_casereference" /></link-entity></entity></fetch>{% endfetchxml %}{% for r in ot_hd_rv.results.entities %}{% assign ot_hd_found = true %}{% if r.al_reviewtype.value == 120910200 %}{% assign ot_hd_tax = true %}{% endif %}{% assign ot_hd_label = r.al_reviewtype.label | default: '' %}{% assign ot_hd_ref = r['case.al_casereference'] | default: '' %}{% assign ot_hd_case = r['case.al_outcomecaseid'] | default: '' %}{% if r.al_submittedon %}{% assign ot_hd_sub = true %}{% endif %}{% endfor %}{% endif %}{% if ot_hd_found %}<a class="ot-btn" href="{% if ot_hd_tax %}/tax-reviews{% else %}/aqs-reviews{% endif %}">Back to your queue</a>{% if ot_hd_case != '' %}<a class="ot-btn ot-rem-open" href="/case-details?id={{ ot_hd_case }}"><span class="ot-rem-open__icon" aria-hidden="true"></span>Open the full case record</a>{% endif %}{% if ot_hd_sub %}<button type="button" class="ot-btn ot-print-action" data-ot-print><span class="ot-case-print__icon" aria-hidden="true"></span>Save as PDF</button>{% endif %}{% endif %}{% endblock %}
 {% block content %}
 {% assign ot_product = settings['OT/ProductName'] | default: 'Outcome Testing' %}
 {% comment %}
@@ -140,6 +162,7 @@
         <attribute name="al_outcomecaseid" />
         <attribute name="al_casereference" />
         <attribute name="al_ioreference" />
+        <attribute name="al_servicecaseref" />
         <attribute name="al_clientname" />
         <attribute name="al_advisername" />
         <attribute name="al_adviseremail" />
@@ -298,62 +321,86 @@
     {% endif %}
     {% if editable %}{% assign header_locked = false %}{% else %}{% assign header_locked = true %}{% endif %}
 
-    <section class="ot-card" aria-labelledby="ot-review-summary">
-      <h2 class="ot-card__title" id="ot-review-summary">
-        {{ rv.al_reviewtype.label | escape }} review
-        <span data-ot-review-status>{% include 'OT Status Badge' status: rv.al_reviewstatus.label %}</span>
-      </h2>
-      <dl class="ot-dl">
+    {% comment %}
+      The review at a glance (2026-11-24 redesign), drawn as the case page's summary card so the
+      review reads as one of the case pages: the case and this review's status, the people and
+      the route, then the review's own facts. The case reference is no longer a link here; the
+      full case record is the button top right (the actions block above), as on Remediation.
+      Unlike the case page's card it prints: the status, sequence and dates are not in the
+      document below.
+
+      data-ot-review-status and data-ot-submitted-on are what the submit script rewrites when
+      the review is submitted without a reload (markSubmitted, below).
+    {% endcomment %}
+    <div class="ot-page--full"></div>
+    {% assign cid = rv['case.al_outcomecaseid'] %}
+    {% assign sum_route = rv['case.al_reviewrouteid'].name | default: '' %}
+    {% capture sum_tax %}{{ rv['case.al_taxcheckername'] }}{% endcapture %}
+    {% capture sum_aqs %}{{ rv['case.al_aqscheckername'] }}{% endcapture %}
+    {% comment %}
+      A discipline the case's route does not ask for is "No check of this type", as on the case
+      page; a case with no route yet owes both. This review's own discipline is always owed.
+    {% endcomment %}
+    {% assign sum_owes_tax = true %}
+    {% assign sum_owes_aqs = true %}
+    {% if sum_route != '' %}
+      {% unless is_tax_review or rv['route.al_requirestaxreview'] == true %}{% assign sum_owes_tax = false %}{% endunless %}
+      {% unless is_tax_review == false or rv['route.al_requiresaqsreview'] == true %}{% assign sum_owes_aqs = false %}{% endunless %}
+    {% endif %}
+    {% if sum_tax == '' %}{% if sum_owes_tax %}{% assign sum_tax = 'Not yet allocated' %}{% else %}{% assign sum_tax = 'No check of this type' %}{% endif %}{% endif %}
+    {% if sum_aqs == '' %}{% if sum_owes_aqs %}{% assign sum_aqs = 'Not yet allocated' %}{% else %}{% assign sum_aqs = 'No check of this type' %}{% endif %}{% endif %}
+    <section class="ot-card ot-rem-summary ot-review-summary" aria-labelledby="ot-review-summary">
+      <h2 class="ot-visually-hidden" id="ot-review-summary">{{ rv.al_reviewtype.label | escape }} review</h2>
+      <dl class="ot-rem-summary__list">
         <div>
           <dt>Case</dt>
-          <dd>
-            {% assign cid = rv['case.al_outcomecaseid'] %}
-            {% if cid %}
-              <a href="/case-details?id={{ cid }}">{{ rv['case.al_casereference'] | default: 'Untitled case' | escape }}</a>
-            {% else %}
-              {{ rv['case.al_casereference'] | default: '—' | escape }}
-            {% endif %}
-          </dd>
+          <dd><span class="ot-rem-summary__ref">{% if cid %}{{ rv['case.al_casereference'] | default: 'Untitled case' | escape }}{% else %}{{ rv['case.al_casereference'] | default: '—' | escape }}{% endif %}</span>
+            <span class="ot-visually-hidden">Review status:</span>
+            <span data-ot-review-status>{% include 'OT Status Badge' status: rv.al_reviewstatus.label %}</span></dd>
         </div>
         <div><dt>Client</dt><dd>{{ rv['case.al_clientname'] | default: '—' | escape }}</dd></div>
         <div><dt>Adviser</dt><dd>{{ rv['case.al_advisername'] | default: '—' | escape }}</dd></div>
+        <div><dt>Route</dt><dd>{% case sum_route %}{% when 'Tax then AQS' %}<span class="ot-route"><span class="ot-route__step">Tax</span><span class="ot-route__arrow" aria-hidden="true"></span><span class="ot-visually-hidden"> then </span><span class="ot-route__step">AQS</span></span>{% when 'Tax only' %}<span class="ot-route"><span class="ot-route__step">Tax</span><span class="ot-visually-hidden"> only</span></span>{% when 'AQS only' %}<span class="ot-route"><span class="ot-route__step">AQS</span><span class="ot-visually-hidden"> only</span></span>{% else %}{{ sum_route | default: 'Not routed' | escape }}{% endcase %}</dd></div>
+        <div class="ot-case-summary__checkers"><dt>Checkers</dt><dd>
+          <ul class="ot-people">
+            <li><span class="ot-people__role">Tax</span>{% if sum_tax == 'No check of this type' %}<span class="ot-checker ot-checker--na">No check of this type</span>{% elsif sum_tax == 'Not yet allocated' %}<span class="ot-checker ot-unallocated">Not yet allocated</span>{% else %}<span class="ot-avatar" data-ot-initials="{{ sum_tax | escape }}" aria-hidden="true"></span>{{ sum_tax | escape }}{% endif %}</li>
+            <li><span class="ot-people__role">AQS</span>{% if sum_aqs == 'No check of this type' %}<span class="ot-checker ot-checker--na">No check of this type</span>{% elsif sum_aqs == 'Not yet allocated' %}<span class="ot-checker ot-unallocated">Not yet allocated</span>{% else %}<span class="ot-avatar" data-ot-initials="{{ sum_aqs | escape }}" aria-hidden="true"></span>{{ sum_aqs | escape }}{% endif %}</li>
+          </ul>
+        </dd></div>
         <div><dt>Checklist version</dt><dd>{{ rv.al_checklistversionid.name | default: '—' | escape }}</dd></div>
         <div><dt>Sequence</dt><dd>{{ rv.al_sequence | default: '—' }}</dd></div>
         <div><dt>Started</dt><dd>{{ rv.al_startedon | date: 'dd MMM yyyy' | default: '—' }}</dd></div>
         <div><dt>Submitted</dt><dd data-ot-submitted-on>{{ rv.al_submittedon | date: 'dd MMM yyyy' | default: '—' }}</dd></div>
       </dl>
-
-      {% comment %}
-        Keeping a copy of the checklist. The browser's print dialogue is the export - every
-        platform's offers "Save as PDF" - and the print rules in outcome-testing.css strip
-        the chrome so what lands in the file is this page's questionnaire and answers.
-
-        No PDF library, for two reasons: Power Pages serves scripts only from an allowlisted
-        set of CDNs, and a generated document would be a second description of this layout to
-        keep in step with the one people read. The button itself is .ot-btn, which the print
-        rules hide, so it never appears in the output.
-
-        Offered on a submitted review only. What this exports is a record of the check, and
-        before submission there is no check to record - the answers are still being edited,
-        so a file saved from here would be a draft that reads exactly like a final one and
-        carries no submission date to say otherwise. The button appears the moment the
-        review is submitted and the page turns read-only.
-      {% endcomment %}
-      {% if rv.al_submittedon %}
-        <p class="ot-print-action">
-          <button type="button" class="ot-btn" data-ot-print>Save as PDF</button>
-        </p>
-
-        <script>
-          (function () {
-            'use strict';
-            var button = document.querySelector('[data-ot-print]');
-            if (!button) { return; }
-            button.addEventListener('click', function () { window.print(); });
-          })();
-        </script>
-      {% endif %}
     </section>
+
+    {% comment %}
+      Keeping a copy of the checklist. The browser's print dialogue is the export - every
+      platform's offers "Save as PDF" - and the print rules in outcome-testing.css strip
+      the chrome so what lands in the file is this page's questionnaire and answers.
+
+      No PDF library, for two reasons: Power Pages serves scripts only from an allowlisted
+      set of CDNs, and a generated document would be a second description of this layout to
+      keep in step with the one people read. The button itself is .ot-print-action, which
+      the print rules hide, so it never appears in the output. It is drawn top right of the
+      page, in the actions block above; this wires it up.
+
+      Offered on a submitted review only. What this exports is a record of the check, and
+      before submission there is no check to record - the answers are still being edited,
+      so a file saved from here would be a draft that reads exactly like a final one and
+      carries no submission date to say otherwise. The button appears the moment the
+      review is submitted and the page turns read-only.
+    {% endcomment %}
+    {% if rv.al_submittedon %}
+      <script>
+        (function () {
+          'use strict';
+          var button = document.querySelector('[data-ot-print]');
+          if (!button) { return; }
+          button.addEventListener('click', function () { window.print(); });
+        })();
+      </script>
+    {% endif %}
 
     {% if rv.al_submittedon %}
       <div class="ot-notice" role="status">
@@ -749,6 +796,10 @@
             <td class="lbl">IO reference</td><td class="val">{{ rv['case.al_ioreference'] | escape }}</td>
           </tr>
           <tr>
+            <td class="lbl">Case reference</td><td class="val">{{ rv['case.al_casereference'] | escape }}</td>
+            <td class="lbl">Service case reference</td><td class="val">{{ rv['case.al_servicecaseref'] | default: '&mdash;' | escape }}</td>
+          </tr>
+          <tr>
             <td class="lbl">Pre or post check</td><td class="val"><select class="ot-hdr-input" data-ot-hdr="al_preorpostcheckid" aria-label="Pre or post check"><option value="">&mdash;</option>{% assign prepost_offered = false %}{% assign prepost_any = false %}{% for o in pre_post_checks.results.entities %}{% assign prepost_any = true %}<option value="{{ o.al_listoptionid }}" {% if held_preorpost and o.al_listoptionid == held_preorpost %}selected{% assign prepost_offered = true %}{% endif %}>{{ o.al_name | escape }}</option>{% endfor %}{% unless prepost_offered %}{% if held_preorpost %}<option value="{{ held_preorpost }}" selected>{{ h_preorpostcheckid.name | escape }}{% if prepost_any %} (retired){% endif %}</option>{% endif %}{% endunless %}</select></td>
             <td class="lbl">Vulnerable client?</td><td class="val"><select class="ot-hdr-input" data-ot-hdr="al_vulnerableclientid" aria-label="Vulnerable client"><option value="">&mdash;</option>{% assign vulnerable_offered = false %}{% assign vulnerable_any = false %}{% for o in vulnerable_clients.results.entities %}{% assign vulnerable_any = true %}<option value="{{ o.al_listoptionid }}" {% if held_vulnerable and o.al_listoptionid == held_vulnerable %}selected{% assign vulnerable_offered = true %}{% endif %}>{{ o.al_name | escape }}</option>{% endfor %}{% unless vulnerable_offered %}{% if held_vulnerable %}<option value="{{ held_vulnerable }}" selected>{{ h_vulnerableclientid.name | escape }}{% if vulnerable_any %} (retired){% endif %}</option>{% endif %}{% endunless %}</select></td>
           </tr>
@@ -767,6 +818,7 @@
           <tr><td class="lbl">Tax Checker</td><td class="val">{{ rv['case.al_taxcheckername'] | default: 'Not yet allocated' | escape }}</td><td class="lbl">AQS Checker</td><td class="val">{{ rv['case.al_aqscheckername'] | default: 'Not yet allocated' | escape }}</td></tr>
           <tr><td class="lbl">Check date</td><td class="val">{{ rv['case.al_checkdate'] | date: 'dd MMM yyyy' }}</td><td class="lbl">Business Unit</td><td class="val">{{ rv['case.al_businessunit'].label | escape }}</td></tr>
           <tr><td class="lbl">Client name / initials</td><td class="val">{{ rv['case.al_clientname'] | escape }}</td><td class="lbl">IO reference</td><td class="val">{{ rv['case.al_ioreference'] | escape }}</td></tr>
+          <tr><td class="lbl">Case reference</td><td class="val">{{ rv['case.al_casereference'] | escape }}</td><td class="lbl">Service case reference</td><td class="val">{{ rv['case.al_servicecaseref'] | default: '&mdash;' | escape }}</td></tr>
           <tr><td class="lbl">Pre or post check</td><td class="val">{% if h_preorpostcheckid.name %}{{ h_preorpostcheckid.name | escape }}{% else %}{{ h_prepost.label | escape }}{% endif %}</td><td class="lbl">Vulnerable client?</td><td class="val">{% if h_vulnerableclientid.name %}{{ h_vulnerableclientid.name | escape }}{% else %}{{ h_vulnerable.label | escape }}{% endif %}</td></tr>
           {% endif %}
           {% comment %}
@@ -1152,7 +1204,7 @@
           {% if q['s.al_sectioncode'] == sec.al_sectioncode %}
             {% assign qrt = q.al_responsetype.value %}
             {% if qrt == 120910012 %}{% assign sec_na = true %}{% assign qrt = 120910006 %}{% endif %}
-            {% if qrt == 120910006 or qrt == 120910008 or qrt == 120910009 %}
+            {% if qrt == 120910006 or qrt == 120910008 or qrt == 120910009 or qrt == 120910014 %}
               {% if sec_rt == 0 %}
                 {% assign sec_rt = qrt %}
               {% elsif sec_rt != qrt %}
@@ -1259,7 +1311,8 @@
               so an environment still holding the old text does not print it.
             {% endcomment %}
             {% assign blk_intro = '' %}
-            {% assign layout = 'grid' %}{% assign grid_rt = 120910009 %}{% assign grid_col = 'Outcome' %}
+            {% comment %}Pass to Potential harm since 2026-11-24; a review answered on Yes / No is re-headed by its rows below.{% endcomment %}
+            {% assign layout = 'grid' %}{% assign grid_rt = 120910014 %}{% assign grid_col = 'Outcome' %}
           {% elsif scode == 'S-GRADE' %}
             {% assign known = true %}
             {% assign blk_title = 'Checker judgement and grading' %}
@@ -1361,8 +1414,8 @@
               {% assign gvalues = '120910300,120910301,120910302,120910307' | split: ',' %}
               {% assign glabels = 'Pass,Fail,Pass with issues,N/A' | split: ',' %}
             {% else %}
-              {% assign gvalues = '120910300,120910303,120910301,120910302,120910307' | split: ',' %}
-              {% assign glabels = 'Pass,Pass with issues,Potential harm,Insufficient evidence,N/A' | split: ',' %}
+              {% assign gvalues = '120910300,120910303,120910302,120910301,120910307' | split: ',' %}
+              {% assign glabels = 'Pass,Pass with issues,Insufficient evidence,Potential harm,N/A' | split: ',' %}
             {% endif %}
           {% elsif grid_rt == 120910008 %}
             {% assign gvalues = '120910305,120910306,120910307' | split: ',' %}
@@ -1370,6 +1423,10 @@
           {% elsif grid_rt == 120910009 %}
             {% assign gvalues = '120910305,120910306,120910302' | split: ',' %}
             {% assign glabels = 'Yes,No,Insufficient evidence' | split: ',' %}
+          {% elsif grid_rt == 120910014 %}
+            {% comment %}The Consumer Duty outcomes (2026-11-24): exactly these four, Potential harm stored as itself.{% endcomment %}
+            {% assign gvalues = '120910300,120910303,120910302,120910304' | split: ',' %}
+            {% assign glabels = 'Pass,Pass with issues,Insufficient evidence,Potential harm' | split: ',' %}
           {% endif %}
 
           {% comment %}
@@ -1465,12 +1522,15 @@
               flag of whichever section opened it, which would mislabel the rest. Those
               get the marker on their own subsection row further down instead.
             {% endcomment %}
-            <h2>{{ blk_title | escape }}{% unless blk_subsections %}{% if soptional %} <span class="ot-optional">Optional</span>{% endif %}{% endunless %}</h2>
+            {% comment %}On a Tax review of a case that still owes an AQS check, File Quality Outcome is AQS's: the block is drawn hidden, so a submitted review does not show an empty heading either, and the script shows it again on Tax only.{% endcomment %}
+            {% assign blk_hidden = '' %}
+            {% if blk == 'S-FQ' and tax_fq_excused %}{% assign blk_hidden = ' hidden' %}{% endif %}
+            <h2{{ blk_hidden }}>{{ blk_title | escape }}{% unless blk_subsections %}{% if soptional %} <span class="ot-optional">Optional</span>{% endif %}{% endunless %}</h2>
             {% if blk_intro != blank %}
               <p class="intro">{{ blk_intro | escape }}</p>
             {% endif %}
             {% if layout == 'grid' %}
-            <table class="grid">
+            <table class="grid"{{ blk_hidden }}>
               <thead>
                 <tr>
                   <th class="label">{{ grid_col }}</th>
@@ -1479,7 +1539,7 @@
               </thead>
               <tbody>
             {% else %}
-            <table class="meta">
+            <table class="meta"{{ blk_hidden }}>
               <tbody>
             {% endif %}
           {% endif %}
@@ -1655,7 +1715,7 @@
               <td colspan="{{ ncols | minus: 1 }}">
               {% if column == 'text' %}
                 {% if rt == 120910001 %}
-                  <textarea data-ot-input{% unless editable %} disabled{% endunless %} aria-label="{{ qv.al_questiontext | escape }}">{{ existing.al_answertext | escape }}</textarea>
+                  <textarea data-ot-input maxlength="4000"{% unless editable %} disabled{% endunless %} aria-label="{{ qv.al_questiontext | escape }}">{{ existing.al_answertext | escape }}</textarea>
                 {% else %}
                   <input type="text" data-ot-input{% unless editable %} disabled{% endunless %} value="{{ existing.al_answertext | escape }}" aria-label="{{ qv.al_questiontext | escape }}" />
                 {% endif %}
@@ -1821,7 +1881,8 @@
             "120910008": { "values": [120910305,120910306,120910307], "labels": ["YES","NO","N/A"] },
             "120910009": { "values": [120910305,120910306,120910302], "labels": ["YES","NO","INSUFFICIENT EVIDENCE"] },
             "120910010": { "values": [120910300,120910303,120910302,120910304], "labels": ["PASS","PASS WITH ISSUES","INSUFFICIENT EVIDENCE","POTENTIAL HARM"] },
-            "120910012": { "values": [120910300,120910303,120910301,120910302,120910307], "labels": ["PASS","PASS WITH ISSUES","POTENTIAL HARM","INSUFFICIENT EVIDENCE","N/A"] }
+            "120910012": { "values": [120910300,120910303,120910302,120910301,120910307], "labels": ["PASS","PASS WITH ISSUES","INSUFFICIENT EVIDENCE","POTENTIAL HARM","N/A"] },
+            "120910014": { "values": [120910300,120910303,120910302,120910304], "labels": ["PASS","PASS WITH ISSUES","INSUFFICIENT EVIDENCE","POTENTIAL HARM"] }
           },
           "grid": {
             {% if is_tax_review %}
@@ -1829,10 +1890,11 @@
             "120910012": { "labels": ["Pass","Fail","Pass with issues","N/A"] },
             {% else %}
             "120910006": { "labels": ["Pass","Fail","Insufficient evidence"] },
-            "120910012": { "labels": ["Pass","Pass with issues","Potential harm","Insufficient evidence","N/A"] },
+            "120910012": { "labels": ["Pass","Pass with issues","Insufficient evidence","Potential harm","N/A"] },
             {% endif %}
             "120910008": { "labels": ["Yes","No","N/A"] },
-            "120910009": { "labels": ["Yes","No","Insufficient evidence"] }
+            "120910009": { "labels": ["Yes","No","Insufficient evidence"] },
+            "120910014": { "labels": ["Pass","Pass with issues","Insufficient evidence","Potential harm"] }
           }
         }
         </script>
@@ -2711,25 +2773,6 @@
       {% endfetchxml %}
       {% assign ot_acc_people = directory.results.entities.size | default: 0 %}
 
-      {% comment %}
-        The administrator at fault for a File Quality fail (requirements log row 10). Any active
-        contact, since an administrator holds neither role above; read under the same Contact -
-        directory read permission. Recorded for reporting only - the export never carries it.
-      {% endcomment %}
-      {% fetchxml everyone %}
-      <fetch count="5000">
-        <entity name="contact">
-          <attribute name="contactid" />
-          <attribute name="fullname" />
-          <attribute name="emailaddress1" />
-          <filter type="and">
-            <condition attribute="statecode" operator="eq" value="0" />
-            <condition attribute="emailaddress1" operator="not-null" />
-          </filter>
-          <order attribute="fullname" />
-        </entity>
-      </fetch>
-      {% endfetchxml %}
 
       <section class="ot-card ot-accountability"
                data-ot-accountability
@@ -2750,6 +2793,8 @@
             <legend>File Quality</legend>
             <label class="opt"><input type="checkbox" data-ot-acc="fqParaplanner" /> The paraplanner ({{ rv['case.al_paraplanner'] | default: 'not named' | escape }})</label>
             <label class="opt"><input type="checkbox" data-ot-acc="fqAdviser" /> The adviser ({{ rv['case.al_advisername'] | default: 'not named' | escape }})</label>
+            {% comment %}An administrator, never named (project owner, 2026-11-25).{% endcomment %}
+            <label class="opt"><input type="checkbox" data-ot-acc="fqAdministrator" /> An administrator</label>
             <label class="ot-accountability__person">
               <span>Or someone else</span>
               <input type="text" class="ot-hdr-input" list="ot-acc-people"
@@ -2757,13 +2802,6 @@
                      autocomplete="off" role="combobox"
                      {% if ot_acc_people == 0 %}disabled{% endif %}
                      aria-label="Person carrying the File Quality fail" />
-            </label>
-            <label class="ot-accountability__person">
-              <span>Administrator at fault (not exported)</span>
-              <input type="text" class="ot-hdr-input" list="ot-acc-everyone"
-                     data-ot-acc-person="fqadmin" placeholder="Search everyone"
-                     autocomplete="off" role="combobox"
-                     aria-label="Administrator carrying the File Quality fail" />
             </label>
           </fieldset>
 
@@ -2799,12 +2837,7 @@
           <option value="{{ c.fullname | escape }} - {{ c.emailaddress1 | escape }}" data-id="{{ c.contactid }}"></option>
           {% endfor %}
         </datalist>
-        <datalist id="ot-acc-everyone">
-          {% for c in everyone.results.entities %}
-          <option value="{{ c.fullname | escape }} - {{ c.emailaddress1 | escape }}" data-id="{{ c.contactid }}"></option>
-          {% endfor %}
-        </datalist>
-        <p class="ot-accountability__note">Naming an administrator records who made the File Quality fail for reporting only: it is not written to the export, and the paraplanner is then no longer named for the File Quality fail by default.</p>
+        <p class="ot-accountability__note">Ticking an administrator records that the File Quality fail was an administrator&rsquo;s, for reporting only: it is not written to the export, and the paraplanner is then no longer named for the File Quality fail by default.</p>
 
         <p class="ot-accountability__status" data-ot-acc-status role="status" aria-live="polite"></p>
       </section>
@@ -2848,9 +2881,9 @@
            * records nobody, and says so rather than failing at the server.
            */{% endcomment %}
           var byText = {};
-          var options = document.querySelectorAll('#ot-acc-people option, #ot-acc-everyone option');
-          {% comment %}// Which saved field each person box holds; fqadmin is the administrator (row 10).{% endcomment %}
-          var SIDES = { fq: 'fqContactId', aq: 'aqContactId', fqadmin: 'fqAdministratorId' };
+          var options = document.querySelectorAll('#ot-acc-people option');
+          {% comment %}// Which saved field each person box holds.{% endcomment %}
+          var SIDES = { fq: 'fqContactId', aq: 'aqContactId' };
           for (var o = 0; o < options.length; o++) {
             byText[options[o].value.trim().toLowerCase()] = options[o].getAttribute('data-id');
           }
@@ -2871,11 +2904,11 @@
           {% comment %}/** Names anyone the boxes hold text for but could not match. */{% endcomment %}
           function unmatched() {
             var stray = [];
-            var which = ['fq', 'aq', 'fqadmin'];
+            var which = ['fq', 'aq'];
             for (var i = 0; i < which.length; i++) {
               var box = root.querySelector('[data-ot-acc-person="' + which[i] + '"]');
               if (box && box.value.trim() !== '' && person(which[i]) === '') {
-                stray.push({ text: box.value.trim(), admin: which[i] === 'fqadmin' });
+                stray.push({ text: box.value.trim() });
               }
             }
             return stray;
@@ -2890,7 +2923,7 @@
               aqParaplanner: value('aqParaplanner'),
               fqContactId: person('fq'),
               aqContactId: person('aq'),
-              fqAdministratorId: person('fqadmin')
+              fqAdministrator: value('fqAdministrator')
             };
           }
 
@@ -2910,8 +2943,13 @@
             for (var r = 0; r < boxes.length; r++) {
               boxes[r].checked = saved[boxes[r].getAttribute('data-ot-acc')] === true;
             }
+            {% comment %}// A choice parked before 2026-11-25 named the administrator; it reads as the tick.{% endcomment %}
+            if (saved.fqAdministratorId) {
+              var adminBox = root.querySelector('[data-ot-acc="fqAdministrator"]');
+              if (adminBox) { adminBox.checked = true; }
+            }
 
-            var sides = ['fq', 'aq', 'fqadmin'];
+            var sides = ['fq', 'aq'];
             for (var k = 0; k < sides.length; k++) {
               var id = saved[SIDES[sides[k]]];
               var input = root.querySelector('[data-ot-acc-person="' + sides[k] + '"]');
@@ -2946,13 +2984,12 @@
           }
 
           function sameState(a, b) {
-            var flags = ['fqAdviser', 'fqParaplanner', 'aqAdviser', 'aqParaplanner'];
+            var flags = ['fqAdviser', 'fqParaplanner', 'aqAdviser', 'aqParaplanner', 'fqAdministrator'];
             for (var f = 0; f < flags.length; f++) {
               if ((a[flags[f]] === true) !== (b[flags[f]] === true)) { return false; }
             }
             return (a.fqContactId || '') === (b.fqContactId || '')
-              && (a.aqContactId || '') === (b.aqContactId || '')
-              && (a.fqAdministratorId || '') === (b.fqAdministratorId || '');
+              && (a.aqContactId || '') === (b.aqContactId || '');
           }
 
           function reportAccountabilityLag() {
@@ -2980,7 +3017,7 @@
 
             var stray = unmatched();
             if (stray.length > 0) {
-              show((stray[0].admin ? 'Nobody in the directory matches "' : 'Nobody holding the Adviser or Planner role matches "')
+              show('Nobody holding the Adviser or Planner role matches "'
                 + stray[0].text + '", so nobody was recorded for it. Pick a name from the list.', 'error');
               finish(false);
               return;
@@ -3001,7 +3038,7 @@
                 aqParaplanner: sent.aqParaplanner,
                 fqContactId: sent.fqContactId,
                 aqContactId: sent.aqContactId,
-                fqAdministratorId: sent.fqAdministratorId
+                fqAdministrator: sent.fqAdministrator
               })
             };
 
@@ -3180,22 +3217,21 @@
            */
           function otRemedialItems(answers, failPoints, isTax) {
             var LABELS = { '120910301': 'Fail', '120910302': 'Insufficient evidence', '120910303': 'Pass with issues', '120910304': 'Potential harm', '120910306': 'No' };
-            var CATEGORIES = { 'Q-TAX-05': true, 'Q-TAX-07': true, 'Q-TAX-09': true, 'Q-TAX-11': true };
+            var CATEGORIES = { 'Q-TAX-05': 'Calculations', 'Q-TAX-07': 'Wording', 'Q-TAX-11': 'Other' };
             var OUTCOME = { 'Q-TAX-02': true, 'Q-FQ-01': true, 'Q-FQTAX-01': true };
-            var SCALE = { '120910005': 'pf', '120910006': 'pf', '120910012': 'pf', '120910009': 'yni', '120910008': 'ynn' };
+            var SCALE = { '120910005': 'pf', '120910006': 'pf', '120910012': 'pf', '120910014': 'pf', '120910009': 'yni', '120910008': 'ynn' };
 
             function nonPass(type, value) {
               var scale = SCALE[type];
               if (!scale) { return false; }
               if (scale === 'ynn') { return value === '120910306'; }
               if (scale === 'yni') { return value === '120910306' || value === '120910302'; }
-              if (type === '120910012' && value === '120910303') { return true; }
+              if ((type === '120910012' || type === '120910014') && value === '120910303') { return true; }
               return value === '120910301' || value === '120910302' || value === '120910304';
             }
 
             var items = [];
             var owed = false;
-            var categories = 0;
             for (var i = 0; i < answers.length; i++) {
               var a = answers[i];
               var code = (a.code || '').toUpperCase();
@@ -3205,7 +3241,7 @@
               }
               if (!isTax && code === 'Q-GR-01' && a.value && a.value !== '120910300') { owed = true; }
               if (isTax && code === 'Q-TAX-02' && (a.value === '120910301' || a.value === '120910302')) { owed = true; }
-              if (isTax && CATEGORIES[code] && a.value === '120910305') { owed = true; categories += 1; }
+              if (isTax && CATEGORIES[code] && a.value === '120910305') { owed = true; }
               if (OUTCOME[code] || !a.value || !nonPass(a.type, a.value)) { continue; }
               var text = (a.text || '').trim();
               var word = a.type === '120910012' && a.value === '120910301' ? 'Potential harm' : LABELS[a.value];
@@ -3217,7 +3253,15 @@
               if (name) { items.push(name); }
             }
 
-            return { owed: owed, items: items, categories: categories };
+            // Each Yes category is a row of its own, in form order, after the fail points (TaxCategories.Parked).
+            var ORDER = ['Q-TAX-05', 'Q-TAX-07', 'Q-TAX-11'];
+            for (var o = 0; o < ORDER.length; o++) {
+              for (var j = 0; isTax && j < answers.length; j++) {
+                if ((answers[j].code || '').toUpperCase() === ORDER[o] && answers[j].value === '120910305') { items.push(CATEGORIES[ORDER[o]]); }
+              }
+            }
+
+            return { owed: owed, items: items };
           }
 
           /*
@@ -3321,7 +3365,9 @@
               var entry = list[i];
               if (!entry) { continue; }
               var key = String(entry.item || '').trim();
-              var text = String(entry.text || '').trim();
+              // Words only: the server rebuilds formatted markup (b becomes strong), so what
+              // this tab sent and what it later draws differ in tags while saying the same thing.
+              var text = String(entry.text || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
               if (!key || !text) { continue; }
               if (!Object.prototype.hasOwnProperty.call(map, key)) { keys.push(key); }
               map[key] = text;
@@ -3330,6 +3376,32 @@
             var pairs = [];
             for (var k = 0; k < keys.length; k++) { pairs.push([keys[k], map[keys[k]]]); }
             return JSON.stringify(pairs);
+          }
+
+          /*
+           * A remedial action as editor markup. Formatted words were cleaned by the server
+           * (RemedialActionsRequestPlugin) and start with a tag; words written before the
+           * editor are plain text and are escaped, one paragraph, line breaks kept.
+           */
+          function otRemedialMarkup(text) {
+            var value = String(text || '');
+            if (value.replace(/^\s+/, '').charAt(0) === '<') { return value; }
+            if (!value.trim()) { return ''; }
+            var escaped = value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+            return '<p>' + escaped.replace(/\r?\n/g, '<br>') + '</p>';
+          }
+          /*
+           * What an editor's markup is stored as: '' without words, else markup that starts with
+           * a tag. A first line typed before any Enter has no paragraph, and stored bare it would
+           * be read back as plain text, so its run up to the first block is wrapped in one.
+           */
+          function otRemedialStored(html, words) {
+            if (!String(words || '').trim()) { return ''; }
+            var value = String(html || '').replace(/^\s+/, '');
+            var block = value.search(/<(p|ul|ol)[\s>]/i);
+            if (block === 0) { return value; }
+            if (block < 0) { block = value.length; }
+            return '<p>' + value.slice(0, block) + '</p>' + value.slice(block);
           }
           /* ot-remedial-canonical:end */
 
@@ -3434,9 +3506,72 @@
             timer = window.setTimeout(function () { save(null); }, 700);
           }
 
-          function onInput(event) {
-            texts[event.target.getAttribute('data-ot-remedial-item')] = event.target.value;
+          {% comment %}// The editor's markup, or nothing when it holds no words, so an emptied box counts as unwritten.{% endcomment %}
+          function onInput(area) {
+            texts[area.getAttribute('data-ot-remedial-item')] = otRemedialStored(area.innerHTML, area.textContent || '');
             queue();
+          }
+
+          {% comment %}// Enter makes a paragraph, not a div: HtmlSanitiser keeps p and drops div, which ran lines together.{% endcomment %}
+          try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch (e) { {% comment %}/* older browser: divs */{% endcomment %} }
+
+          {% comment %}/*
+           * One remedial action's box: the rich-text answer's editor (bold, italic, underline,
+           * lists - HtmlSanitiser's vocabulary, owner 2026-11-23), drawn by script because the
+           * rows are. Same classes, so it looks and behaves like that editor.
+           */{% endcomment %}
+          var TOOLS = [
+            ['bold', 'Bold', '<strong>B</strong>'], ['italic', 'Italic', '<em>I</em>'], ['underline', 'Underline', '<u>U</u>'],
+            ['insertUnorderedList', 'Bulleted list', '&bull; List'], ['insertOrderedList', 'Numbered list', '1. List']
+          ];
+          function richBox(key, label) {
+            var wrap = document.createElement('div');
+            wrap.className = 'ot-rte';
+            var bar = document.createElement('div');
+            bar.className = 'ot-rte__bar';
+            bar.setAttribute('role', 'toolbar');
+            bar.setAttribute('aria-label', 'Formatting for ' + label);
+            var area = document.createElement('div');
+            area.className = 'ot-rte__area';
+            area.setAttribute('role', 'textbox');
+            area.setAttribute('aria-multiline', 'true');
+            area.setAttribute('aria-label', label);
+            area.setAttribute('data-ot-remedial-item', key);
+            area.setAttribute('data-ot-maxlength', '4000');
+            area.innerHTML = otRemedialMarkup(texts[key] || '');
+            {% comment %}// A redraw after submit must not hand back a live box (lock).{% endcomment %}
+            area.contentEditable = locked ? 'false' : 'true';
+            for (var t = 0; t < TOOLS.length; t++) {
+              var tool = document.createElement('button');
+              tool.type = 'button';
+              tool.className = 'ot-rte__btn';
+              tool.title = TOOLS[t][1];
+              tool.setAttribute('aria-label', TOOLS[t][1]);
+              tool.innerHTML = TOOLS[t][2];
+              tool.disabled = locked;
+              tool.addEventListener('mousedown', (function (command) {
+                return function (event) {
+                  event.preventDefault();
+                  area.focus();
+                  try { document.execCommand(command, false, null); } catch (e) { return; }
+                  onInput(area);
+                };
+              })(TOOLS[t][0]));
+              bar.appendChild(tool);
+            }
+            area.addEventListener('input', function () { onInput(area); });
+            area.addEventListener('blur', function () { save(null); });
+            {% comment %}// A paste arrives as the source page's markup; plain text keeps it to what the save keeps.{% endcomment %}
+            area.addEventListener('paste', function (event) {
+              var clip = event.clipboardData || window.clipboardData;
+              if (!clip) { return; }
+              event.preventDefault();
+              document.execCommand('insertText', false, clip.getData('text/plain') || '');
+              onInput(area);
+            });
+            wrap.appendChild(bar);
+            wrap.appendChild(area);
+            return wrap;
           }
 
           {% comment %}// Each further action on an item, by number: "item ##2" (RemedialActions.ExtraMark).{% endcomment %}
@@ -3498,7 +3633,7 @@
 
           {% comment %}// The Tax form: comments follow their Yes, and File Quality is AQS's unless Tax only.{% endcomment %}
           function syncTax(list, fails) {
-            var pairs = [['Q-TAX-05', 'Q-TAX-06'], ['Q-TAX-07', 'Q-TAX-08'], ['Q-TAX-09', 'Q-TAX-10'], ['Q-TAX-11', 'Q-TAX-12']];
+            var pairs = [['Q-TAX-05', 'Q-TAX-06'], ['Q-TAX-07', 'Q-TAX-08'], ['Q-TAX-11', 'Q-TAX-12']];
             var owed = fails.length > 0;
             for (var p = 0; p < pairs.length; p++) {
               var picked = answerRow(pairs[p][0]) && answerRow(pairs[p][0]).querySelector('input:checked');
@@ -3555,8 +3690,8 @@
             }
 
             var result = otRemedialItems(list, fails, isTax);
-            {% comment %}// Tax categories carry their own words, so only a check with nothing else needs the card.{% endcomment %}
-            root.hidden = !result.owed || (result.categories > 0 && result.items.length === 0);
+            {% comment %}// Each Yes Tax category is a row of the card (owner, 2026-11-23), so the card shows whenever remediation is owed.{% endcomment %}
+            root.hidden = !result.owed;
 
             var keys = withExtras(result.items.length ? result.items : [OVERALL]);
             if (keys.join('\n') === current.join('\n')) { return; }
@@ -3572,19 +3707,7 @@
               var stem = keys[i].replace(/ ##\d+$/, '');
               label.textContent = (stem === OVERALL ? 'Overall' : stem) + (further ? ' (further action)' : '');
               var cell = document.createElement('td');
-              var box = document.createElement('textarea');
-              box.rows = 3;
-              box.maxLength = 4000;
-              box.required = true;
-              box.className = 'ot-response-cell__text';
-              box.setAttribute('aria-label', 'Remedial action for ' + (keys[i] === OVERALL ? 'this check' : keys[i]));
-              box.setAttribute('data-ot-remedial-item', keys[i]);
-              box.value = texts[keys[i]] || '';
-              {% comment %}// A redraw after submit must not hand back a live box (lock).{% endcomment %}
-              box.disabled = locked;
-              box.addEventListener('input', onInput);
-              box.addEventListener('blur', function () { save(null); });
-              cell.appendChild(box);
+              cell.appendChild(richBox(keys[i], 'Remedial action for ' + (keys[i] === OVERALL ? 'this check' : keys[i])));
 
               {% comment %}// One query per box: another action on this item raises its own remediation row.{% endcomment %}
               var more = document.createElement('button');
@@ -3651,6 +3774,8 @@
             if (timer) { window.clearTimeout(timer); timer = null; }
             var boxes = root.querySelectorAll('textarea, select, button');
             for (var b = 0; b < boxes.length; b++) { boxes[b].disabled = true; }
+            var editors = root.querySelectorAll('[contenteditable]');
+            for (var e = 0; e < editors.length; e++) { editors[e].contentEditable = 'false'; }
           }
 
           {% comment %}// Any change outside the card may move the list: an answer, a fail point tick.{% endcomment %}
@@ -3780,6 +3905,8 @@
                     {% assign rr_checker = a.al_remedialaction | strip %}
                     {% assign rr_adviser = a.al_adviserresponse | strip %}
                     {% assign rr_text = rr_checker | default: rr_adviser | default: '—' %}
+                    {% comment %}Only the checker's words can be markup (cleaned on save); the adviser's are always plain.{% endcomment %}
+                    {% assign rr_probe = '[[ot]]' | append: rr_checker %}
                     {% assign rr_owner = a.al_assignedcontactid.name | strip | default: 'Nobody assigned' %}
                     {% assign rr_due = '—' %}{% if a.al_duedate %}{% assign rr_due = a.al_duedate | date: 'dd MMM yyyy' %}{% endif %}
                     {% assign rr_status = a.al_actionstatus.label | strip | default: '—' %}
@@ -3792,7 +3919,7 @@
                       <tr>
                         <td>{{ rr_no }}</td>
                         <td>—</td>
-                        <td>{{ rr_text | escape | newline_to_br }}</td>
+                        <td>{% if rr_probe contains '[[ot]]<' %}<div class="ot-rte__read">{{ rr_checker }}</div>{% else %}{{ rr_text | escape | newline_to_br }}{% endif %}</td>
                         <td>{{ rr_owner | escape }}</td>
                         <td>{{ rr_due }}</td>
                         <td>{{ rr_status | escape }}</td>
@@ -3808,7 +3935,7 @@
                             <td>{{ rr_no }}</td>
                             <td>{{ rest | escape }}</td>
                             {% if rr_shown == 1 %}
-                              <td rowspan="{{ rr_count }}">{{ rr_text | escape | newline_to_br }}</td>
+                              <td rowspan="{{ rr_count }}">{% if rr_probe contains '[[ot]]<' %}<div class="ot-rte__read">{{ rr_checker }}</div>{% else %}{{ rr_text | escape | newline_to_br }}{% endif %}</td>
                               <td rowspan="{{ rr_count }}">{{ rr_owner | escape }}</td>
                               <td rowspan="{{ rr_count }}">{{ rr_due }}</td>
                               <td rowspan="{{ rr_count }}">{{ rr_status | escape }}</td>

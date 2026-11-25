@@ -105,7 +105,7 @@ namespace OutcomeTesting.Plugins
 
             var name = outcome == OutcomeRules.OutcomePassWithIssues
                 ? "Pass with issues"
-                : "insufficient evidence/ potential harm";
+                : outcome == OutcomeRules.OutcomeInsufficient ? "Insufficient evidence" : "Potential harm";
 
             return "Remedial needed - " + name + ": " + Reference(caseReference);
         }
@@ -127,8 +127,9 @@ namespace OutcomeTesting.Plugins
                 case OutcomeRules.OutcomePassWithIssues:
                     return "a pass with issues grading";
                 case OutcomeRules.OutcomeInsufficient:
+                    return "an insufficient evidence grading";
                 case OutcomeRules.OutcomePotentialHarm:
-                    return "an insufficient evidence/ potential harm grading";
+                    return "a potential harm grading";
                 default:
                     return null;
             }

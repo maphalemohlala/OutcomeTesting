@@ -141,7 +141,8 @@ namespace OutcomeTesting.Plugins
 
             var fqContact = ParseOptionalContact(payload.FqContactId, "File Quality");
             var aqContact = ParseOptionalContact(payload.AqContactId, "Advice Quality");
-            var fqAdministrator = ParseOptionalContact(payload.FqAdministratorId, "the File Quality administrator");
+            var legacyAdministrator = ParseOptionalContact(payload.FqAdministratorId, "the File Quality administrator");
+            var fqAdministrator = payload.FqAdministrator || legacyAdministrator != null;
 
             // The command's rule, through the same check (owner, 2026-11-17).
             WebRoleRegistry.EnsureAccountable(
@@ -149,7 +150,7 @@ namespace OutcomeTesting.Plugins
             WebRoleRegistry.EnsureAccountable(
                 service, aqContact, outcome.GetAttributeValue<EntityReference>("al_aqaccountablecontactid"));
 
-            service.Update(new Entity(OutcomeEntity, outcomeId)
+            var update = new Entity(OutcomeEntity, outcomeId)
             {
                 ["al_fqadviseraccountable"] = payload.FqAdviser,
                 ["al_fqparaplanneraccountable"] = payload.FqParaplanner,
@@ -160,13 +161,15 @@ namespace OutcomeTesting.Plugins
                 // case's own adviser or paraplanner back into the extract.
                 ["al_fqaccountablecontactid"] = fqContact,
                 ["al_aqaccountablecontactid"] = aqContact,
-                [GenerateExportPlugin.FqAdministratorContactAttr] = fqAdministrator,
-            });
+                [GenerateExportPlugin.FqAdministratorFlag] = fqAdministrator,
+            };
+            SetFailAccountabilityPlugin.ApplyAdministratorContact(update, fqAdministrator, legacyAdministrator);
+            service.Update(update);
 
             var details = "FQ adviser " + payload.FqAdviser + ", FQ paraplanner " + payload.FqParaplanner
                 + ", AQ adviser " + payload.AqAdviser + ", AQ paraplanner " + payload.AqParaplanner
                 + ", FQ named " + Describe(fqContact) + ", AQ named " + Describe(aqContact)
-                + ", FQ administrator " + (fqAdministrator == null ? "(none)" : fqAdministrator.Id.ToString("D"))
+                + ", FQ administrator " + (fqAdministrator ? "Yes" : "No")
                 + " (from the portal)";
 
             // Named to the contact, not the caller: a portal write reaches Dataverse as the
@@ -264,6 +267,7 @@ namespace OutcomeTesting.Plugins
                 FqContactId = payload.FqContactId,
                 AqContactId = payload.AqContactId,
                 FqAdministratorId = payload.FqAdministratorId,
+                FqAdministrator = payload.FqAdministrator,
             };
 
             using (var stream = new MemoryStream())
@@ -312,8 +316,9 @@ namespace OutcomeTesting.Plugins
             outcome["al_aqparaplanneraccountable"] = parked.AqParaplanner;
             outcome["al_fqaccountablecontactid"] = ParseOptionalContact(parked.FqContactId, "File Quality");
             outcome["al_aqaccountablecontactid"] = ParseOptionalContact(parked.AqContactId, "Advice Quality");
-            outcome[GenerateExportPlugin.FqAdministratorContactAttr] =
-                ParseOptionalContact(parked.FqAdministratorId, "the File Quality administrator");
+            var legacyAdministrator = ParseOptionalContact(parked.FqAdministratorId, "the File Quality administrator");
+            outcome[GenerateExportPlugin.FqAdministratorFlag] = parked.FqAdministrator || legacyAdministrator != null;
+            outcome[GenerateExportPlugin.FqAdministratorContactAttr] = legacyAdministrator;
             return true;
         }
 
@@ -393,6 +398,10 @@ namespace OutcomeTesting.Plugins
         // The administrator carrying a File Quality fail (requirements log row 10); never exported.
         [DataMember(Name = "fqAdministratorId")]
         public string FqAdministratorId { get; set; }
+
+        // Since 2026-11-25 the portal sends this tick instead of a name (project owner).
+        [DataMember(Name = "fqAdministrator")]
+        public bool FqAdministrator { get; set; }
 
         public static AccountabilityRequestPayload Parse(string json)
         {

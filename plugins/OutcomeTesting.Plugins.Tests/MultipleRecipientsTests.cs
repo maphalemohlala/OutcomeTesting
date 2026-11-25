@@ -198,7 +198,97 @@ namespace OutcomeTesting.Plugins.Tests
                 contactIds: ian.Id.ToString()));
         }
 
+        // ------------------------------------------------- letters limited to gradings
+
+        [Theory]
+        [InlineData("120910701,120910702", OutcomeRules.OutcomePassWithIssues, true)]
+        [InlineData("120910701,120910702", OutcomeRules.OutcomeInsufficient, true)]
+        [InlineData("120910701,120910702", OutcomeRules.OutcomePotentialHarm, false)]
+        [InlineData("120910700", OutcomeRules.OutcomePass, true)]
+        [InlineData(null, OutcomeRules.OutcomePotentialHarm, true)]
+        public void A_letter_limited_to_gradings_goes_only_for_those(string gradings, int grade, bool sent)
+        {
+            var service = Case();
+            var ian = Contact(service, "Ian Gibbs", "ian@example.com");
+            Template(service, "TELL-IAN", NotificationOutbox.EventRemediationAssigned, null, ian.Id.ToString(),
+                gradings: gradings);
+            Outcome(service, grade, new DateTime(2026, 11, 20));
+
+            QueueRemediation(service);
+
+            Assert.Equal(sent, Sent(service).Any(n => n.Recipient == "ian@example.com"));
+        }
+
+        [Fact]
+        public void A_limited_letter_does_not_go_before_the_AQS_check_has_graded_the_case()
+        {
+            var service = Case();
+            var ian = Contact(service, "Ian Gibbs", "ian@example.com");
+            Template(service, "TELL-IAN", NotificationOutbox.EventRemediationAssigned, null, ian.Id.ToString(),
+                gradings: "120910700,120910701,120910702,120910703");
+
+            QueueRemediation(service);
+
+            Assert.DoesNotContain(Sent(service), n => n.Recipient == "ian@example.com");
+        }
+
+        [Fact]
+        public void The_newest_AQS_grading_decides()
+        {
+            var service = Case();
+            var ian = Contact(service, "Ian Gibbs", "ian@example.com");
+            Template(service, "TELL-IAN", NotificationOutbox.EventRemediationAssigned, null, ian.Id.ToString(),
+                gradings: "120910703");
+            Outcome(service, OutcomeRules.OutcomePotentialHarm, new DateTime(2026, 11, 1));
+            Outcome(service, OutcomeRules.OutcomePass, new DateTime(2026, 11, 20));
+
+            QueueRemediation(service);
+
+            Assert.DoesNotContain(Sent(service), n => n.Recipient == "ian@example.com");
+        }
+
+        [Fact]
+        public void The_guard_accepts_the_four_gradings_on_a_letter_of_your_own()
+        {
+            var service = new FakeOrganizationService();
+            var row = Custom(kinds: NotificationRecipients.KindAdviser.ToString());
+            row[NotificationTemplateRows.GradingsAttr] = "120910700,120910701,120910702,120910703";
+
+            Guard(service, row);
+        }
+
+        [Fact]
+        public void The_guard_refuses_a_value_that_is_not_a_grading()
+        {
+            var service = new FakeOrganizationService();
+            var row = Custom(kinds: NotificationRecipients.KindAdviser.ToString());
+            row[NotificationTemplateRows.GradingsAttr] = "120910701,Fail";
+
+            var refused = Assert.Throws<InvalidPluginExecutionException>(() => Guard(service, row));
+            Assert.Contains("\"Fail\" is not a grading", refused.Message);
+        }
+
+        [Fact]
+        public void The_guard_refuses_gradings_on_a_built_in_letter()
+        {
+            var service = new FakeOrganizationService();
+            var row = new Entity(NotificationTemplates.TemplateEntity);
+            row[NotificationTemplates.CodeAttr] = NotificationTemplates.CasePassed;
+            row[NotificationTemplateRows.GradingsAttr] = "120910700";
+
+            var refused = Assert.Throws<InvalidPluginExecutionException>(() => Guard(service, row));
+            Assert.Contains("built-in letter", refused.Message);
+        }
+
         // ------------------------------------------------------------ helpers
+
+        private static void Outcome(FakeOrganizationService service, int grade, DateTime createdOn)
+        {
+            service.Seed("al_outcome", Guid.NewGuid(),
+                "al_outcomecaseid", new EntityReference("al_outcomecase", CaseId),
+                "al_initialoutcome", new OptionSetValue(grade),
+                "createdon", createdOn);
+        }
 
         private static void QueueRemediation(FakeOrganizationService service)
         {
@@ -234,12 +324,14 @@ namespace OutcomeTesting.Plugins.Tests
             int? eventValue,
             string kinds,
             string contactIds,
-            string subject = "Custom")
+            string subject = "Custom",
+            string gradings = null)
         {
             var row = service.Seed(NotificationTemplates.TemplateEntity, Guid.NewGuid(),
                 NotificationTemplates.CodeAttr, code,
                 "statecode", 0);
 
+            if (gradings != null) row[NotificationTemplateRows.GradingsAttr] = gradings;
             if (eventValue.HasValue) row[NotificationTemplateRows.EventAttr] = new OptionSetValue(eventValue.Value);
             if (kinds != null) row[NotificationTemplateRows.RecipientKindsAttr] = kinds;
             if (contactIds != null) row[NotificationTemplateRows.RecipientContactIdsAttr] = contactIds;

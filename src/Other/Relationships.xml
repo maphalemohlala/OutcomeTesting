@@ -18,6 +18,7 @@
   <EntityRelationship Name="al_outcomecase_exportrecord" />
   <EntityRelationship Name="al_outcomecase_outcome" />
   <EntityRelationship Name="al_outcomecase_previouscase" />
+  <EntityRelationship Name="al_outcomecase_tcmanagers" />
   <EntityRelationship Name="al_outcomecase_remediationaction" />
   <EntityRelationship Name="al_outcomecase_reviewinstance" />
   <EntityRelationship Name="al_outcomecase_signoff" />

@@ -2,7 +2,7 @@
   <content>{
   "append": false,
   "appendto": false,
-  "contactrelationship": "contact_al_tcsupervisorcontactid_al_outcomecase",
+  "contactrelationship": "al_outcomecase_tcmanagers",
   "create": false,
   "delete": false,
   "entitylogicalname": "al_outcomecase",

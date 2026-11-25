@@ -24,7 +24,11 @@ import {
   ROLE_KINDS,
   readRecipients,
   recipientColumns,
+  GRADINGS,
+  readGradings,
+  gradingColumns,
 } from './notificationRouting';
+import outcomeRulesSource from '../../../../plugins/OutcomeTesting.Plugins/OutcomeRules.cs?raw';
 
 describe('the events a letter can be attached to', () => {
   it('lists exactly the events the plug-in raises', () => {
@@ -259,5 +263,32 @@ describe('the attachment marker', () => {
 
   it('says it puts nothing in the text, which is the surprising part', () => {
     expect(tokenHelp(TOKEN_COMPLETED_CHECK).toLowerCase()).toContain('nothing in the text');
+  });
+});
+
+describe('a letter limited to gradings', () => {
+  it('offers the four AQS gradings with the values the plug-in compares', () => {
+    const value = (name: string) =>
+      Number(new RegExp(`public const int ${name} = (\\d+);`).exec(outcomeRulesSource)?.[1]);
+    expect(GRADINGS.map((g) => g.value)).toEqual([
+      value('OutcomePass'),
+      value('OutcomePassWithIssues'),
+      value('OutcomeInsufficient'),
+      value('OutcomePotentialHarm'),
+    ]);
+  });
+
+  it('writes the column the plug-in reads', () => {
+    expect(rowsSource).toContain('GradingsAttr = "al_gradings"');
+    expect(gradingColumns([120910702, 120910701])).toEqual({ al_gradings: '120910701,120910702' });
+  });
+
+  it('clears the column when nothing is ticked, so the letter goes whatever the grading', () => {
+    expect(gradingColumns([])).toEqual({ al_gradings: null });
+  });
+
+  it('reads a stored value, dropping anything that is not a grading', () => {
+    expect(readGradings('120910703; 120910700,999')).toEqual([120910700, 120910703]);
+    expect(readGradings(null)).toEqual([]);
   });
 });

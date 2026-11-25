@@ -108,12 +108,18 @@ export interface ActionGroup {
  * both raised remediation does not report only the earlier of the two. They are joined in
  * the order the actions come in, each shown once.
  */
-export function outcomeOf(actions: RemediationActionRow[]): string | null {
+export function outcomeOf(actions: RemediationActionRow[], currentGrade?: string | null): string | null {
   const seen: string[] = [];
   for (const action of actions) {
     const { outcome } = splitIssues(action.description);
-    if (outcome !== null && !seen.includes(outcome)) {
-      seen.push(outcome);
+    // The description is written once at submit; an amended advice grade replaces its
+    // grade half. "Tax check: ..." is never amended, so it is kept as written.
+    for (const part of (outcome ?? '').split(';')) {
+      const raised = part.trim();
+      const piece = raised.startsWith('Tax check') || !currentGrade ? raised : currentGrade;
+      if (piece && !seen.includes(piece)) {
+        seen.push(piece);
+      }
     }
   }
 

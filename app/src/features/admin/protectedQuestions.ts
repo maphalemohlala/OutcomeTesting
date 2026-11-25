@@ -25,10 +25,8 @@ const PROTECTED: Record<string, string> = {
   'Q-TAX-04': "is the Tax remedial note, which the portal's Tax check notes card finds by this code",
   'Q-TAX-05': 'is the Calculations remediation answer; a Yes raises its own remedial action',
   'Q-TAX-06': "holds the Calculations remediation comments, which become that action's wording",
-  'Q-TAX-07': 'is the Taxation Narrative remediation answer; a Yes raises its own remedial action',
-  'Q-TAX-08': "holds the Taxation Narrative remediation comments, which become that action's wording",
-  'Q-TAX-09': 'is the Omissions remediation answer; a Yes raises its own remedial action',
-  'Q-TAX-10': "holds the Omissions remediation comments, which become that action's wording",
+  'Q-TAX-07': 'is the Wording remediation answer; a Yes raises its own remedial action',
+  'Q-TAX-08': "holds the Wording remediation comments, which become that action's wording",
   'Q-TAX-11': 'is the Other remediation answer; a Yes raises its own remedial action',
   'Q-TAX-12': "holds the Other remediation comments, which become that action's wording",
 };

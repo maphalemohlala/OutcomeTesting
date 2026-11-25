@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.ServiceModel;
 using Microsoft.Xrm.Sdk;
@@ -73,7 +73,7 @@ namespace OutcomeTesting.Plugins.Tests
         [Fact]
         public void A_row_whose_route_is_not_configured_is_refused_before_any_case_is_written()
         {
-            // Only the AQS route exists, so the Tax row cannot be routed. It is reported as an
+            // Only the AQS route exists, so the Tax-only row cannot be routed. It is reported as an
             // invalid row and the other row still imports.
             var service = new FakeOrganizationService();
             service.Seed("al_reviewroute", Guid.NewGuid(), "al_routecode", "ROUTE-AQS");
@@ -85,7 +85,7 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Equal("1", provider.Context.OutputParameters["Failed"]);
             var report = (string)provider.Context.OutputParameters["Report"];
             Assert.Contains("\"rowNumber\":2,\"caseReference\":\"T1\",\"status\":\"Invalid\"", report);
-            Assert.Contains("Review route 'ROUTE-TAX-AQS' is not configured.", report);
+            Assert.Contains("Review route 'ROUTE-TAX' is not configured.", report);
             Assert.Equal(new[] { "T2" }, service.All("al_outcomecase").Select(c => c.GetAttributeValue<string>("al_casereference")));
         }
 

@@ -38,7 +38,8 @@ const PARENTS: [string, string, string, string][] = [
   ['Case - my Tax checks', 'contact_al_taxcheckercontactid_al_outcomecase', '756150001', ROLE.tax],
   ['Case - my AQS checks', 'contact_al_aqscheckercontactid_al_outcomecase', '756150001', ROLE.aqs],
   ['Case - my clients', 'contact_al_advisercontactid_al_outcomecase', '756150001', ROLE.adviser],
-  ['Case - advisers I supervise', 'contact_al_tcsupervisorcontactid_al_outcomecase', '756150001', ROLE.supervisor],
+  // Every manager of the adviser, through the case's T&C Managers many-to-many (owner, 2026-11-24).
+  ['Case - advisers I supervise', 'al_outcomecase_tcmanagers', '756150001', ROLE.supervisor],
 ];
 
 describe('each role reads cases through its own column', () => {

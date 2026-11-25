@@ -97,7 +97,8 @@ namespace OutcomeTesting.Plugins
                     var type = review.GetAttributeValue<OptionSetValue>("al_reviewtype");
                     documents.Add(new Document(
                         FileName(CompletedCheck.CheckName(type == null ? (int?)null : type.Value), reference),
-                        PdfWriter.Build(blocks)));
+                        // Landscape, so the remedial action boxes are wide enough to read (UAT, 2026-11-25).
+                        PdfWriter.Build(blocks, true)));
                 }
                 catch (Exception)
                 {

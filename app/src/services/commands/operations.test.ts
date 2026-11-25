@@ -222,17 +222,10 @@ describe('every parameter a command sends is declared in the schema', () => {
       },
     ],
     [
-      'al_CreateExportBatch',
-      async () => {
-        const { createExportBatch } = await import('./exports');
-        return createExportBatch({ name: 'n', idempotencyKey: 'k' });
-      },
-    ],
-    [
       'al_GenerateExport',
       async () => {
         const { generateExport } = await import('./exports');
-        return generateExport({ batchId: 'b', idempotencyKey: 'k' });
+        return generateExport({ batchId: 'b', idempotencyKey: 'k', fileKind: 'Daily', checkedFrom: '2026-11-24', checkedTo: '2026-11-24' });
       },
     ],
     [

@@ -143,5 +143,37 @@ namespace OutcomeTesting.Plugins.Tests
 
             Assert.Equal(ResponseRules.StatusSubmitted, AqsStatus(svc));
         }
+
+        [Fact]
+        public void A_consumer_duty_outcome_does_not_restrict_the_grade()
+        {
+            // Record-only (project owner, 2026-11-24): Potential harm on a Consumer Duty outcome
+            // beside a Pass grade still submits, where the same answer on a suitability point is refused.
+            var svc = CleanCase();
+            var response = Answer(svc, AqsReviewId, "Q-CD-01", ResponseRules.ChoicePotentialHarm, null);
+            Retype(svc, response, ResponseRules.TypeOutcomeScale);
+
+            SubmitBoth(svc);
+
+            Assert.Equal(ResponseRules.StatusSubmitted, AqsStatus(svc));
+        }
+
+        [Fact]
+        public void The_same_harm_on_a_suitability_point_is_still_refused_beside_a_pass_grade()
+        {
+            var svc = CleanCase();
+            var response = Answer(svc, AqsReviewId, "Q-E1-01", ResponseRules.ChoiceFail, null);
+            Retype(svc, response, ResponseRules.TypePassFailInsufficientNa);
+
+            Submit(svc, TaxReviewId);
+            CaseTransitions.MoveThrough(svc, CaseId, CaseLifecycle.Assigned);
+            Assert.Throws<InvalidPluginExecutionException>(() => Submit(svc, AqsReviewId));
+        }
+
+        private static void Retype(FakeOrganizationService svc, Guid responseId, int responseType)
+        {
+            var versionId = svc.Row("al_response", responseId).GetAttributeValue<EntityReference>("al_questionversionid").Id;
+            svc.Row("al_questionversion", versionId)["al_responsetype"] = new OptionSetValue(responseType);
+        }
     }
 }

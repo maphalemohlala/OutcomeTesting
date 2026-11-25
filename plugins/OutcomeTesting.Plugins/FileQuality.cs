@@ -119,7 +119,8 @@ namespace OutcomeTesting.Plugins
         // Matched on the question's business code rather than its GUID so this does not break
         // when the question is retired and succeeded (BR-013, AD-004): a successor version
         // keeps the code and stays the same question.
-        private static Entity ResolveAnswer(IOrganizationService service, Guid caseId, string questionCode)
+        /// <summary>The case's latest answer to a question, by code, or null. AmendOutcome reads Q-GR-01 with it.</summary>
+        public static Entity ResolveAnswer(IOrganizationService service, Guid caseId, string questionCode)
         {
             var query = new QueryExpression(ResponseEntity)
             {

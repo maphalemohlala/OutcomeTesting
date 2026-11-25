@@ -2,11 +2,10 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { RemediationActionRow } from '../remediation/remediationMapping';
-import caseDetailCss from './CaseDetailPage.css?raw';
 
 vi.mock('../remediation/useRemediation', () => ({ useRemediation: () => ({ status: 'loading' }) }));
 
-const { CaseRemedialActions } = await import('./CaseRemedialActions');
+const { CaseRemedialActions, remedialSummary } = await import('./CaseRemedialActions');
 
 function action(overrides: Partial<RemediationActionRow>): RemediationActionRow {
   return {
@@ -50,8 +49,9 @@ describe('the case page lists the remedial actions', () => {
     expect(html).toContain('Adam Strumidlo');
     expect(html).toContain('05 Oct 2026');
     expect(html).toContain('AQS check');
-    expect(html).toContain('<td>1</td>');
-    expect(html).toContain('<td>2</td>');
+    // Numbered straight through, one number per fail point.
+    expect(html).toContain('<span class="remedial__number">1</span>');
+    expect(html).toContain('<span class="remedial__number">2</span>');
     // The record owner is a system account, never the person who owes the action.
     expect(html).not.toContain('Service Account');
   });
@@ -79,10 +79,15 @@ describe('the case page lists the remedial actions', () => {
     expect(renderToStaticMarkup(<CaseRemedialActions actions={[action({ active: false })]} />)).toBe('');
   });
 
-  it('styles its table as the checks table above it', () => {
-    // One rule set for both, so the two tables on the page cannot drift apart again.
-    expect(caseDetailCss).toMatch(/\.case-detail__checks-table,\s*\.case-detail__remedial-table\s*\{/);
-    expect(caseDetailCss).toMatch(/\.case-detail__checks-table thead th,\s*\.case-detail__remedial-table thead th\s*\{/);
+  it('sums up how many are completed and how many were not performed', () => {
+    expect(remedialSummary([action({})])).toBe('0 of 1 completed');
+    expect(
+      remedialSummary([
+        action({ completedOn: '05 Oct 2026', actionPerformed: 'Yes' }),
+        action({ id: 'a2', completedOn: '06 Oct 2026', actionPerformed: 'No' }),
+        action({ id: 'a3' }),
+      ]),
+    ).toBe('2 of 3 completed, 1 not performed');
   });
 });
 

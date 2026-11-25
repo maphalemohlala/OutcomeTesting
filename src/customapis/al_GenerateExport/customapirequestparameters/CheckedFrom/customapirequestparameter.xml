@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="CheckedFrom">
+  <description default="First check date to include, yyyy-mm-dd. Omit for no lower bound.">
+    <label description="First check date to include, yyyy-mm-dd. Omit for no lower bound." languagecode="1033" />
+  </description>
+  <displayname default="Checked from">
+    <label description="Checked from" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>1</isoptional>
+  <name>CheckedFrom</name>
+  <type>10</type>
+</customapirequestparameter>

@@ -26,6 +26,42 @@ namespace OutcomeTesting.Plugins.Tests
 
         // ================================================================== the page's head
 
+        [Theory]
+        [InlineData(ResponseRules.TypePassFailInsufficient, false)]
+        [InlineData(ResponseRules.TypePassFailInsufficient, true)]
+        [InlineData(ResponseRules.TypePassFailInsufficientNa, false)]
+        [InlineData(ResponseRules.TypePassFailInsufficientNa, true)]
+        [InlineData(ResponseRules.TypeYesNoNa, false)]
+        [InlineData(ResponseRules.TypeYesNoInsufficient, false)]
+        [InlineData(ResponseRules.TypeOutcomeScale, false)]
+        public void Heads_every_tick_column_without_breaking_a_word(int scale, bool isTax)
+        {
+            // A4 portrait less two 15mm margins, and 4pt of padding each side of a cell
+            // (PdfWriter's Margin and CellPad); headings are bold at the 9pt table size.
+            const double contentWidth = 595.28 - (2 * 42.5);
+            const double cellPad = 4;
+            var options = ChecklistDocument.GridOptions(scale, isTax);
+            var widths = CompletedCheck.GridWidths(options.Count);
+
+            Assert.Equal(1.0, widths.Sum(), 6);
+            for (var i = 0; i < options.Count; i++)
+            {
+                var room = (widths[i + 1] * contentWidth) - (2 * cellPad);
+                foreach (var word in options[i].Label.Split(' '))
+                {
+                    Assert.True(
+                        PdfWriter.Width(word, "F2", 9) <= room,
+                        $"'{word}' ({PdfWriter.Width(word, "F2", 9):0.0}pt) does not fit a {room:0.0}pt column");
+                }
+            }
+        }
+
+        [Fact]
+        public void Keeps_the_test_point_at_55_percent_when_its_tick_columns_fit()
+        {
+            Assert.Equal(new[] { 0.55, 0.15, 0.15, 0.15 }, CompletedCheck.GridWidths(3).Select(w => Math.Round(w, 6)));
+        }
+
         [Fact]
         public void Opens_as_the_page_opens_with_the_review_summary_and_checklist_items()
         {
@@ -55,6 +91,20 @@ namespace OutcomeTesting.Plugins.Tests
 
             Assert.Equal("Not yet allocated", Row(header, "Tax Checker").Cells[1].Text);
             Assert.Equal("Service Account", Row(header, "Tax Checker").Cells[3].Text);
+        }
+
+        [Fact]
+        public void The_case_header_shows_both_references_side_by_side()
+        {
+            // TaskID stays the key; the service case reference is the one people quote, and two
+            // tasks can share it, so the header names both (client, 2026-11-24).
+            var header = Tables(CompletedCheck.Blocks(Case(), AqsReviewId))
+                .First(t => t.Rows.Any(r => r.Cells.Any(c => c.Text == "Adviser name")));
+
+            var refs = Row(header, "Case reference");
+            Assert.Equal(
+                new[] { "Case reference", "300000006", "Service case reference", "IOA07066846" },
+                refs.Cells.Select(c => c.Text).ToArray());
         }
 
         [Fact]
@@ -123,7 +173,7 @@ namespace OutcomeTesting.Plugins.Tests
             var suitability = Grid(CompletedCheck.Blocks(Case(), AqsReviewId), "Suitability test point");
 
             Assert.Equal(
-                new[] { "Suitability test point", "Pass", "Pass with issues", "Potential harm", "Insufficient evidence", "N/A" },
+                new[] { "Suitability test point", "Pass", "Pass with issues", "Insufficient evidence", "Potential harm", "N/A" },
                 suitability.Rows[0].Cells.Select(c => c.Text).ToArray());
 
             var concessions = Row(suitability, "Any concessions / off-tariff pricing approved and recorded");
@@ -185,6 +235,18 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
+        public void The_consumer_duty_grid_is_headed_by_the_four_outcomes()
+        {
+            Assert.True(ChecklistDocument.IsTickScale(ResponseRules.TypeOutcomeScale));
+            Assert.Equal(
+                new[] { "Pass", "Pass with issues", "Insufficient evidence", "Potential harm" },
+                ChecklistDocument.GridOptions(ResponseRules.TypeOutcomeScale, false).Select(o => o.Label).ToArray());
+            Assert.Equal(
+                new[] { 120910300, 120910303, 120910302, 120910304 },
+                ChecklistDocument.GridOptions(ResponseRules.TypeOutcomeScale, false).Select(o => o.Value).ToArray());
+        }
+
+        [Fact]
         public void Consumer_duty_no_longer_prints_the_section_h_line()
         {
             var blocks = CompletedCheck.Blocks(Case(), AqsReviewId);
@@ -220,6 +282,47 @@ namespace OutcomeTesting.Plugins.Tests
 
             Assert.Equal("[x]", Row(fails, "AML - ID verification issue").Cells[1].Text);
             Assert.DoesNotContain(fails.Rows, r => r.Cells[0].Text == "Breach - Any other process breach has been identified");
+        }
+
+        [Fact]
+        public void Each_check_prints_only_its_own_teams_fail_points()
+        {
+            // UAT 2026-11-25: the Tax PDF listed every old File Quality point on a Tax only case.
+            var service = Case();
+            service.Seed("al_failreason", Guid.NewGuid(),
+                "al_name", "OEL missing or incomplete",
+                "al_category", new OptionSetValue(CompletedCheck.TaxFileQualityCategory),
+                "al_displayorder", 30,
+                "statecode", new OptionSetValue(0));
+
+            var aqs = Grid(CompletedCheck.Blocks(service, AqsReviewId), "File Quality fail reason");
+            var tax = Grid(CompletedCheck.Blocks(service, TaxReviewId), "File Quality fail reason");
+
+            Assert.Contains(aqs.Rows, r => r.Cells[0].Text == "AML - ID verification issue");
+            Assert.DoesNotContain(aqs.Rows, r => r.Cells[0].Text == "OEL missing or incomplete");
+            Assert.Equal(new[] { "File Quality fail reason", "OEL missing or incomplete" }, tax.Rows.Select(r => r.Cells[0].Text));
+        }
+
+        [Theory]
+        [InlineData(true, false)]
+        [InlineData(false, true)]
+        public void A_tax_check_prints_file_quality_outcome_only_when_no_aqs_check_follows(bool requiresAqs, bool printed)
+        {
+            // UAT 2026-11-25: on Tax then AQS the Tax team completes no File Quality Outcome.
+            var service = Case();
+            var route = Guid.NewGuid();
+            service.Seed("al_reviewroute", route, "al_requiresaqsreview", requiresAqs, "al_requirestaxreview", true);
+            service.Row("al_outcomecase", CaseId)["al_reviewrouteid"] = new EntityReference("al_reviewroute", route);
+            service.Seed("al_failreason", Guid.NewGuid(),
+                "al_name", "OEL missing or incomplete",
+                "al_category", new OptionSetValue(CompletedCheck.TaxFileQualityCategory),
+                "al_displayorder", 30,
+                "statecode", new OptionSetValue(0));
+
+            var blocks = CompletedCheck.Blocks(service, TaxReviewId);
+
+            Assert.Equal(printed, blocks.Any(b => b.Kind == PdfBlockKind.Subheading && b.Text == "File Quality Outcome"));
+            Assert.Contains(blocks, b => b.Kind == PdfBlockKind.Subheading && b.Text == ChecklistDocument.FailPointsTitle);
         }
 
         [Fact]
@@ -396,6 +499,9 @@ namespace OutcomeTesting.Plugins.Tests
                 new[] { "Tax check 300000006.pdf", "AQS check 300000006.pdf" },
                 documents.Select(d => d.Name).ToArray());
             Assert.All(documents, d => Assert.StartsWith("%PDF-1.4", Encoding.GetEncoding(28591).GetString(d.Content)));
+
+            // Landscape, so the remedial action boxes are wide enough to read (UAT, 2026-11-25).
+            Assert.All(documents, d => Assert.Contains("/MediaBox [0 0 841.89 595.28]", Encoding.GetEncoding(28591).GetString(d.Content)));
         }
 
         [Fact]
@@ -439,6 +545,25 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Equal("2", table.Rows.First(r => r.Cells[0].Text == "2").Cells[0].Text);
 
             Assert.Contains("OUTCOME\nInsufficient evidence", Tables(blocks).First().Rows[0].Cells[2].Text);
+        }
+
+        [Fact]
+        public void The_remediation_outcome_follows_an_amended_grade_and_keeps_the_tax_half()
+        {
+            var service = Case();
+            var action = Action(service, completed: false);
+            action["al_description"] = ((string)action["al_description"]).Replace(
+                "(Insufficient evidence)", "(Potential harm; Tax check: Fail)");
+            service.SeedOptionSet("al_outcome", "al_initialoutcome",
+                120910702, "Insufficient evidence", 120910704, "Potential harm");
+            service.Seed("al_outcome", Guid.NewGuid(),
+                "al_outcomecaseid", Ref(),
+                "al_initialoutcome", new OptionSetValue(120910702),
+                "createdon", new DateTime(2026, 9, 25, 10, 0, 0, DateTimeKind.Utc));
+
+            var blocks = RemediationDocument.Blocks(service, Ref(), new DateTime(2026, 9, 29));
+
+            Assert.Equal("OUTCOME\nInsufficient evidence; Tax check: Fail", Tables(blocks).First().Rows[0].Cells[2].Text);
         }
 
         [Fact]
@@ -836,6 +961,7 @@ namespace OutcomeTesting.Plugins.Tests
             service.Seed("al_outcomecase", CaseId,
                 "al_casereference", "300000006",
                 "al_ioreference", "30000001-30000106",
+                "al_servicecaseref", "IOA07066846",
                 "al_clientname", "Test Client 6",
                 "al_advisername", "Adam Strumidlo",
                 "al_paraplanner", "Adam Strumidlo",

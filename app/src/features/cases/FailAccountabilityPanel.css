@@ -4,120 +4,233 @@
  */
 
 .accountability {
-  padding: var(--space-4);
-  margin-bottom: var(--space-5);
+  padding: var(--space-5);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
 }
 
 .accountability h2 {
+  margin: 0;
   font-size: var(--text-lg);
-  margin: 0 0 var(--space-3);
 }
 
-.accountability__list,
-.accountability__flags {
+.accountability > h2 {
+  margin-bottom: var(--space-4);
+}
+
+.accountability__list {
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
 .accountability__outcome + .accountability__outcome {
-  margin-top: var(--space-4);
-  padding-top: var(--space-4);
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
   border-top: 1px solid var(--colour-border);
 }
 
-.accountability__head {
-  display: flex;
-  align-items: baseline;
+.accountability__title {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-3);
-  margin-bottom: var(--space-2);
 }
-
-.accountability__check { font-weight: 600; }
 
 /* Says which of the two states the row is in, in words. A derived row and
    a recorded row can show identical ticks and mean different things: the
    first changes if the grade changes, the second never does. */
 .accountability__source {
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 2px 6px;
-  border-radius: var(--radius);
-  background: var(--colour-surface-sunken);
-  color: var(--colour-text-muted);
+  padding: 2px var(--space-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  background: var(--colour-chip);
+  color: var(--colour-chip-text);
 }
 
+/* Recorded is the settled state, so it takes the stronger tint. */
 .accountability__source[data-source='recorded'] {
-  background: var(--colour-surface-header);
-  color: var(--colour-text);
+  background: var(--colour-action);
+  color: var(--colour-action-text);
 }
 
 .accountability__note {
-  margin: 0 0 var(--space-3);
+  margin: 0 0 var(--space-4);
   font-size: var(--text-sm);
   color: var(--colour-text-muted);
-  max-width: 60ch;
+  max-width: 72ch;
 }
 
-.accountability__flags li + li { margin-top: var(--space-2); }
-
-.accountability__flags label {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-  cursor: pointer;
+/* The table scrolls on its own at phone width rather than widening the page. */
+.accountability__scroll {
+  position: relative;
+  overflow-x: auto;
+  margin-bottom: var(--space-3);
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
 }
 
-.accountability__actions {
+.accountability__table {
+  width: 100%;
+  min-width: 30rem;
+  border-collapse: collapse;
+}
+
+.accountability__table th,
+.accountability__table td {
+  padding: var(--space-3) var(--space-5);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.accountability__table thead th {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--colour-text-muted);
+  background: var(--colour-surface-sunken);
+  border-bottom: 1px solid var(--colour-border);
+}
+
+.accountability__table thead th + th,
+.accountability__table td {
+  text-align: center;
+}
+
+.accountability__table tbody tr + tr > * {
+  border-top: 1px solid var(--colour-border);
+}
+
+.accountability__table tbody th {
+  font-weight: 600;
+}
+
+.accountability__who {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--colour-text-muted);
+}
+
+/* The box sits dead centre under its column heading; the Default chip hangs beside it,
+   out of the flow, so a ticked-by-default row lines up with the rows without one. */
+.accountability__tick {
+  position: relative;
+  display: inline-flex;
+  vertical-align: middle;
+}
+
+.accountability__tick input {
+  width: 1.375rem;
+  height: 1.375rem;
+  margin: 0;
+  accent-color: var(--colour-action);
+}
+
+.accountability__default {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + var(--space-2));
+  transform: translateY(-50%);
+  white-space: nowrap;
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  background: var(--colour-chip);
+  color: var(--colour-chip-text);
+}
+
+/* Nobody can be named, or the holders are still loading. */
+.accountability__banner {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-3);
-  flex-wrap: wrap;
-  margin-top: var(--space-4);
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm);
+  background: var(--colour-surface-sunken);
+  color: var(--colour-text);
 }
 
-.accountability__save {
-  font: inherit;
-  padding: var(--space-2) var(--space-4);
-  color: var(--colour-text-inverse);
-  background: var(--colour-action);
-  border: 1px solid var(--colour-action);
-  border-radius: var(--radius);
-  cursor: pointer;
+.accountability__banner[data-kind='warn'] {
+  background: var(--colour-warn-bg);
 }
 
-.accountability__save:hover:not(:disabled) { background: var(--colour-action-hover); }
-
-.accountability__save:disabled {
-  opacity: 0.5;
-  cursor: default;
+.accountability__banner .icon {
+  margin-top: 0.15em;
+  color: var(--colour-outcome-issues);
 }
-
-.accountability__message { font-size: var(--text-sm); }
-.accountability__message[data-kind='error'] { color: var(--colour-outcome-harm); }
-.accountability__message[data-kind='success'] { color: var(--colour-text-muted); }
 
 /* The two named-person pickers, side by side where there is room. */
 .accountability__people {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
   gap: var(--space-4);
-  margin-top: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+/* The administrator option with what it means beside it. */
+.accountability__admin {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-5);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--colour-border);
+}
+
+.accountability__admin .accountability__note {
+  margin: 0;
+}
+
+.accountability__admin-tick {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 600;
+}
+
+.accountability__admin-tick input {
+  width: 1.375rem;
+  height: 1.375rem;
+  margin: 0;
+  accent-color: var(--colour-action);
+}
+
+@media (max-width: 45rem) {
+  .accountability__admin {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
 }
 
 .accountability__person {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  min-width: 0;
 }
 
 .accountability__person > span {
-  font-size: var(--text-xs);
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+}
+
+.accountability__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.accountability__message {
+  font-size: var(--text-sm);
   color: var(--colour-text-muted);
 }
+
+.accountability__message[data-kind='error'] { color: var(--colour-outcome-harm); }
+.accountability__message[data-kind='success'] { color: var(--colour-outcome-pass); }

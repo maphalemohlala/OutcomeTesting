@@ -11,7 +11,22 @@
   or purple contains 'fail', and the statuses that already matched 'failed' —
   Validation Failed, a Failed notification — are blocked either way.
 {% endcomment %}
+{% comment %}
+  Grades (pass, issues, insufficient, harm) draw as a coloured mark before the words; a stage
+  draws as a pill and reads in sentence case ("Awaiting sign-off"), the casing the rest of the
+  page uses. A grade keeps its own casing because "Tax: Pass" is two words of a label.
+{% endcomment %}
 {% assign s = status | default: '' | downcase %}
+{% comment %}
+  Sentence case by hand, from filters this site is known to run: some DotLiquid versions'
+  capitalize title-cases every word, and slice is unproven here. A letter L leads the label
+  exactly when L followed by the label less its first L is the label itself.
+{% endcomment %}
+{% assign said_low = status | default: '' | downcase %}
+{% assign said = said_low %}
+{% assign said_letters = 'a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z' | split: ',' %}
+{% for said_l in said_letters %}{% assign said_rest = said_low | remove_first: said_l %}{% assign said_try = said_l | append: said_rest %}{% if said == said_low and said_try == said_low %}{% assign said = said_l | upcase | append: said_rest %}{% endif %}{% endfor %}
+{% assign said = said | replace: 't&c', 'T&C' | replace: ' aqs', ' AQS' | escape %}
 {% if s == '' %}
   <span class="ot-badge ot-badge--none">Not set</span>
 {% elsif s contains 'potential harm' %}
@@ -23,11 +38,15 @@
 {% elsif s contains 'pass' %}
   <span class="ot-badge ot-badge--pass">{{ status | escape }}</span>
 {% elsif s contains 'closed' or s contains 'no check required' %}
-  <span class="ot-badge ot-badge--closed">{{ status | escape }}</span>
-{% elsif s contains 'fail' or s contains 'blocked' or s contains 'overdue' %}
-  <span class="ot-badge ot-badge--blocked">{{ status | escape }}</span>
-{% elsif s contains 'progress' or s contains 'assigned' or s contains 'submitted' %}
-  <span class="ot-badge ot-badge--active">{{ status | escape }}</span>
+  <span class="ot-badge ot-badge--closed">{{ said }}</span>
+{% elsif s contains 'completed' %}
+  <span class="ot-badge ot-badge--done">{{ said }}</span>
+{% elsif s contains 'fail' or s contains 'blocked' or s contains 'overdue' or s contains 'awaiting remediation' %}
+  <span class="ot-badge ot-badge--blocked">{{ said }}</span>
+{% elsif s contains 'progress' %}
+  <span class="ot-badge ot-badge--progress">{{ said }}</span>
+{% elsif s contains 'assigned' or s contains 'submitted' or s contains 'sign-off' or s contains 'recheck' %}
+  <span class="ot-badge ot-badge--active">{{ said }}</span>
 {% else %}
-  <span class="ot-badge ot-badge--waiting">{{ status | escape }}</span>
+  <span class="ot-badge ot-badge--waiting">{{ said }}</span>
 {% endif %}

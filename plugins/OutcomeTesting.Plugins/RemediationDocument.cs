@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
@@ -88,7 +88,7 @@ namespace OutcomeTesting.Plugins
             head.Add(
                 Stacked("CLIENT", row.GetAttributeValue<string>("al_clientname")),
                 Stacked("ADVISER", row.GetAttributeValue<string>("al_advisername")),
-                Stacked("OUTCOME", Outcome(actions)),
+                Stacked("OUTCOME", Outcome(actions, CurrentGrade(service, caseRef, labels))),
                 Stacked("CASE", row.GetAttributeValue<string>("al_casereference")));
             blocks.Add(PdfBlock.Table(head));
 
@@ -186,9 +186,10 @@ namespace OutcomeTesting.Plugins
 
                     // The page runs the action's own columns down the rows of its issues; here
                     // they sit on the first, and the rows under it belong to the same action.
-                    foreach (var detail in details)
+                    // The remedial action, first, is the checker's own words and may be formatted.
+                    for (var d = 0; d < details.Length; d++)
                     {
-                        cells.Add(i == 0 ? PdfCell.Of(detail) : PdfCell.Blank());
+                        cells.Add(i > 0 ? PdfCell.Blank() : d == 0 ? PdfCell.FromMarkup(details[d]) : PdfCell.Of(details[d]));
                     }
 
                     table.Add(cells.ToArray());
@@ -367,11 +368,52 @@ namespace OutcomeTesting.Plugins
 
         // ------------------------------------------------------------------ the page's wording
 
+        /// <summary>The advice grade the case holds now, or null; an amendment rewrites it.</summary>
+        private static string CurrentGrade(IOrganizationService service, EntityReference caseRef, OptionLabels labels)
+        {
+            try
+            {
+                // The newest outcome, as AmendOutcomePlugin picks the row it rewrites. Inline:
+                // the Registration tool links this file but not the plug-in or Outcomes.cs.
+                var query = new QueryExpression("al_outcome") { ColumnSet = new ColumnSet("al_initialoutcome"), TopCount = 1 };
+                query.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseRef.Id);
+                query.AddOrder("createdon", OrderType.Descending);
+                var found = service.RetrieveMultiple(query).Entities;
+                var outcome = found.Count == 0 ? null : found[0];
+                var grade = outcome == null ? null : outcome.GetAttributeValue<OptionSetValue>("al_initialoutcome");
+                return grade == null ? null : labels.Label("al_outcome", "al_initialoutcome", grade.Value);
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
         /// <summary>
         /// The grade each action was raised for, read from "... submitted (Insufficient
         /// evidence)" in its description and joined across actions, as the page reads it.
+        /// The description is written once at submit, so its advice-grade half is replaced by
+        /// <paramref name="currentGrade"/> when there is one (an amended grade); the
+        /// "Tax check: ..." half is never amended and is kept as written.
         /// </summary>
-        private static string Outcome(List<Entity> actions)
+        private static string Outcome(List<Entity> actions, string currentGrade)
+        {
+            var reasons = new List<string>();
+            foreach (var part in RaisedOutcome(actions))
+            {
+                var piece = part.StartsWith("Tax check", StringComparison.Ordinal) || currentGrade == null
+                    ? part
+                    : currentGrade;
+                if (!reasons.Contains(piece))
+                {
+                    reasons.Add(piece);
+                }
+            }
+
+            return reasons.Count == 0 ? null : string.Join("; ", reasons.ToArray());
+        }
+
+        private static List<string> RaisedOutcome(List<Entity> actions)
         {
             var reasons = new List<string>();
             foreach (var action in actions)
@@ -389,14 +431,17 @@ namespace OutcomeTesting.Plugins
                     continue;
                 }
 
-                var reason = description.Substring(open + 1, close - open - 1).Trim();
-                if (reason.Length > 0 && !reasons.Contains(reason))
+                foreach (var raw in description.Substring(open + 1, close - open - 1).Split(';'))
                 {
-                    reasons.Add(reason);
+                    var reason = raw.Trim();
+                    if (reason.Length > 0 && !reasons.Contains(reason))
+                    {
+                        reasons.Add(reason);
+                    }
                 }
             }
 
-            return reasons.Count == 0 ? null : string.Join("; ", reasons.ToArray());
+            return reasons;
         }
 
         /// <summary>The issues an action lists, one per "- " line of its description.</summary>

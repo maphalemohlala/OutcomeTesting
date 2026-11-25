@@ -1,7 +1,7 @@
 import { ukDayOf } from './caseHeaderDates';
 import type { CellValue } from '../../lib/tabular';
 import { ADVICE_DATE_LABEL } from './caseHeaderDates';
-import { UPLOADED_BY_LABEL } from '../../types/domain';
+import { SERVICE_CASE_REF_LABEL, UPLOADED_BY_LABEL } from '../../types/domain';
 import type { CaseSummary } from './caseWorklistMapping';
 import { isoDay } from '../../lib/format';
 
@@ -12,6 +12,7 @@ import { isoDay } from '../../lib/format';
  */
 export const CASE_EXPORT_HEADERS = [
   'Case reference',
+  SERVICE_CASE_REF_LABEL,
   'Status',
   'Review route',
   'Priority',
@@ -45,6 +46,7 @@ function ukDate(iso: string | null): string {
 export function caseExportRow(item: CaseSummary): CellValue[] {
   return [
     item.caseReference,
+    item.serviceCaseRef ?? '',
     item.status,
     item.route ?? '',
     item.priority ?? '',
@@ -77,6 +79,7 @@ export function caseExportRow(item: CaseSummary): CellValue[] {
  */
 export const COMPLETED_CASE_HEADERS = [
   'Case reference',
+  SERVICE_CASE_REF_LABEL,
   'Client name',
   'Adviser name',
   'Adviser code',
@@ -112,6 +115,7 @@ function daysBetween(from: string | null | undefined, to: string | null | undefi
 export function completedCaseRow(item: CaseSummary): CellValue[] {
   return [
     item.caseReference,
+    item.serviceCaseRef ?? '',
     item.client ?? '',
     item.adviser ?? '',
     item.adviserCode ?? '',

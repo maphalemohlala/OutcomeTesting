@@ -95,6 +95,7 @@ export const RESOURCE_KEYS = [
   'case.delete',
   'case.amendoutcome',
   'case.reassignmanager',
+  'adviser.status',
   'remediation.complete',
   'question.retire',
   'export.generate',
@@ -249,6 +250,12 @@ export const DEFAULT_PERMISSIONS: readonly PermissionRule[] = [
       { role, resource: 'case.amendoutcome' as ResourceKey, level: 'Edit' as AccessLevel },
       { role, resource: 'case.reassignmanager' as ResourceKey, level: 'Edit' as AccessLevel },
     ],
+  ),
+
+  // An adviser's status (Pre-CAS and the rest), which OTIS follows over IO: the system
+  // administrators only (client, 2026-11-25), not the managers who run the mapping page.
+  ...(['AL Portal - Portal Administrator', 'Administrators'] as const).map(
+    (role) => ({ role, resource: 'adviser.status' as ResourceKey, level: 'Edit' as AccessLevel }),
   ),
 
   // Portal Administrator and Administrators both manage configuration and the permission

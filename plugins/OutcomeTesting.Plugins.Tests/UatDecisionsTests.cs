@@ -90,20 +90,33 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void A_tax_category_answered_yes_carries_its_comments_and_refuses_without_them()
+        public void A_tax_category_answered_yes_is_a_card_row_that_needs_its_own_remedial_action()
         {
-            var choices = new Dictionary<string, int> { { "Q-TAX-05", Yes }, { "Q-TAX-07", No }, { "Q-TAX-09", Yes } };
-            var comments = new Dictionary<string, string> { { "Q-TAX-06", " Rerun the CGT figures. " } };
+            // Q-TAX-09 (Omissions) was retired at UAT, 2026-11-25: a Yes left on it raises nothing.
+            var choices = new Dictionary<string, int> { { "Q-TAX-05", Yes }, { "Q-TAX-07", No }, { "Q-TAX-09", Yes }, { "Q-TAX-11", Yes } };
+            var raised = TaxCategories.Raised(code => choices.ContainsKey(code) ? choices[code] : (int?)null);
+            Assert.Equal(new[] { "Calculations", "Other" }, raised);
 
-            var raised = TaxCategories.Raised(
-                code => choices.ContainsKey(code) ? choices[code] : (int?)null,
-                code => comments.ContainsKey(code) ? comments[code] : null);
+            // Card words for Calculations (two actions); a category now No left words behind.
+            var map = new Dictionary<string, string>
+            {
+                { "Calculations", "Rerun the CGT figures." },
+                { "Calculations ##2", "Send the client the corrected figures." },
+                { "Wording", "Left from a Yes since changed to No." },
+                { "Wording ##2", "Also left behind." },
+                { "Omissions", "Parked before the category was retired." },
+                { "Some fail point", "Kept." },
+            };
 
-            Assert.Equal(new[] { "Calculations", "Omissions" }, raised.Keys);
-            Assert.Equal("Rerun the CGT figures.", raised["Calculations"]);
-            Assert.Contains("Omissions", TaxCategories.Refusal(raised));
-            raised["Omissions"] = "Add the trust deed.";
-            Assert.Null(TaxCategories.Refusal(raised));
+            Assert.Equal("Write the remedial action for 'Other' before submitting.", TaxCategories.Settle(raised, map));
+            Assert.False(map.ContainsKey("Wording"));
+            Assert.False(map.ContainsKey("Wording ##2"));
+            Assert.Equal("Kept.", map["Some fail point"]);
+
+            map["Other"] = "Add the trust deed.";
+            Assert.Null(TaxCategories.Settle(raised, map));
+            Assert.Equal(new[] { "Calculations", "Other" }, TaxCategories.Parked(map));
+            Assert.Equal(2, RemedialActions.Expand(TaxCategories.Parked(map), map).Count(p => p.Key == "Calculations"));
         }
 
         [Fact]

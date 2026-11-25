@@ -4,8 +4,9 @@ using Microsoft.Xrm.Sdk;
 namespace OutcomeTesting.Plugins
 {
     /// <summary>
-    /// The gate both supervisor commands pass: the signatory must be the T&amp;C Manager that
-    /// <c>al_advisermapping</c> names for THIS case's adviser (AD-198, AD-202).
+    /// The gate both supervisor commands pass: the signatory must be one of the T&amp;C Managers
+    /// that <c>al_advisermapping</c> names for THIS case's adviser (AD-198, AD-202), or the one
+    /// chosen for this case. An adviser may have several, all equal (owner, 2026-11-24).
     ///
     /// <para>
     /// <b>Unlike <see cref="TcManagerRouting"/>, this type does decide.</b> Routing answers
@@ -39,8 +40,8 @@ namespace OutcomeTesting.Plugins
     public static class SupervisorMapping
     {
         /// <summary>
-        /// Refuses unless <paramref name="contactId"/> is the T&amp;C Manager mapped to the
-        /// adviser on <paramref name="caseRef"/>.
+        /// Refuses unless <paramref name="contactId"/> is one of the T&amp;C Managers mapped to
+        /// the adviser on <paramref name="caseRef"/>, or the one chosen for that case.
         /// </summary>
         /// <param name="act">
         /// What is being refused, as the sentence's subject - "Signing a case off",
@@ -55,7 +56,7 @@ namespace OutcomeTesting.Plugins
             // Matched on the manager alone, never on whether they can be EMAILED. That is a
             // routing concern - the reason ManagerNotReachable exists - and has nothing to do
             // with whether this account may act.
-            if (routing.Manager != null && routing.Manager.Id == contactId)
+            if (routing.Includes(contactId))
             {
                 return;
             }
@@ -65,13 +66,13 @@ namespace OutcomeTesting.Plugins
             // would let anyone holding the role enumerate who supervises whom. Where there is
             // no mapping at all the routing's own sentence IS the useful answer - the gap is
             // in al_advisermapping and the reader is the person who can have it filled in.
-            var detail = routing.Manager == null
+            var detail = routing.Managers.Count == 0
                 ? " " + routing.Reason
-                : " Your portal account is not this case's T&C Manager.";
+                : " Your portal account is not one of this case's T&C Managers.";
 
             throw new InvalidPluginExecutionException(
                 CommandHelpers.PreconditionPrefix +
-                act + " is the T&C Manager mapped to its adviser." + detail);
+                act + " is for a T&C Manager mapped to its adviser." + detail);
         }
     }
 }

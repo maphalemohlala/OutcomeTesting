@@ -518,6 +518,9 @@ namespace OutcomeTesting.Plugins.Tests
 
         // Requirements log row 6 (2026-11-18): Business Unit from Group2, column H of the extract.
         [Theory]
+        [InlineData("Whole of Market Proposition", ImportRules.BusinessUnitIndependent)]
+        [InlineData("Restricted Proposition", ImportRules.BusinessUnitRestricted)]
+        [InlineData(" restricted proposition", ImportRules.BusinessUnitRestricted)]
         [InlineData("Whole of Market", ImportRules.BusinessUnitIndependent)]
         [InlineData("whole of market ", ImportRules.BusinessUnitIndependent)]
         [InlineData("Restricted Market", ImportRules.BusinessUnitRestricted)]

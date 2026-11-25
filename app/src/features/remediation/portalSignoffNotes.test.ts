@@ -39,9 +39,14 @@ describe.each(pages)('%s', (_name, page) => {
    * emailed document draws the same trail - RemediationDocument.SupervisorTrail.
    */
   it("draws every supervisor decision, each with its notes, in the form's sign-off row", () => {
-    const row = page.slice(page.indexOf('Supervisor sign-off'));
-    const cell = row.slice(row.indexOf('<td'), row.indexOf('</td>'));
+    // The case record draws the paper form's "Supervisor sign-off" row; the remediation page
+    // draws the supervisor on its Sign-off card (2026-11-24 redesign), in the cell its script
+    // rewrites after a decision.
+    const card = page.indexOf('<dd data-ot-supervisor-cell>');
+    const row = card > -1 ? page.slice(card) : page.slice(page.indexOf('Supervisor sign-off'));
+    const cell = card > -1 ? row.slice(0, row.indexOf('</dd>')) : row.slice(row.indexOf('<td'), row.indexOf('</td>'));
 
+    expect(cell.length).toBeGreaterThan(0);
     expect(cell).not.toContain('latest_supervisor');
     expect(cell).toContain('{{ ot_supervisor_trail }}');
     expect(page).toMatch(/\{% for s in \w+\.results\.entities %\}\s*\{% assign ot_tn = s\.al_notes \| default: '' \| strip %\}/);

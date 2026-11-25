@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { CaseReferenceLink } from '../cases/CaseReferenceLink';
 import { FilterBar, FilterField } from '../../components/form/FilterBar';
 import { ExportMenu } from '../../components/export/ExportMenu';
 import { OutcomeIndicator } from '../../components/status/OutcomeIndicator';
@@ -9,6 +9,8 @@ import type { CaseSummary } from '../cases/caseWorklistMapping';
 import { checkerLabel } from '../cases/checkerNames';
 import { ukDayOf } from '../cases/caseHeaderDates';
 import './CompletedCaseReport.css';
+import { Pager } from '../../components/navigation/Pager';
+import { PAGE_SIZE, usePaged } from '../../components/navigation/paging';
 
 /** The check date is the business date of the report; where it is missing, intake date stands in. */
 // eslint-disable-next-line react-refresh/only-export-components -- exported for its test
@@ -68,6 +70,7 @@ export function CompletedCaseReport({
   const exportRows = useMemo(() => filtered.map(completedCaseRow), [filtered]);
 
   const isFiltered = Boolean(outcome || product || from || to || closedOnly);
+  const paged = usePaged(filtered, PAGE_SIZE, `${outcome}|${product}|${from}|${to}|${closedOnly}`);
 
   return (
     <section className="completed" aria-labelledby="completed-heading">
@@ -168,10 +171,10 @@ export function CompletedCaseReport({
                 </td>
               </tr>
             ) : (
-              filtered.map((item) => (
+              paged.rows.map((item) => (
                 <tr key={item.id}>
                   <th scope="row">
-                    <Link to={`/cases/${item.id}`}>{item.caseReference}</Link>
+                    <CaseReferenceLink id={item.id} caseReference={item.caseReference} serviceCaseRef={item.serviceCaseRef} />
                   </th>
                   <td>{item.client ?? '—'}</td>
                   <td>{item.adviser ?? '—'}</td>
@@ -192,6 +195,7 @@ export function CompletedCaseReport({
           </tbody>
         </table>
       </div>
+      <Pager {...paged} label="cases" />
     </section>
   );
 }

@@ -72,21 +72,22 @@ namespace OutcomeTesting.Plugins.Tests
             var body = NotificationBodies.Remediation(
                 OutcomeRules.OutcomeInsufficient, "Jane Adviser", "Mr and Mrs Smith", Link, null);
 
-            Assert.Contains("insufficient evidence/ potential harm grading", body);
+            Assert.Contains("an insufficient evidence grading", body);
             Assert.Contains("liaise with your T&amp;C Manager", body);
             Assert.Contains(Link, body);
         }
 
         [Fact]
-        public void Potential_harm_reads_as_the_same_letter_as_insufficient_evidence()
+        public void Potential_harm_and_insufficient_evidence_each_name_their_own_grading()
         {
-            // One letter covers both gradings, as the supplied copy does.
+            // A letter each since the client asked (2026-11-25), differing only in the grading named.
             var insufficient = NotificationBodies.Remediation(
                 OutcomeRules.OutcomeInsufficient, "Jane Adviser", "Mr and Mrs Smith", Link, null);
             var harm = NotificationBodies.Remediation(
                 OutcomeRules.OutcomePotentialHarm, "Jane Adviser", "Mr and Mrs Smith", Link, null);
 
-            Assert.Equal(insufficient, harm);
+            Assert.Contains("a potential harm grading", harm);
+            Assert.Equal(insufficient, harm.Replace("a potential harm grading", "an insufficient evidence grading"));
         }
 
         [Fact]
@@ -138,8 +139,10 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Equal("Case check - Pass: OT-1001", NotificationBodies.PassSubject("OT-1001"));
             Assert.Equal("Remedial needed - Pass with issues: OT-1001",
                 NotificationBodies.RemediationSubject(OutcomeRules.OutcomePassWithIssues, "OT-1001"));
-            Assert.Equal("Remedial needed - insufficient evidence/ potential harm: OT-1001",
+            Assert.Equal("Remedial needed - Insufficient evidence: OT-1001",
                 NotificationBodies.RemediationSubject(OutcomeRules.OutcomeInsufficient, "OT-1001"));
+            Assert.Equal("Remedial needed - Potential harm: OT-1001",
+                NotificationBodies.RemediationSubject(OutcomeRules.OutcomePotentialHarm, "OT-1001"));
         }
 
         [Fact]

@@ -22,10 +22,11 @@ export class Al_SetFailAccountabilityService {
    * @param FqContactId type: `String`
    * @param AqContactId type: `String`
    * @param FqAdministratorId type: `String`
+   * @param FqAdministrator type: `Boolean`
    */
-  public static async al_SetFailAccountability(TargetId: string, FqAdviser: boolean, FqParaplanner: boolean, AqAdviser: boolean, AqParaplanner: boolean, IdempotencyKey: string, FqContactId?: string, AqContactId?: string, FqAdministratorId?: string): Promise<IOperationResult<Record<string, unknown>>> {
-    const params: { TargetId: string, FqAdviser: boolean, FqParaplanner: boolean, AqAdviser: boolean, AqParaplanner: boolean, IdempotencyKey: string, FqContactId?: string, AqContactId?: string, FqAdministratorId?: string } = { TargetId, FqAdviser, FqParaplanner, AqAdviser, AqParaplanner, IdempotencyKey, FqContactId, AqContactId, FqAdministratorId };
-    const result = await Al_SetFailAccountabilityService.client.executeAsync<{ TargetId: string, FqAdviser: boolean, FqParaplanner: boolean, AqAdviser: boolean, AqParaplanner: boolean, IdempotencyKey: string, FqContactId?: string, AqContactId?: string, FqAdministratorId?: string }, Record<string, unknown>>(
+  public static async al_SetFailAccountability(TargetId: string, FqAdviser: boolean, FqParaplanner: boolean, AqAdviser: boolean, AqParaplanner: boolean, IdempotencyKey: string, FqContactId?: string, AqContactId?: string, FqAdministratorId?: string, FqAdministrator?: boolean): Promise<IOperationResult<Record<string, unknown>>> {
+    const params: { TargetId: string, FqAdviser: boolean, FqParaplanner: boolean, AqAdviser: boolean, AqParaplanner: boolean, IdempotencyKey: string, FqContactId?: string, AqContactId?: string, FqAdministratorId?: string, FqAdministrator?: boolean } = { TargetId, FqAdviser, FqParaplanner, AqAdviser, AqParaplanner, IdempotencyKey, FqContactId, AqContactId, FqAdministratorId, FqAdministrator };
+    const result = await Al_SetFailAccountabilityService.client.executeAsync<{ TargetId: string, FqAdviser: boolean, FqParaplanner: boolean, AqAdviser: boolean, AqParaplanner: boolean, IdempotencyKey: string, FqContactId?: string, AqContactId?: string, FqAdministratorId?: string, FqAdministrator?: boolean }, Record<string, unknown>>(
       {
         dataverseRequest: {
           action: 'customapi',

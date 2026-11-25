@@ -773,7 +773,7 @@
           <IsRetrievable>0</IsRetrievable>
           <IsLocalizable>0</IsLocalizable>
           <Format>textarea</Format>
-          <MaxLength>4000</MaxLength>
+          <MaxLength>20000</MaxLength>
           <displaynames>
             <displayname description="Remedial action" languagecode="1033" />
           </displaynames>

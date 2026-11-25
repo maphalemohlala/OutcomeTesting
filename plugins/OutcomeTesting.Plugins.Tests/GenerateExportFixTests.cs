@@ -96,6 +96,7 @@ namespace OutcomeTesting.Plugins.Tests
             provider.Context.MessageName = "al_GenerateExport";
             provider.Context.InputParameters["BatchId"] = batchId.ToString("D");
             provider.Context.InputParameters["IdempotencyKey"] = Guid.NewGuid().ToString("N");
+            provider.Context.InputParameters["FileKind"] = GenerateExportPlugin.FileQuarterly;
             new GenerateExportPlugin(null, null).Execute(provider);
             return provider;
         }

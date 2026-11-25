@@ -34,6 +34,7 @@ export interface Al_outcomesBase {
   al_finalisedon?: string;
   al_finaloutcome?: Al_outcomesal_finaloutcome;
   "al_FqAccountableContactId@odata.bind"?: string;
+  al_fqadministratoraccountable?: boolean;
   "al_FqAdministratorContactId@odata.bind"?: string;
   al_fqadviseraccountable?: boolean;
   al_fqparaplanneraccountable?: boolean;
@@ -60,8 +61,10 @@ export interface Al_outcomes extends Al_outcomesBase {
   al_aqparaplanneraccountablename?: string;
   al_finaloutcomename?: string;
   al_fqaccountablecontactidname?: string;
-  al_fqadministratorcontactidname?: string;
   al_fqaccountablecontactidyominame?: string;
+  al_fqadministratoraccountablename?: string;
+  al_fqadministratorcontactidname?: string;
+  al_fqadministratorcontactidyominame?: string;
   al_fqadviseraccountablename?: string;
   al_fqparaplanneraccountablename?: string;
   al_initialoutcomename?: string;

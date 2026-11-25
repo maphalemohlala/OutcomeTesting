@@ -1,16 +1,25 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { closesOnBackdrop, closesOnEscape } from './modalDismiss';
+import { Icon } from '../icons/Icon';
 import './Modal.css';
 
 interface Props {
   title: string;
   onClose: () => void;
   children: ReactNode;
+  /** 'wide' for a form laid out in columns, such as Edit case; 'editor' fills the screen and lets its columns scroll. */
+  size?: 'wide' | 'editor';
+  /** A line under the title, inside the header. */
+  intro?: ReactNode;
+  /** Shown beside the title, on its line: a status chip, a category. */
+  meta?: ReactNode;
+  /** Pinned under the body, for the dialog's own buttons. */
+  footer?: ReactNode;
 }
 
 /** Accessible pop-up dialog: backdrop click and Escape close it, focus moves in. */
-export function Modal({ title, onClose, children }: Props) {
+export function Modal({ title, onClose, children, size, intro, meta, footer }: Props) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   // Where the last press began, so a drag that ends on the backdrop is not taken for a click on it.
@@ -44,7 +53,7 @@ export function Modal({ title, onClose, children }: Props) {
     >
       <div
         ref={dialogRef}
-        className="modal__dialog"
+        className={size ? `modal__dialog modal__dialog--${size}` : 'modal__dialog'}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -52,14 +61,21 @@ export function Modal({ title, onClose, children }: Props) {
         onClick={(event) => event.stopPropagation()}
       >
         <div className="modal__header">
-          <h2 id={titleId} className="modal__title">
-            {title}
-          </h2>
+          <div className="modal__heading">
+            <div className="modal__title-line">
+              <h2 id={titleId} className="modal__title">
+                {title}
+              </h2>
+              {meta}
+            </div>
+            {intro ? <p className="modal__intro">{intro}</p> : null}
+          </div>
           <button type="button" className="modal__close" aria-label="Close" onClick={onClose}>
-            &times;
+            <Icon name="close" />
           </button>
         </div>
         <div className="modal__body">{children}</div>
+        {footer ? <div className="modal__footer">{footer}</div> : null}
       </div>
     </div>,
     document.body,

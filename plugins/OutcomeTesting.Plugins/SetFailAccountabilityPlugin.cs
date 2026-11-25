@@ -29,6 +29,9 @@ namespace OutcomeTesting.Plugins
         // Optional (requirements log row 10): the administrator who carries a File Quality
         // fail. Any contact - no Adviser or Planner role - and never exported.
         private const string InFqAdministratorId = "FqAdministratorId";
+        // Since 2026-11-25 (project owner): "an administrator", with no name. FqAdministratorId
+        // is still accepted from an older caller and counts as ticked.
+        private const string InFqAdministrator = "FqAdministrator";
         private const string InIdempotencyKey = "IdempotencyKey";
 
         private const string OutStatus = "Status";
@@ -69,6 +72,8 @@ namespace OutcomeTesting.Plugins
             var fqContactId = ParseOptionalContact(context, InFqContactId);
             var aqContactId = ParseOptionalContact(context, InAqContactId);
             var fqAdministratorId = ParseOptionalContact(context, InFqAdministratorId);
+            var fqAdministrator = (CommandHelpers.GetOptionalBool(context, InFqAdministrator) ?? false)
+                || fqAdministratorId != null;
 
             PermissionHelpers.EnsureAppPermission(systemService, context, "page.cases", PermissionHelpers.AccessEdit);
 
@@ -102,7 +107,7 @@ namespace OutcomeTesting.Plugins
             WebRoleRegistry.EnsureAccountable(
                 systemService, aqContactId, outcome.GetAttributeValue<EntityReference>("al_aqaccountablecontactid"));
 
-            userService.Update(new Entity(OutcomeEntity, targetId)
+            var update = new Entity(OutcomeEntity, targetId)
             {
                 ["al_fqadviseraccountable"] = fqAdviser,
                 ["al_fqparaplanneraccountable"] = fqParaplanner,
@@ -114,14 +119,16 @@ namespace OutcomeTesting.Plugins
                 // leaving a stale name the extract would keep using.
                 ["al_fqaccountablecontactid"] = fqContactId,
                 ["al_aqaccountablecontactid"] = aqContactId,
-                [GenerateExportPlugin.FqAdministratorContactAttr] = fqAdministratorId,
-            });
+                [GenerateExportPlugin.FqAdministratorFlag] = fqAdministrator,
+            };
+            ApplyAdministratorContact(update, fqAdministrator, fqAdministratorId);
+            userService.Update(update);
 
             var details = "FQ adviser " + fqAdviser + ", FQ paraplanner " + fqParaplanner
                 + ", AQ adviser " + aqAdviser + ", AQ paraplanner " + aqParaplanner
                 + ", FQ named " + Describe(fqContactId, NameOf(userService, fqContactId))
                 + ", AQ named " + Describe(aqContactId, NameOf(userService, aqContactId))
-                + ", FQ administrator " + DescribeAdministrator(fqAdministratorId, NameOf(userService, fqAdministratorId));
+                + ", FQ administrator " + (fqAdministrator ? "Yes" : "No");
 
             var auditId = CommandHelpers.WriteAuditEvent(
                 systemService, CommandSetFailAccountability, "SetFailAccountability", OutcomeEntity, targetId,
@@ -180,9 +187,21 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>The administrator in the audit line: as a named person, or "(none)".</summary>
-        public static string DescribeAdministrator(EntityReference contact, string fullName)
+        /// <summary>
+        /// The administrator's contact column on a save. Unticked clears it, so a name kept from
+        /// before 2026-11-25 stops counting. Ticked leaves a kept name alone, and writes one
+        /// only when an older caller still sends an id.
+        /// </summary>
+        public static void ApplyAdministratorContact(Entity update, bool administrator, EntityReference legacyContact)
         {
-            return contact == null ? "(none)" : Describe(contact, fullName);
+            if (!administrator)
+            {
+                update[GenerateExportPlugin.FqAdministratorContactAttr] = null;
+            }
+            else if (legacyContact != null)
+            {
+                update[GenerateExportPlugin.FqAdministratorContactAttr] = legacyContact;
+            }
         }
 
         /// <summary>

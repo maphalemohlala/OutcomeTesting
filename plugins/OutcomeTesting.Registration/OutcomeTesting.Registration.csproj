@@ -53,6 +53,7 @@
     <Compile Include="..\OutcomeTesting.Plugins\RemediationDocument.cs" Link="Linked\RemediationDocument.cs" />
     <Compile Include="..\OutcomeTesting.Plugins\RemedialActions.cs" Link="Linked\RemedialActions.cs" />
     <Compile Include="..\OutcomeTesting.Plugins\PdfWriter.cs" Link="Linked\PdfWriter.cs" />
+    <Compile Include="..\OutcomeTesting.Plugins\AscotLloydLogo.cs" Link="Linked\AscotLloydLogo.cs" />
     <Compile Include="..\OutcomeTesting.Plugins\ChecklistDocument.cs" Link="Linked\ChecklistDocument.cs" />
     <Compile Include="..\OutcomeTesting.Plugins\ProductName.cs" Link="Linked\ProductName.cs" />
     <Compile Include="..\OutcomeTesting.Plugins\EnvironmentVariable.cs" Link="Linked\EnvironmentVariable.cs" />

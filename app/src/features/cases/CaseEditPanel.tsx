@@ -8,7 +8,8 @@ import { classify } from '../../services/commands/failures';
 import { UserPicker } from '../../components/form/UserPicker';
 import { useIntentKeys } from '../../hooks/useIntentKey';
 import { updateCaseDetails } from '../../services/commands/updateCaseDetails';
-import { CaseRemoveAction } from './CaseRemoveAction';
+import { Link } from 'react-router-dom';
+import { Icon } from '../../components/icons/Icon';
 import { assignCase } from '../../services/commands/assignCase';
 import {
   describeSubmit,
@@ -70,6 +71,7 @@ import {
 } from './caseCheckers';
 import type { CaseDetail, CaseEditValues } from './useCaseDetail';
 import './CaseEditPanel.css';
+import { Skeleton } from '../../components/feedback/Skeleton';
 
 /**
  * `listoption` is a dropdown whose choices are ROWS the checking team maintains rather than
@@ -89,6 +91,10 @@ interface FieldDef {
   help?: string;
   /** For a `user` field, the sibling attribute its picked person's email is written to. */
   emailAttr?: keyof CaseEditValues;
+  /** Columns the field takes in the dialog's three-column grid. */
+  span?: 2 | 3;
+  /** Offers a link to the list's admin page beside the label. */
+  manage?: boolean;
 }
 
 interface Section {
@@ -108,20 +114,20 @@ const SECTIONS: Section[] = [
         attr: 'al_duedate',
         label: 'Due date',
         kind: 'date',
-        help: 'Three days after the case was uploaded. Editable by a manager.',
+        help: 'Three days after upload. Editable by a manager.',
       },
     ],
   },
   {
     heading: 'Client',
     fields: [
-      { attr: 'al_clientname', label: 'Client', kind: 'text' },
+      { attr: 'al_clientname', label: 'Client', kind: 'text', span: 2 },
       {
         attr: 'al_vulnerableclientid',
         label: 'Vulnerable client',
         kind: 'listoption',
         list: managedList('vulnerable-client'),
-        help: 'Maintained under Admin → Dropdown options.',
+        manage: true,
       },
     ],
   },
@@ -146,24 +152,10 @@ const SECTIONS: Section[] = [
       },
       {
         attr: 'al_producttypeid',
-        label: 'Product/solution type',
+        label: 'Product / solution type',
         kind: 'listoption',
         list: managedList('product-solution-type'),
-        help: 'Maintained under Admin → Dropdown options. A new option appears here as soon as it is added.',
-      },
-      {
-        attr: 'al_productids',
-        label: 'Products',
-        kind: 'listoptionset',
-        list: managedList('products'),
-        help: 'Tick every product the case covers. Maintained under Admin → Dropdown options.',
-      },
-      { attr: 'al_advicedate', label: ADVICE_DATE_LABEL, kind: 'date' },
-      {
-        attr: 'al_samplesourceid',
-        label: 'Sample source',
-        kind: 'listoption',
-        list: managedList('sample-source'),
+        manage: true,
       },
       {
         attr: 'al_preorpostcheckid',
@@ -171,6 +163,22 @@ const SECTIONS: Section[] = [
         kind: 'listoption',
         list: managedList('pre-or-post-check'),
       },
+      {
+        attr: 'al_productids',
+        label: 'Products',
+        kind: 'listoptionset',
+        list: managedList('products'),
+        help: 'Tick every product the case covers.',
+        span: 2,
+        manage: true,
+      },
+      {
+        attr: 'al_samplesourceid',
+        label: 'Sample source',
+        kind: 'listoption',
+        list: managedList('sample-source'),
+      },
+      { attr: 'al_advicedate', label: ADVICE_DATE_LABEL, kind: 'date' },
     ],
   },
   {
@@ -207,6 +215,8 @@ interface Props {
   /** Every managed list's options, unshaped; empty until read or where the read failed. */
   listRows: readonly RawListOption[];
   onSaved: () => void;
+  /** Where the page shows what a save did; the button sits in the page header, so the notice cannot. */
+  onNotice: (notice: string | null) => void;
 }
 
 /**
@@ -253,6 +263,7 @@ function TickSet({
   const shown = filterTickOptions(options, chosen, term);
   const long = options.length >= FOLD_FROM;
   const summary = describeTickSelection(options, chosen, `Select ${label.toLowerCase()}`);
+  const picked = options.filter((option) => chosen.includes(option.id));
 
   const list = (
     <div className="case-edit__set" role="group" aria-labelledby={labelledBy}>
@@ -285,7 +296,15 @@ function TickSet({
         aria-expanded={open}
         onClick={() => setOpen(!open)}
       >
-        <span className="case-edit__set-summary">{summary}</span>
+        <span className="case-edit__set-summary">
+          {picked.length > 0
+            ? picked.map((option) => (
+                <span key={option.id} className="case-edit__chip">
+                  {option.label}
+                </span>
+              ))
+            : summary}
+        </span>
       </button>
       {open ? (
         <>
@@ -310,7 +329,7 @@ function TickSet({
     </div>
   );
 }
-export function CaseEditPanel({ detail, reviews, directory, listRows, onSaved }: Props) {
+export function CaseEditPanel({ detail, reviews, directory, listRows, onSaved, onNotice }: Props) {
   const { can, roles } = usePermissions();
   const product = useProductName();
   const [open, setOpen] = useState(false);
@@ -325,7 +344,6 @@ export function CaseEditPanel({ detail, reviews, directory, listRows, onSaved }:
   }
   const [reason, setReason] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
-  const [panelNotice, setPanelNotice] = useState<string | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const intent = useIntentKeys();
@@ -338,6 +356,8 @@ export function CaseEditPanel({ detail, reviews, directory, listRows, onSaved }:
   const [checkerBy, setCheckerBy] = useState<Record<Discipline, string>>({ Tax: '', AQS: '' });
 
   const mayAssign = can('command.assign', 'Edit');
+  // The dropdowns' own admin page, offered beside the fields it feeds to whoever may open it.
+  const mayManageLists = can('page.admin.lists');
 
   // AD-218: each team manager allocates their own discipline only. al_AssignCase refuses the
   // rest; this stops the modal offering what the command will refuse.
@@ -638,7 +658,7 @@ export function CaseEditPanel({ detail, reviews, directory, listRows, onSaved }:
       .then((outcome) => {
         setSaving(false);
         setModalError(outcome.error);
-        if (outcome.notice) setPanelNotice(outcome.notice);
+        if (outcome.notice) onNotice(outcome.notice);
         if (outcome.close) {
           setReason('');
           setErrors([]);
@@ -660,7 +680,7 @@ export function CaseEditPanel({ detail, reviews, directory, listRows, onSaved }:
     setCheckerBy({ Tax: '', AQS: '' });
     setModalError(null);
     setErrors([]);
-    setPanelNotice(null);
+    onNotice(null);
     setOpen(true);
   }
 
@@ -696,12 +716,17 @@ export function CaseEditPanel({ detail, reviews, directory, listRows, onSaved }:
     return (
       <label
         key={field.attr}
-        className={
-          field.kind === 'listoptionset' ? 'case-edit__field case-edit__field--wide' : 'case-edit__field'
-        }
+        className={field.span ? `case-edit__field case-edit__field--span${field.span}` : 'case-edit__field'}
         htmlFor={inputId}
       >
-        <span id={`${inputId}-label`}>{field.label}</span>
+        <span className="case-edit__label-row">
+          <span id={`${inputId}-label`}>{field.label}</span>
+          {field.manage && mayManageLists ? (
+            <Link className="case-edit__manage" to="/admin/lists">
+              Manage
+            </Link>
+          ) : null}
+        </span>
         {field.kind === 'listoptionset' ? (
           !detail.productsKnown && field.attr === 'al_productids' ? (
             <p className="case-edit__help">
@@ -812,27 +837,19 @@ export function CaseEditPanel({ detail, reviews, directory, listRows, onSaved }:
   }
 
   return (
-    <section className="case-edit" aria-labelledby="case-edit-heading">
-      <div className="case-edit__bar">
-        <h2 id="case-edit-heading">Case management</h2>
-        <div className="case-edit__bar-actions">
-          <CaseRemoveAction detail={detail} onRemoved={onSaved} onStale={onSaved} />
-          <button type="button" className="case-edit__save" onClick={openForm}>
-            Edit case details
-          </button>
-        </div>
-      </div>
-      {panelNotice ? <Notice tone="success">{panelNotice}</Notice> : null}
+    <>
+      <button type="button" className="button-primary" onClick={openForm}>
+        <Icon name="pencil" />
+        Edit case details
+      </button>
 
       {open ? (
-        <Modal title="Edit case details" onClose={() => { if (!saving) setOpen(false); }}>
-          <p className="case-edit__intro">
-            Amend any case field, and allocate a check to a named checker. Only the fields
-            you change are saved, each recorded in the audit history with the change itself
-            and your reason where you give one. Adviser, paraplanner and checker
-            can be changed at any point, including after a check has started.
-          </p>
-
+        <Modal
+          size="wide"
+          title={`Edit case ${detail.caseReference}`}
+          intro="Only the fields you change are saved. Each change is recorded in the audit history with your reason, if you give one. Adviser, paraplanner and checker can be changed at any point, including after a check has started."
+          onClose={() => { if (!saving) setOpen(false); }}
+        >
           <ValidationSummary errors={errors} />
           {modalError ? <Notice tone="error">{modalError}</Notice> : null}
 
@@ -857,9 +874,7 @@ export function CaseEditPanel({ detail, reviews, directory, listRows, onSaved }:
                 <legend>Checkers</legend>
 
                 {reviews.status === 'loading' ? (
-                  <p className="case-edit__help" role="status">
-                    Loading this case&apos;s checks…
-                  </p>
+                  <Skeleton label="Loading this case&apos;s checks…" rows={2} />
                 ) : null}
 
                 {reviews.status === 'unavailable' ? (
@@ -992,39 +1007,39 @@ export function CaseEditPanel({ detail, reviews, directory, listRows, onSaved }:
             {mayAssign && !allocationOpen ? (
               <fieldset className="case-edit__section">
                 <legend>Checkers</legend>
-                <p className="case-edit__help">
+                <p className="case-edit__locked">
+                  <Icon name="lock" />
                   Checks cannot be allocated while a case is at {statusNow}.
                 </p>
               </fieldset>
             ) : null}
 
-            <label className="case-edit__field" htmlFor="case-edit-reason">
-              <span>Reason <span className="case-edit__optional">(optional)</span></span>
-              <textarea
-                id="case-edit-reason"
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                rows={2}
-                placeholder="Why are you making this change?"
-              />
-            </label>
-
-            <div className="case-edit__actions">
+            <div className="case-edit__footer">
+              <label className="case-edit__field case-edit__reason" htmlFor="case-edit-reason">
+                <span>Reason <span className="case-edit__optional">(optional)</span></span>
+                <input
+                  id="case-edit-reason"
+                  type="text"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Why are you making this change?"
+                />
+              </label>
               <button
                 type="button"
-                className="case-edit__cancel"
+                className="button-secondary"
                 onClick={() => setOpen(false)}
                 disabled={saving}
               >
                 Cancel
               </button>
-              <button type="submit" className="case-edit__save" disabled={saving}>
+              <button type="submit" className="button-primary" disabled={saving}>
                 {saving ? 'Saving…' : 'Save changes'}
               </button>
             </div>
           </form>
         </Modal>
       ) : null}
-    </section>
+    </>
   );
 }

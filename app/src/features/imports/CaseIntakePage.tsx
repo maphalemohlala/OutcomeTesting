@@ -8,6 +8,9 @@ import { useCaseUpload } from './useCaseUpload';
 import { ResolveExceptionForm } from './ResolveExceptionForm';
 import { downloadValidationReport } from './caseUpload';
 import './CaseIntakePage.css';
+import { Skeleton } from '../../components/feedback/Skeleton';
+import { Pager } from '../../components/navigation/Pager';
+import { usePaged } from '../../components/navigation/paging';
 
 export function CaseIntakePage() {
   const { state, reload } = useCaseIntake();
@@ -21,6 +24,8 @@ export function CaseIntakePage() {
   const [resolvedNotice, setResolvedNotice] = useState<string | null>(null);
 
   const mayResolve = can('page.imports', 'Edit');
+  const batches = usePaged(state.status === 'ready' ? state.batches : []);
+  const exceptions = usePaged(state.status === 'ready' ? state.exceptions : []);
 
   const busy = upload.state.phase === 'processing';
 
@@ -125,7 +130,7 @@ export function CaseIntakePage() {
         </div>
       ) : null}
 
-      {state.status === 'loading' ? <p role="status">Loading intake batches…</p> : null}
+      {state.status === 'loading' ? <Skeleton label="Loading intake batches…" rows={6} /> : null}
 
       {state.status === 'unavailable' ? (
         <section className="intake__unavailable" aria-labelledby="intake-unavailable">
@@ -170,7 +175,7 @@ export function CaseIntakePage() {
                       </td>
                     </tr>
                   ) : (
-                    state.batches.map((batch) => (
+                    batches.rows.map((batch) => (
                       <tr key={batch.id}>
                         <th scope="row">{batch.name}</th>
                         <td>{batch.source}</td>
@@ -186,6 +191,7 @@ export function CaseIntakePage() {
                 </tbody>
               </table>
             </div>
+            <Pager {...batches} label="batches" />
           </section>
 
           <section className="intake__section" aria-labelledby="intake-exceptions">
@@ -231,7 +237,7 @@ export function CaseIntakePage() {
                       </td>
                     </tr>
                   ) : (
-                    state.exceptions.map((exception) => (
+                    exceptions.rows.map((exception) => (
                       <Fragment key={exception.id}>
                         <tr>
                           <td>{exception.batch ?? 'Unknown batch'}</td>
@@ -286,6 +292,7 @@ export function CaseIntakePage() {
                 </tbody>
               </table>
             </div>
+            <Pager {...exceptions} label="exceptions" />
           </section>
         </>
       ) : null}

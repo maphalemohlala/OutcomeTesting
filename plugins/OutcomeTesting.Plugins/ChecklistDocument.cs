@@ -203,7 +203,9 @@ namespace OutcomeTesting.Plugins
                 case "amlcra":
                     return ResponseRules.TypeYesNoNa;
                 case "cd":
-                    return ResponseRules.TypeYesNoInsufficient;
+                    // The Consumer Duty outcomes since 2026-11-24; a review answered on the old
+                    // Yes / No scale is headed by its own rows, which win over this.
+                    return ResponseRules.TypeOutcomeScale;
                 default:
                     return ResponseRules.TypePassFailInsufficient;
             }
@@ -218,7 +220,8 @@ namespace OutcomeTesting.Plugins
             return responseType == ResponseRules.TypePassFailInsufficient
                 || responseType == ResponseRules.TypeYesNoNa
                 || responseType == ResponseRules.TypeYesNoInsufficient
-                || responseType == ResponseRules.TypePassFailInsufficientNa;
+                || responseType == ResponseRules.TypePassFailInsufficientNa
+                || responseType == ResponseRules.TypeOutcomeScale;
         }
 
         /// <summary>
@@ -300,8 +303,8 @@ namespace OutcomeTesting.Plugins
                         : Options(
                             ResponseRules.ChoicePass, "Pass",
                             ResponseRules.ChoicePassWithIssues, "Pass with issues",
-                            ResponseRules.ChoiceFail, "Potential harm",
                             ResponseRules.ChoiceInsufficient, insufficient,
+                            ResponseRules.ChoiceFail, "Potential harm",
                             ResponseRules.ChoiceNa, "N/A");
                 case ResponseRules.TypeYesNoNa:
                     return Options(
@@ -313,6 +316,12 @@ namespace OutcomeTesting.Plugins
                         ResponseRules.ChoiceYes, "Yes",
                         ResponseRules.ChoiceNo, "No",
                         ResponseRules.ChoiceInsufficient, "Insufficient evidence");
+                case ResponseRules.TypeOutcomeScale:
+                    return Options(
+                        ResponseRules.ChoicePass, "Pass",
+                        ResponseRules.ChoicePassWithIssues, "Pass with issues",
+                        ResponseRules.ChoiceInsufficient, "Insufficient evidence",
+                        ResponseRules.ChoicePotentialHarm, "Potential harm");
                 default:
                     return new List<Option>();
             }
@@ -343,8 +352,8 @@ namespace OutcomeTesting.Plugins
                     return Options(
                         ResponseRules.ChoicePass, "PASS",
                         ResponseRules.ChoicePassWithIssues, "PASS WITH ISSUES",
-                        ResponseRules.ChoiceFail, "POTENTIAL HARM",
                         ResponseRules.ChoiceInsufficient, "INSUFFICIENT EVIDENCE",
+                        ResponseRules.ChoiceFail, "POTENTIAL HARM",
                         ResponseRules.ChoiceNa, "N/A");
                 case ResponseRules.TypeYesNo:
                     return Options(ResponseRules.ChoiceYes, "YES", ResponseRules.ChoiceNo, "NO");
@@ -359,6 +368,7 @@ namespace OutcomeTesting.Plugins
                         ResponseRules.ChoiceNo, "NO",
                         ResponseRules.ChoiceInsufficient, "INSUFFICIENT EVIDENCE");
                 case ResponseRules.TypeGrade:
+                case ResponseRules.TypeOutcomeScale:
                     return Options(
                         ResponseRules.ChoicePass, "PASS",
                         ResponseRules.ChoicePassWithIssues, "PASS WITH ISSUES",

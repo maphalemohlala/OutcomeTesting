@@ -1,4 +1,4 @@
-﻿using OutcomeTesting.Registration;
+using OutcomeTesting.Registration;
 using Microsoft.Crm.Sdk.Messages;
 using Microsoft.PowerPlatform.Dataverse.Client;
 using Microsoft.PowerPlatform.Dataverse.Client.Exceptions;
@@ -424,11 +424,6 @@ if (args.Length >= 2 && args[0].Equals("clearrulapprole", StringComparison.Ordin
     return ClearRuleAppRole(args[1], ConfirmedFor(args, args[1]));
 }
 
-if (args.Length >= 2 && args[0].Equals("backfillinitialgrade", StringComparison.OrdinalIgnoreCase))
-{
-    return BackfillInitialGrade(args[1], ConfirmedFor(args, args[1]));
-}
-
 if (args.Length >= 3 && args[0].Equals("registertype", StringComparison.OrdinalIgnoreCase))
 {
     return RegisterType(args[1], args[2]);
@@ -442,6 +437,11 @@ if (args.Length >= 2 && args[0].Equals("createnotificationtable", StringComparis
 if (args.Length >= 2 && args[0].Equals("createadvisermapping", StringComparison.OrdinalIgnoreCase))
 {
     return CreateAdviserMappingTable(args[1], args.Length > 2 ? args[2] : "OutcomeTesting");
+}
+
+if (args.Length >= 2 && args[0].Equals("severalmanagers", StringComparison.OrdinalIgnoreCase))
+{
+    return SeveralManagers(args);
 }
 
 if (args.Length >= 2 && args[0].Equals("createlistoptiontable", StringComparison.OrdinalIgnoreCase))
@@ -519,6 +519,11 @@ if (args.Length >= 2 && args[0].Equals("addboolcolumn", StringComparison.Ordinal
 if (args.Length >= 2 && args[0].Equals("setcolumnlabel", StringComparison.OrdinalIgnoreCase))
 {
     return SetColumnLabel(args);
+}
+
+if (args.Length >= 2 && args[0].Equals("setmemolength", StringComparison.OrdinalIgnoreCase))
+{
+    return SetMemoLength(args);
 }
 
 if (args.Length >= 2 && args[0].Equals("setstepfilter", StringComparison.OrdinalIgnoreCase))
@@ -2592,10 +2597,9 @@ int PushWebFile(string orgUrl, string componentIdArg, string path, string? mimeT
     return 0;
 }
 
-// Runs the Trail Light export the way the Exports page does — CreateExportBatch then
-// GenerateExport — and reports the row count and the records actually written. This is
-// the evidence that the Download control has something to download; the control disables
-// itself on an empty row set, so a batch of 0 was never a UI defect.
+// Runs the Trail Light export the way the Exports page does — one GenerateExport that creates
+// the batch, here for the quarterly file over every closed case — and reports the row count and
+// the records actually written.
 int ProveExport(string orgUrl)
 {
     using var svc = Connect(orgUrl);
@@ -2610,18 +2614,12 @@ int ProveExport(string orgUrl)
     var closedCases = svc.RetrieveMultiple(closed).Entities;
     Console.WriteLine($"Closed cases available to the export: {closedCases.Count}");
 
-    var createKey = "PROVE-EXPORT-CREATE-" + DateTime.UtcNow.ToString("yyyyMMddHHmmss");
-    var created = svc.Execute(new OrganizationRequest("al_CreateExportBatch")
-    {
-        ["IdempotencyKey"] = createKey,
-    });
-    var batchId = (string)created["BatchId"];
-    Console.WriteLine($"Created draft batch {batchId}.");
-
+    var batchId = Guid.NewGuid().ToString("D");
     var generated = svc.Execute(new OrganizationRequest("al_GenerateExport")
     {
         ["BatchId"] = batchId,
-        ["IdempotencyKey"] = "PROVE-EXPORT-GEN-" + batchId,
+        ["IdempotencyKey"] = batchId,
+        ["FileKind"] = "Quarterly",
     });
     var rowCount = (string)generated["RowCount"];
     Console.WriteLine($"Generated: RowCount={rowCount}, Status={generated["Status"]}");
@@ -3906,6 +3904,72 @@ int AddTextColumn(string[] a)
 /// behaviour or the required level. MergeLabels keeps labels in languages this call does
 /// not supply.
 /// </summary>
+// Widens a memo column, e.g. al_remediationaction.al_remedialaction to 20000 for formatted
+// remedial actions (2026-11-23). Only widens: a narrower limit would refuse rows already stored.
+int SetMemoLength(string[] a)
+{
+    var orgUrl = a[1];
+    int maxLength;
+    if (a.Length < 5 || !int.TryParse(a[4], out maxLength) || !ConfirmedFor(a, orgUrl))
+    {
+        Console.Error.WriteLine(
+            "This writes metadata to a live environment. Re-run as: setmemolength <orgUrl> " +
+            "<entityLogicalName> <columnLogicalName> <maxLength> --confirm <orgUrl>");
+        return 1;
+    }
+
+    var entity = a[2].Trim();
+    var logicalName = a[3].Trim().ToLowerInvariant();
+
+    using var svc = Connect(orgUrl);
+
+    var memo = ((RetrieveAttributeResponse)svc.Execute(new RetrieveAttributeRequest
+    {
+        EntityLogicalName = entity,
+        LogicalName = logicalName,
+    })).AttributeMetadata as MemoAttributeMetadata;
+    if (memo == null)
+    {
+        Console.Error.WriteLine($"{entity}.{logicalName} is not a memo column. Nothing was changed.");
+        return 1;
+    }
+
+    var before = memo.MaxLength;
+    if (before >= maxLength)
+    {
+        Console.WriteLine($"{entity}.{logicalName}: already {before}, not narrowed. Nothing was changed.");
+        return 0;
+    }
+
+    memo.MaxLength = maxLength;
+    svc.Execute(new UpdateAttributeRequest
+    {
+        SolutionUniqueName = SolutionUniqueName,
+        EntityName = entity,
+        Attribute = memo,
+        MergeLabels = true,
+    });
+    svc.Execute(new PublishXmlRequest
+    {
+        ParameterXml = $"<importexportxml><entities><entity>{entity}</entity></entities></importexportxml>",
+    });
+
+    // Read back, because on this project a successful-looking write is not evidence.
+    var now = (((RetrieveAttributeResponse)svc.Execute(new RetrieveAttributeRequest
+    {
+        EntityLogicalName = entity,
+        LogicalName = logicalName,
+    })).AttributeMetadata as MemoAttributeMetadata)?.MaxLength;
+    if (now != maxLength)
+    {
+        Console.Error.WriteLine($"{entity}.{logicalName}: MaxLength still reads {now}. Nothing to rely on.");
+        return 1;
+    }
+
+    Console.WriteLine($"{entity}.{logicalName}: MaxLength {before} -> {now}.");
+    return 0;
+}
+
 int SetColumnLabel(string[] a)
 {
     var orgUrl = a[1];
@@ -9320,8 +9384,8 @@ int CreateAdviserMappingTable(string orgUrl, string solutionUniqueName)
             {
                 SchemaName = AdviserMappingTable.KeySchema,
                 LogicalName = AdviserMappingTable.KeyLogical,
-                DisplayName = AdviserMappingTable.Text("Adviser email"),
-                KeyAttributes = new[] { AdviserMappingTable.EmailLogical },
+                DisplayName = AdviserMappingTable.Text("Adviser and T&C Manager"),
+                KeyAttributes = new[] { AdviserMappingTable.EmailLogical, AdviserMappingTable.ManagerLogical },
             },
         });
         Console.WriteLine($"  {AdviserMappingTable.KeyLogical}: created");
@@ -9362,6 +9426,173 @@ int CreateAdviserMappingTable(string orgUrl, string solutionUniqueName)
     Console.WriteLine(
         $"Published. {AdviserMappingTable.Schema} is in solution '{solutionUniqueName}', "
         + "with its email key and T&C Manager lookup.");
+    return 0;
+}
+
+// Owner, 2026-11-24: an adviser may have several T&C Managers, all equal. Re-runnable, in
+// this order, against any environment the tool can reach:
+//   1. the case-to-managers many-to-many (al_outcomecase_tcmanagers), created if missing;
+//   2. the alternate key on adviser email + manager, created if missing and waited on until
+//      the platform has finished building it (a key starts Pending);
+//   3. the old key on adviser email alone, deleted if present - only after step 2 is Active,
+//      so the table is never without a duplicate guard;
+//   4. the relationship and the new key added to the solution (idempotent), then published.
+// In an environment where the old key arrived in a MANAGED solution (TEST), step 3 cannot
+// delete it - a managed component goes only by an upgrade import of a solution that no
+// longer carries it - and the verb says so rather than failing.
+int SeveralManagers(string[] a)
+{
+    var orgUrl = a[1];
+    if (!ConfirmedFor(a, orgUrl))
+    {
+        Console.Error.WriteLine(
+            "This writes metadata to a live environment. Re-run as: severalmanagers <orgUrl> --confirm <orgUrl>");
+        return 1;
+    }
+
+    using var svc = Connect(orgUrl);
+
+    // 1. The many-to-many.
+    Guid relationshipId;
+    try
+    {
+        var found = (RetrieveRelationshipResponse)svc.Execute(
+            new RetrieveRelationshipRequest { Name = AdviserMappingTable.ManagersRelationship });
+        relationshipId = found.RelationshipMetadata.MetadataId ?? Guid.Empty;
+        Console.WriteLine($"  {AdviserMappingTable.ManagersRelationship}: already present");
+    }
+    catch (Exception)
+    {
+        var created = (CreateManyToManyResponse)svc.Execute(new CreateManyToManyRequest
+        {
+            SolutionUniqueName = SolutionUniqueName,
+            IntersectEntitySchemaName = AdviserMappingTable.ManagersRelationship,
+            ManyToManyRelationship = new ManyToManyRelationshipMetadata
+            {
+                SchemaName = AdviserMappingTable.ManagersRelationship,
+                Entity1LogicalName = "al_outcomecase",
+                Entity1AssociatedMenuConfiguration = new AssociatedMenuConfiguration
+                {
+                    Behavior = AssociatedMenuBehavior.UseLabel,
+                    Group = AssociatedMenuGroup.Details,
+                    Label = AdviserMappingTable.Text("T&C Managers"),
+                    Order = 10000,
+                },
+                Entity2LogicalName = "contact",
+                Entity2AssociatedMenuConfiguration = new AssociatedMenuConfiguration
+                {
+                    Behavior = AssociatedMenuBehavior.UseLabel,
+                    Group = AssociatedMenuGroup.Details,
+                    Label = AdviserMappingTable.Text("Cases to sign off"),
+                    Order = 10000,
+                },
+            },
+        });
+        relationshipId = created.ManyToManyRelationshipId;
+        Console.WriteLine($"  {AdviserMappingTable.ManagersRelationship}: created");
+    }
+
+    // 2. The new key, waited on until Active. Read by name: RetrieveEntity here did not list
+    // a key the Web API showed Active (DEV, 2026-11-24), so it cannot say whether one exists.
+    EntityKeyMetadata KeyNamed(string logical)
+    {
+        try
+        {
+            return ((RetrieveEntityKeyResponse)svc.Execute(new RetrieveEntityKeyRequest
+            {
+                EntityLogicalName = AdviserMappingTable.Logical,
+                LogicalName = logical,
+            })).EntityKeyMetadata;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    if (KeyNamed(AdviserMappingTable.KeyLogical) == null)
+    {
+        svc.Execute(new CreateEntityKeyRequest
+        {
+            EntityName = AdviserMappingTable.Logical,
+            SolutionUniqueName = SolutionUniqueName,
+            EntityKey = new EntityKeyMetadata
+            {
+                SchemaName = AdviserMappingTable.KeySchema,
+                LogicalName = AdviserMappingTable.KeyLogical,
+                DisplayName = AdviserMappingTable.Text("Adviser and T&C Manager"),
+                KeyAttributes = new[] { AdviserMappingTable.EmailLogical, AdviserMappingTable.ManagerLogical },
+            },
+        });
+        Console.WriteLine($"  {AdviserMappingTable.KeyLogical}: created");
+    }
+    else
+    {
+        Console.WriteLine($"  {AdviserMappingTable.KeyLogical}: already present");
+    }
+
+    EntityKeyMetadata key = null;
+    for (var attempt = 0; attempt < 60; attempt++)
+    {
+        // A key just created can take a moment to appear in the metadata at all.
+        key = KeyNamed(AdviserMappingTable.KeyLogical);
+        if (key?.EntityKeyIndexStatus == EntityKeyIndexStatus.Active) break;
+        if (key?.EntityKeyIndexStatus == EntityKeyIndexStatus.Failed)
+        {
+            Console.Error.WriteLine(
+                $"  {AdviserMappingTable.KeyLogical}: the platform FAILED to build it - two rows share an adviser and "
+                + "manager. Remove the duplicate, then reactivate the key (ReactivateEntityKey) and re-run.");
+            return 1;
+        }
+
+        Thread.Sleep(5000);
+    }
+
+    if (key?.EntityKeyIndexStatus != EntityKeyIndexStatus.Active)
+    {
+        Console.Error.WriteLine($"  {AdviserMappingTable.KeyLogical}: still {key?.EntityKeyIndexStatus.ToString() ?? "not visible"} after five minutes. Re-run later.");
+        return 1;
+    }
+
+    Console.WriteLine($"  {AdviserMappingTable.KeyLogical}: Active");
+
+    // 3. The old key, now that the new one guards the table.
+    var old = KeyNamed(AdviserMappingTable.OldKeyLogical);
+    if (old == null)
+    {
+        Console.WriteLine($"  {AdviserMappingTable.OldKeyLogical}: already gone");
+    }
+    else if (old.IsManaged == true)
+    {
+        Console.WriteLine(
+            $"  {AdviserMappingTable.OldKeyLogical}: MANAGED here, so it was left. It goes only with an upgrade "
+            + "import (stage for upgrade, then apply) of a solution version that no longer carries it.");
+    }
+    else
+    {
+        svc.Execute(new DeleteEntityKeyRequest
+        {
+            EntityLogicalName = AdviserMappingTable.Logical,
+            Name = AdviserMappingTable.OldKeyLogical,
+        });
+        Console.WriteLine($"  {AdviserMappingTable.OldKeyLogical}: deleted");
+    }
+
+    // 4. Into the solution, so an export carries both (AddSolutionComponent is idempotent).
+    // Component types: 10 entity relationship, 14 entity key.
+    svc.Execute(new AddSolutionComponentRequest
+    {
+        ComponentId = relationshipId, ComponentType = 10, SolutionUniqueName = SolutionUniqueName, AddRequiredComponents = false,
+    });
+    svc.Execute(new AddSolutionComponentRequest
+    {
+        ComponentId = key.MetadataId ?? Guid.Empty, ComponentType = 14, SolutionUniqueName = SolutionUniqueName, AddRequiredComponents = false,
+    });
+    svc.Execute(new PublishAllXmlRequest());
+
+    Console.WriteLine(
+        $"Done. {AdviserMappingTable.ManagersRelationship} and {AdviserMappingTable.KeyLogical} are in '{SolutionUniqueName}'. "
+        + "Run reconcileaccess once the plug-in assembly that maintains the links is deployed.");
     return 0;
 }
 
@@ -11827,85 +12058,6 @@ int AddMetadataToSolution(string orgUrl, string entityName, string? attributeNam
 
 /// <summary>What a registered step is set to do, so a check can report it rather than restate it.</summary>
 
-// backfillinitialgrade <orgUrl> [--confirm <orgUrl>]: fills al_exportrecord.al_initialadvicequalitygrade
-// on rows snapshotted before the column existed (2026-11-16), so their daily Trail Light file
-// reports the grade first recorded rather than the one in force. The value is the label of
-// al_initialoutcome on the case's newest al_outcome - the row GenerateExport reads. A row with
-// no advice grade (Tax-only) is not owed one and is not read; a row whose case has no initial
-// grade is listed and left alone. Dry run by default; touches no other column.
-int BackfillInitialGrade(string orgUrl, bool confirm)
-{
-    const string Column = "al_initialadvicequalitygrade";
-    using var svc = Connect(orgUrl);
-
-    var columns = ((RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
-    {
-        LogicalName = "al_exportrecord",
-        EntityFilters = EntityFilters.Attributes,
-    })).EntityMetadata.Attributes;
-    if (!columns.Any(a => a.LogicalName == Column))
-    {
-        Console.Error.WriteLine(
-            "This environment's export records have no column for the first-recorded Advice Quality grade yet. "
-            + "It arrives with the next solution import; run this again after that. Nothing was changed.");
-        return 1;
-    }
-
-    var query = new QueryExpression("al_exportrecord")
-    {
-        ColumnSet = new ColumnSet("al_exportrecordcode", "al_outcomecaseid"),
-        Criteria = new FilterExpression(),
-    };
-    query.Criteria.AddCondition(Column, ConditionOperator.Null);
-    query.Criteria.AddCondition("al_advicequalitygrade", ConditionOperator.NotNull);
-    var rows = RetrieveAll(svc, query);
-
-    var initialByCase = new Dictionary<Guid, string?>();
-    var filled = 0;
-    var leftAlone = 0;
-    foreach (var row in rows)
-    {
-        var code = row.GetAttributeValue<string>("al_exportrecordcode");
-        var caseRef = row.GetAttributeValue<EntityReference>("al_outcomecaseid");
-        string? initial = null;
-        if (caseRef != null && !initialByCase.TryGetValue(caseRef.Id, out initial))
-        {
-            var outcome = new QueryExpression("al_outcome")
-            {
-                ColumnSet = new ColumnSet("al_initialoutcome"),
-                TopCount = 1,
-                Criteria = new FilterExpression(),
-            };
-            outcome.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseRef.Id);
-            outcome.AddOrder("createdon", OrderType.Descending);
-            var newest = svc.RetrieveMultiple(outcome).Entities.FirstOrDefault();
-            initial = newest != null && newest.FormattedValues.TryGetValue("al_initialoutcome", out var label) ? label : null;
-            initialByCase[caseRef.Id] = initial;
-        }
-
-        if (string.IsNullOrWhiteSpace(initial))
-        {
-            Console.WriteLine($"  {code}: the case has no first-recorded grade - left alone");
-            leftAlone++;
-            continue;
-        }
-
-        Console.WriteLine($"  {code}: {Column} = {initial}");
-        if (confirm)
-        {
-            svc.Update(new Entity("al_exportrecord", row.Id) { [Column] = initial });
-        }
-
-        filled++;
-    }
-
-    Console.WriteLine();
-    Console.WriteLine(confirm
-        ? $"Filled {filled} export record(s); left {leftAlone} alone."
-        : $"{filled} export record(s) would be filled and {leftAlone} left alone. Dry run. Re-run with --confirm {orgUrl} to write them.");
-    return 0;
-}
-
 // clearrulapprole <orgUrl> [--confirm <orgUrl>]: lists every ACTIVE al_pagepermission rule
 // that carries BOTH al_rolecode and al_approle, and with --confirm sets al_approle to null on
 // each. al_approle defaults to Adviser, so every rule written by role code before the writers
@@ -12290,8 +12442,14 @@ static class AdviserMappingTable
     public const string ManagerLogical = "al_tcmanagerid";
     public const string ManagerSchema = "al_TcManagerId";
 
-    public const string KeyLogical = "al_advisermappingemailkey";
-    public const string KeySchema = "al_AdviserMappingEmailKey";
+    // One row per adviser AND manager (owner, 2026-11-24): an adviser may have several
+    // managers, never the same one twice. The old key on the email alone is OldKeyLogical.
+    public const string KeyLogical = "al_advisermanagerkey";
+    public const string KeySchema = "al_AdviserManagerKey";
+    public const string OldKeyLogical = "al_advisermappingemailkey";
+
+    // The case's T&C Managers, many-to-many to contact; CaseAccessReconciler.SupervisorsRelationship.
+    public const string ManagersRelationship = "al_outcomecase_tcmanagers";
 
     public const string RelationshipSchema = "al_contact_al_advisermapping_tcmanager";
 

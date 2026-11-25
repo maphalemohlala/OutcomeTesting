@@ -36,6 +36,7 @@ namespace OutcomeTesting.Plugins
             "al_aqadviseraccountable", "al_aqparaplanneraccountable",
             "al_fqaccountablecontactid", "al_aqaccountablecontactid",
             GenerateExportPlugin.FqAdministratorContactAttr,
+            GenerateExportPlugin.FqAdministratorFlag,
         };
 
         public OutcomeGuardPlugin(string unsecureConfiguration, string secureConfiguration)

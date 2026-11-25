@@ -1,5 +1,6 @@
 using System;
 using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Query;
 
 namespace OutcomeTesting.Plugins
 {
@@ -115,6 +116,17 @@ namespace OutcomeTesting.Plugins
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.PreconditionPrefix +
                     "This case cannot close yet: a remedial action is still open, or its grade needs T&C sign-off first.");
+            }
+
+            if (to.Value == CaseLifecycle.NoCheckRequired
+                && from != CaseLifecycle.NoCheckRequired
+                && ImportRules.IsTier1(service
+                    .Retrieve(CaseEntity, target.Id, new ColumnSet("al_checklistitems"))
+                    .GetAttributeValue<string>("al_checklistitems")))
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix +
+                    "This is a Tier 1 high-risk case (High Risk Item 1), which is always checked. It cannot be marked No check required.");
             }
         }
     }

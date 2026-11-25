@@ -50,13 +50,13 @@ namespace OutcomeTesting.Plugins
             { typeof(ClaimRequestPlugin), "Claiming the case" },
             { typeof(CompleteRemediationPlugin), "Completing the remediation" },
             { typeof(CompleteRequestPlugin), "Completing the remediation" },
-            { typeof(CreateExportBatchPlugin), "Starting the export" },
             { typeof(CreateRolePlugin), "Creating the role" },
             { typeof(CreateUserPlugin), "Adding the user" },
             { typeof(DeleteCasePlugin), "Deleting the case" },
             { typeof(ReassignTcManagerPlugin), "Handing the case to another T&C Manager" },
             { typeof(AmendOutcomePlugin), "Amending the outcome" },
             { typeof(DrainNotificationsPlugin), "Sending the notifications" },
+            { typeof(CreateExportBatchPlugin), "Starting the export" },
             { typeof(GenerateExportPlugin), "Generating the export" },
             { typeof(GetMyRolesPlugin), "Loading your roles" },
             { typeof(GetRoleHoldersPlugin), "Loading who holds the role" },
@@ -126,6 +126,10 @@ namespace OutcomeTesting.Plugins
             0x80048d07, // IsvAbortedRequestTimeout
             0x80048d10); // IsvAbortedGatewayTimeout
 
+        private const int TextTooLongCode = unchecked((int)0x80044331); // "The length of the ... attribute ... exceeded the maximum allowed length"
+        private const string TextTooLongReason =
+            "some text in it is longer than the box allows. Nothing was saved. Shorten it and try again.";
+
         private const string RoleReason =
             "your Dataverse security role does not allow it. This is a platform privilege rather " +
             "than one of this app's application roles: ask an administrator to check the security " +
@@ -160,6 +164,8 @@ namespace OutcomeTesting.Plugins
                 return CommandHelpers.ConflictPrefix + action + Because + DuplicateReason;
             if (CommandHelpers.IsConcurrencyFault(fault))
                 return CommandHelpers.ConflictPrefix + action + Because + ConcurrencyReason;
+            if (code == TextTooLongCode)
+                return CommandHelpers.ValidationPrefix + action + Because + TextTooLongReason;
             if (NotFoundCodes.Contains(code))
                 return UnexpectedPrefix + action + Because + NotFoundReason;
             if (TimeoutCodes.Contains(code))

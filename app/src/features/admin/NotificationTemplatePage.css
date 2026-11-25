@@ -1,5 +1,6 @@
 .templates {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
 }
 
@@ -7,13 +8,16 @@
   padding: var(--space-4);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
 }
 
 .templates__table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
 }
 
 .templates__table th,
@@ -25,7 +29,9 @@
 }
 
 .templates__table thead th {
-  background: var(--colour-surface-sunken);
+  background: var(--colour-surface);
+  font-weight: 500;
+  color: var(--colour-text-muted);
 }
 
 .templates__table tbody tr:last-child td {
@@ -139,17 +145,14 @@
    side by side read as two primary buttons. */
 .templates__btn--ghost {
   color: var(--colour-action);
-  background: transparent;
+  background: var(--colour-surface);
   border-color: var(--colour-border-strong);
 }
 
 .templates__btn--ghost:hover:not(:disabled) {
-  color: var(--colour-action-text);
-  background: var(--colour-action-hover);
-}
-
-.templates__add {
-  justify-self: start;
+  color: var(--colour-action);
+  background: var(--colour-surface-hover);
+  border-color: var(--colour-action);
 }
 
 /* A custom letter with no event attached is sent by nothing at all, which is the one state
@@ -157,106 +160,6 @@
 .templates__problem-cell {
   color: var(--colour-danger, #b3261e);
   font-size: var(--text-sm);
-}
-
-/* The token list. Buttons rather than the read-only chips this replaced: the old row named
-   the tokens and said nothing about what any of them did, so using one meant knowing it
-   already and spelling it exactly. */
-.tokens {
-  margin-top: var(--space-2);
-}
-
-.tokens__intro {
-  margin: 0 0 var(--space-2);
-  font-size: var(--text-sm);
-  font-weight: 600;
-}
-
-.tokens__list {
-  display: grid;
-  gap: var(--space-1, 4px);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-/* Bordered rather than borderless. A button with no edge on a plain background reads as a
-   line of text, which is how the first version of this looked like no picker at all. */
-.tokens__btn {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-  width: 100%;
-  padding: var(--space-2);
-  text-align: left;
-  font-family: inherit;
-  font-size: var(--text-sm);
-  color: inherit;
-  background: var(--colour-surface);
-  border: 1px solid var(--colour-border);
-  border-radius: var(--radius);
-  cursor: pointer;
-}
-
-.tokens__btn:hover:not(:disabled) {
-  background: var(--colour-surface-sunken);
-  border-color: var(--colour-action);
-}
-
-.tokens__btn:disabled {
-  color: var(--colour-text-muted);
-  cursor: not-allowed;
-}
-
-.tokens__name {
-  flex: 0 0 auto;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  color: var(--colour-action);
-}
-
-.tokens__help {
-  color: var(--colour-text-muted);
-}
-
-/* One line per recipient in the list, so several read as a list and not a sentence. */
-.templates__recipient {
-  display: block;
-}
-
-.templates__recipients {
-  display: grid;
-  gap: var(--space-2);
-  margin: 0;
-  padding: var(--space-3);
-  border: 1px solid var(--colour-border);
-}
-
-.templates__recipients legend {
-  font-weight: 600;
-  padding: 0 var(--space-1);
-}
-
-.templates__form .templates__check {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-weight: normal;
-}
-
-.templates__chosen {
-  display: grid;
-  gap: var(--space-1);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.templates__chosen li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
 }
 
 .templates__failed {
@@ -267,4 +170,568 @@
 .templates__failed-heading {
   margin: var(--space-4) 0 0;
   font-size: var(--text-lg);
+}
+
+/* The row actions sit side by side, so every letter keeps to one line of height. */
+.templates__table td:last-child {
+  white-space: nowrap;
+}
+
+.templates__table td:last-child .templates__btn + .templates__btn {
+  margin-left: var(--space-2);
+}
+
+.templates__info {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm);
+}
+
+.templates__info .icon {
+  margin-top: 0.15em;
+  font-size: 1.125rem;
+  color: var(--colour-text-muted);
+}
+
+/* A stage: its name and what sends it on the left, its letters in a card on the right. */
+.templates__group {
+  display: grid;
+  grid-template-columns: minmax(12rem, 17rem) minmax(0, 1fr);
+  gap: var(--space-6, 2rem);
+  align-items: start;
+}
+
+.templates__group-head h2 {
+  margin: var(--space-4) 0 var(--space-2);
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 500;
+}
+
+.templates__group-head p {
+  margin: 0 0 var(--space-2);
+  color: var(--colour-text-muted);
+}
+
+.templates__letters {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
+}
+
+.templates__letter {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 10rem auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--colour-border);
+}
+
+.templates__letter:last-child {
+  border-bottom: none;
+}
+
+.templates__letter-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius);
+  background: var(--colour-chip);
+  color: var(--colour-chip-text);
+  font-size: 1.25rem;
+}
+
+.templates__letter-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.templates__name {
+  font-weight: 600;
+}
+
+.templates__letter .templates__code {
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.templates__routing {
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--colour-text);
+}
+
+.templates__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0.125rem 0.625rem;
+  border-radius: var(--radius-pill);
+  background: var(--colour-chip);
+  color: var(--colour-chip-text);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.templates__chip--builtin {
+  background: var(--colour-surface-sunken);
+  color: var(--colour-text-muted);
+}
+
+.templates__row-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  white-space: nowrap;
+}
+
+@media (max-width: 60rem) {
+  .templates__group {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+
+  .templates__letter {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .templates__state,
+  .templates__row-actions {
+    grid-column: 2;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+}
+
+/* ---- The letter editor: a full-screen dialog, wording on the left, routing and fields on the right. ---- */
+
+.tedit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30rem;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+.tedit__main {
+  display: grid;
+  align-content: start;
+  gap: var(--space-5);
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-5) var(--space-6) var(--space-6);
+}
+
+.tedit__side {
+  display: grid;
+  align-content: start;
+  gap: var(--space-6);
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-5) var(--space-5) var(--space-6);
+  border-left: 1px solid var(--colour-border);
+  background: var(--colour-surface-sunken);
+}
+
+.tedit__field {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.tedit__field > label {
+  font-weight: 600;
+}
+
+.tedit__field .templates__hint,
+.recipients .templates__hint {
+  margin: 0;
+}
+
+.tedit__row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.tedit input[type='text'],
+.tedit select {
+  min-height: 2.75rem;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--colour-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--colour-surface);
+  color: inherit;
+  font: inherit;
+}
+
+.tedit .templates__problem {
+  margin: 0;
+  border-radius: var(--radius);
+}
+
+.tedit__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.tedit__stage {
+  color: var(--colour-text-muted);
+  font-size: var(--text-sm);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tedit__actions {
+  display: inline-flex;
+  gap: var(--space-3);
+}
+
+/* The subject: a plain input over a copy of its text that draws the tokens as chips. */
+.subject-field {
+  position: relative;
+  border: 1px solid var(--colour-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--colour-surface);
+}
+
+.subject-field:focus-within {
+  outline: 2px solid var(--colour-focus);
+  outline-offset: 2px;
+}
+
+.subject-field__mirror,
+.tedit .subject-field .subject-field__input {
+  padding: var(--space-3) var(--space-4);
+  font: inherit;
+  font-size: var(--text-lg);
+  line-height: 1.5;
+  letter-spacing: normal;
+}
+
+.subject-field__mirror {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  white-space: pre;
+  pointer-events: none;
+  color: var(--colour-text);
+}
+
+.tedit .subject-field .subject-field__input {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 0;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: transparent;
+  caret-color: var(--colour-text);
+  outline: none;
+}
+
+.subject-field__input::selection {
+  background: color-mix(in srgb, var(--colour-focus) 30%, transparent);
+}
+
+/* A shadow, not padding: padding would push the copy's text out from under the input's caret. */
+.subject-field__token {
+  border-radius: 4px;
+  background: var(--colour-chip);
+  box-shadow: 0 0 0 2px var(--colour-chip);
+  color: var(--colour-chip-text);
+}
+
+/* The preview: the letter as a reader gets it, on a paper tint. */
+.preview {
+  border: 1px solid var(--colour-border-strong);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--brand-gold) 5%, var(--colour-surface));
+  overflow: hidden;
+}
+
+.preview__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--colour-border);
+}
+
+.preview__heading {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.preview__note {
+  color: var(--colour-text-muted);
+  font-size: var(--text-sm);
+}
+
+.preview__letter {
+  min-height: 9rem;
+  padding: var(--space-4) var(--space-4) var(--space-6);
+  font-size: var(--text-lg);
+  line-height: 1.55;
+}
+
+.preview__subject {
+  margin: 0 0 var(--space-2);
+  font-weight: 600;
+}
+
+.preview__body p,
+.preview__body ul,
+.preview__body ol {
+  margin: 0 0 var(--space-2);
+}
+
+.preview__body a {
+  color: var(--colour-action);
+  text-decoration: underline;
+}
+
+.preview__button {
+  display: inline-block;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius);
+  background: var(--colour-action);
+  color: var(--colour-action-text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.preview__panel {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  background: var(--colour-surface-sunken);
+}
+
+/* Goes to: the roles as tiles, then named contacts. */
+.recipients {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.recipients__heading {
+  margin-bottom: var(--space-3);
+  padding: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.recipients__default {
+  display: flex;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--colour-chip);
+  line-height: 1.5;
+}
+
+.recipients__default .icon {
+  margin-top: 0.2em;
+  color: var(--colour-chip-text);
+}
+
+.recipients__kinds {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.recipients__kind {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--colour-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--colour-surface);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.recipients__kind:has(input:checked) {
+  border-color: var(--colour-action);
+}
+
+.recipients__kind input {
+  width: 1.125rem;
+  height: 1.125rem;
+  margin: 0;
+  accent-color: var(--colour-action);
+}
+
+.recipients__label {
+  margin-top: var(--space-2);
+  font-weight: 500;
+}
+
+.recipients select {
+  width: 100%;
+}
+
+.recipients__chosen {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recipients__chosen li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+/* Fields you can insert: what each token fills in, and a button to put it at the caret. */
+.tokens {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.tokens__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.tokens__heading {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.tokens__where {
+  color: var(--colour-text-muted);
+  font-size: var(--text-sm);
+}
+
+.tokens__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tokens__item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--colour-border);
+}
+
+.tokens__item:last-child {
+  border-bottom: 0;
+}
+
+.tokens__text {
+  display: grid;
+  flex: 1;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.tokens__top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.tokens__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+  background: var(--colour-chip);
+  color: var(--colour-chip-text);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.tokens__used {
+  color: var(--colour-text-muted);
+  font-size: var(--text-xs);
+}
+
+.tokens__help {
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.tokens__add {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  margin-top: var(--space-1);
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--colour-text);
+  cursor: pointer;
+}
+
+.tokens__add:hover:not(:disabled) {
+  border-color: var(--colour-border-strong);
+  background: var(--colour-surface);
+}
+
+.tokens__add:disabled {
+  color: var(--colour-text-muted);
+  cursor: not-allowed;
+}
+
+@media (max-width: 60rem) {
+  .tedit {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tedit__main,
+  .tedit__side {
+    overflow: visible;
+  }
+
+  .tedit__side {
+    border-left: 0;
+    border-top: 1px solid var(--colour-border);
+  }
 }

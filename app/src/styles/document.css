@@ -21,6 +21,9 @@
   padding: 32px 40px 48px;
   background: #fff;
   border: 1px solid var(--colour-border);
+  /* The sheet sits on the page like the app's other cards; what is ON it stays the paper form. */
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
   font-family: Calibri, "Segoe UI", Arial, sans-serif;
   font-size: 11pt;
   color: #000;
@@ -151,6 +154,8 @@
     margin: 0;
     padding: 0;
     border: 0;
+    border-radius: 0;
+    box-shadow: none;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }

@@ -1,5 +1,6 @@
 .lists {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
 }
 
@@ -7,6 +8,7 @@
   padding: var(--space-4);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
 }
 
 .lists__add {
@@ -15,9 +17,11 @@
 
 .lists__table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
 }
 
 .lists__table th,
@@ -28,7 +32,9 @@
 }
 
 .lists__table thead th {
-  background: var(--colour-surface-sunken);
+  background: var(--colour-surface);
+  font-weight: 500;
+  color: var(--colour-text-muted);
 }
 
 .lists__table tbody tr:last-child td {
@@ -76,10 +82,13 @@
   background: var(--colour-surface-sunken);
 }
 
+/* A table cell: display flex would take it out of the table and break the row rules. */
 .lists__actions {
-  display: flex;
-  gap: var(--space-3);
-  margin-top: var(--space-2);
+  white-space: nowrap;
+}
+
+.lists__actions > * + * {
+  margin-left: var(--space-3);
 }
 
 /* Visually hidden, still read out: the actions column has no visible heading but the
@@ -126,13 +135,14 @@
    side by side read as two primary buttons. */
 .lists__btn--ghost {
   color: var(--colour-action);
-  background: transparent;
+  background: var(--colour-surface);
   border-color: var(--colour-border-strong);
 }
 
 .lists__btn--ghost:hover:not(:disabled) {
-  color: var(--colour-action-text);
-  background: var(--colour-action-hover);
+  color: var(--colour-action);
+  background: var(--colour-surface-hover);
+  border-color: var(--colour-action);
 }
 
 .lists__picker {
@@ -181,4 +191,179 @@
 .lists__btn--danger:hover:not(:disabled) {
   color: var(--colour-action-text);
   background: var(--colour-danger, #b3261e);
+}
+
+.lists__muted {
+  color: var(--colour-text-muted);
+}
+
+/* The options on the left, the live preview on the right. */
+.lists__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 26rem);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.lists__main {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.lists__section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  margin: 0 0 var(--space-3);
+}
+
+.lists__section-head .lists__muted {
+  font-size: var(--text-sm);
+}
+
+.lists__rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
+}
+
+.lists__row {
+  display: grid;
+  grid-template-columns: 2rem 1.5rem minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 4.5rem;
+  padding: var(--space-3) var(--space-5) var(--space-3) var(--space-3);
+  border-bottom: 1px solid var(--colour-border);
+}
+
+.lists__row:last-child {
+  border-bottom: none;
+}
+
+.lists__row[draggable='true'] {
+  cursor: grab;
+}
+
+.lists__handle {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--colour-text-muted);
+  font-size: 1.125rem;
+  cursor: grab;
+}
+
+.lists__handle:hover:not(:disabled) {
+  background: var(--colour-surface-hover);
+}
+
+.lists__position {
+  color: var(--colour-text-muted);
+  font-size: var(--text-sm);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.lists__label {
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.lists__row-note {
+  font-size: var(--text-sm);
+}
+
+.lists__row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
+.lists__row--retired .lists__label {
+  font-weight: 500;
+  color: var(--colour-text-muted);
+}
+
+.lists__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.125rem 0.75rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.lists__chip--warn {
+  background: var(--colour-warn-bg);
+  color: var(--colour-warn-text);
+}
+
+.lists__preview {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius-lg);
+}
+
+.lists__preview h2 {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-lg);
+}
+
+.lists__preview label {
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
+
+.lists__preview select {
+  min-height: 2.75rem;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--colour-border-strong);
+  background: var(--colour-surface);
+  color: var(--colour-text);
+  font: inherit;
+}
+
+.lists__preview p {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 64rem) {
+  .lists__layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 40rem) {
+  .lists__row {
+    grid-template-columns: 2rem 1.5rem minmax(0, 1fr);
+  }
+
+  .lists__row-note,
+  .lists__row-actions {
+    grid-column: 3;
+  }
+}
+
+/* The six dots draw as points, so they need a heavier stroke to be seen. */
+.lists__handle .icon {
+  stroke-width: 3;
 }

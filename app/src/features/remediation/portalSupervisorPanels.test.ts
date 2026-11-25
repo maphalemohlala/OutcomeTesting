@@ -119,6 +119,13 @@ describe('the sign-off panel and the case adviser', () => {
     );
   });
 
+  it('counts only an active mapping, as the server gate does', () => {
+    // An adviser may have several managers (owner, 2026-11-24); a withdrawn row is not one of them.
+    expect(remediation).toMatch(
+      /al_tcmanagerid" operator="eq" value="\{\{ user\.id \| xml_escape \}\}" \/>\s*<condition attribute="statecode" operator="eq" value="0" \/>/,
+    );
+  });
+
   it('carries the adviser email on the case fetch, since the mapping is keyed on it', () => {
     const fetchStart = remediation.indexOf('{% fetchxml remcase %}');
     const fetchEnd = remediation.indexOf('{% endfetchxml %}', fetchStart);

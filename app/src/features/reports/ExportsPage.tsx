@@ -1,16 +1,20 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useMemo, useState, type FormEvent } from 'react';
 import { PageIntro } from '../../components/layout/PageIntro';
 import { FilterBar, FilterField } from '../../components/form/FilterBar';
 import { useExportBatches } from './useExports';
+import { exportTrailLight } from './exportTrailLight';
 import { useIntentKeys } from '../../hooks/useIntentKey';
-import { createExportBatch, generateExport } from '../../services/commands/exports';
-import { messageForFailure } from '../../services/errors';
-import { ukDayOf } from '../cases/caseHeaderDates';
+import type { TrailLightFileKind } from '../../services/commands/exports';
+import { ukDayOf, ukToday } from '../cases/caseHeaderDates';
 import { buildFullExtract } from './fullExtract';
 import { downloadWorkbook, stampedFilename } from '../../lib/tabular';
+import { dayBefore, recentQuarters } from './trailLight';
+import { QuarterSelect } from './QuarterSelect';
 import './ExportsPage.css';
 import { dateTime } from '../../lib/format';
+import { Skeleton } from '../../components/feedback/Skeleton';
+import { Pager } from '../../components/navigation/Pager';
+import { PAGE_SIZE, usePaged } from '../../components/navigation/paging';
 
 type Notice = { tone: 'ok' | 'error'; message: string } | null;
 
@@ -24,12 +28,24 @@ function inRange(iso: string | null, from: string, to: string): boolean {
   return true;
 }
 
+/**
+ * The Trail Light export in one action (2026-11-25): choose the file and the check dates, and
+ * Export produces the batch on the server and downloads it. The daily file starts on yesterday,
+ * the last whole UK day; the quarterly file starts on every closed case.
+ */
 export function ExportsPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const state = useExportBatches(reloadKey);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
   const intent = useIntentKeys();
+
+  const yesterday = useMemo(() => dayBefore(ukToday()), []);
+  const quarters = useMemo(() => recentQuarters(ukToday()), []);
+  const [file, setFile] = useState<TrailLightFileKind>('Daily');
+  const [from, setFrom] = useState(yesterday);
+  const [to, setTo] = useState(yesterday);
+  const [format, setFormat] = useState<'xlsx' | 'csv'>('xlsx');
 
   const [batchStatus, setBatchStatus] = useState('');
   const [batchFrom, setBatchFrom] = useState('');
@@ -51,6 +67,14 @@ export function ExportsPage() {
   );
 
   const batchesFiltered = batchStatus !== '' || batchFrom !== '' || batchTo !== '';
+  const paged = usePaged(filteredBatches, PAGE_SIZE, `${batchStatus}|${batchFrom}|${batchTo}`);
+
+  function chooseFile(next: TrailLightFileKind) {
+    setFile(next);
+    setFrom(next === 'Daily' ? yesterday : '');
+    setTo(next === 'Daily' ? yesterday : '');
+  }
+
   async function onFullExtract() {
     setBusy(true);
     setNotice(null);
@@ -74,44 +98,23 @@ export function ExportsPage() {
     }
   }
 
-  async function onCreateBatch() {
+  async function onExport(event: FormEvent) {
+    event.preventDefault();
     setBusy(true);
     setNotice(null);
-    const result = await createExportBatch({ idempotencyKey: intent.keyFor('create-batch') });
-    setBusy(false);
-    if (result.ok) {
-      intent.release('create-batch');
-      setNotice({ tone: 'ok', message: 'New draft export batch created.' });
-      setReloadKey((k) => k + 1);
-    } else {
-      setNotice({ tone: 'error', message: messageForFailure(result) });
-    }
-  }
-
-  async function onGenerate(batchId: string) {
-    setBusy(true);
-    setNotice(null);
-    const result = await generateExport({ batchId, idempotencyKey: intent.keyFor(batchId) });
-    setBusy(false);
-    if (result.ok) {
-      intent.release(batchId);
-      const rows = Number(result.data.RowCount ?? 0);
-      // A zero-row batch is a legitimate outcome, not a success worth celebrating: the
-      // export collects only checked cases (closed, or graded and still open), so none are.
-      // Reporting it in the success tone and then disabling Download reads as a broken
-      // button, which is exactly how it was reported.
-      setNotice(
-        rows === 0
-          ? {
-              tone: 'error',
-              message:
-                'This batch generated 0 rows. The Trail Light export collects only cases that have been checked, closed or not, and none have been, so there is nothing to download.',
-            }
-          : { tone: 'ok', message: `Generated ${rows} export record(s).` },
-      );
-      setReloadKey((k) => k + 1);
-    } else {
-      setNotice({ tone: 'error', message: messageForFailure(result) });
+    // One intent per choice: a retry of the same choice replays the batch already made rather
+    // than making a second, and the key doubles as the new batch's id.
+    const token = `trail-light|${file}|${from}|${to}`;
+    const key = intent.keyFor(token);
+    try {
+      const outcome = await exportTrailLight({ file, from, to, format, key });
+      if (outcome.produced) setReloadKey((k) => k + 1);
+      if (outcome.settled) intent.release(token);
+      setNotice({ tone: outcome.tone, message: outcome.message });
+    } catch {
+      setNotice({ tone: 'error', message: 'The Trail Light file could not be produced. Select Export again to retry.' });
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -119,16 +122,11 @@ export function ExportsPage() {
     <>
       <PageIntro
         title="Exports"
-        purpose="Produce the Trail Light export on demand. Each batch snapshots the checked cases, closed or not, for reconciliation. Open a batch to see its cases and download them for a range of check dates."
+        purpose="Produce the Trail Light file: choose the file and the check dates, then export. Each export is kept below as a snapshot of what was sent, for reconciliation."
         actions={
-          <>
-            <button type="button" className="exports__btn exports__btn--ghost" onClick={onFullExtract} disabled={busy}>
-              {busy ? 'Working…' : 'Download all data'}
-            </button>
-            <button type="button" className="exports__btn" onClick={onCreateBatch} disabled={busy}>
-              New export batch
-            </button>
-          </>
+          <button type="button" className="exports__btn exports__btn--ghost" onClick={onFullExtract} disabled={busy}>
+            {busy ? 'Working…' : 'Download all data'}
+          </button>
         }
       />
 
@@ -138,121 +136,145 @@ export function ExportsPage() {
         </p>
       ) : null}
 
-      {state.status === 'loading' ? <p role="status">Loading exports…</p> : null}
+      <section aria-labelledby="export-heading">
+        <h2 id="export-heading" className="exports__heading">
+          Trail Light file
+        </h2>
+        <p className="exports__note">
+          The daily file holds every case with a type of failure: a File Quality Fail, an Advice
+          Quality grade first recorded as Pass with issues, Insufficient evidence or Potential harm,
+          or a Tax-only check that came back Fail or Pass with issues. It reports the grade first
+          recorded. The quarterly file holds every closed case and reports the grade in force after
+          any regrade. The check date is the day each case's review was submitted; both dates are
+          included, and an empty date sets no limit.
+        </p>
+        <form className="filter-bar" aria-label="Trail Light file" onSubmit={onExport}>
+          <div className="filter-bar__controls">
+            <FilterField label="File" htmlFor="file-kind">
+              <select id="file-kind" value={file} onChange={(e) => chooseFile(e.target.value as TrailLightFileKind)}>
+                <option value="Daily">Daily file</option>
+                <option value="Quarterly">Quarterly 12-month file</option>
+              </select>
+            </FilterField>
+            <FilterField label="Quarter" htmlFor="check-quarter">
+              <QuarterSelect
+                quarters={quarters}
+                from={from}
+                to={to}
+                onChoose={(range) => {
+                  setFrom(range.from);
+                  setTo(range.to);
+                }}
+                anyLabel={file === 'Daily' ? 'Any (every check date)' : 'Any (every closed case)'}
+              />
+            </FilterField>
+            <FilterField label="Checked from" htmlFor="check-from">
+              <input
+                id="check-from"
+                type="date"
+                value={from}
+                max={to || undefined}
+                onChange={(e) => setFrom(e.target.value)}
+              />
+            </FilterField>
+            <FilterField label="Checked to" htmlFor="check-to">
+              <input
+                id="check-to"
+                type="date"
+                value={to}
+                min={from || undefined}
+                onChange={(e) => setTo(e.target.value)}
+              />
+            </FilterField>
+            <FilterField label="Format" htmlFor="file-format">
+              <select id="file-format" value={format} onChange={(e) => setFormat(e.target.value as 'xlsx' | 'csv')}>
+                <option value="xlsx">Excel workbook (.xlsx)</option>
+                <option value="csv">Comma-separated values (.csv)</option>
+              </select>
+            </FilterField>
+          </div>
+          <button type="submit" className="exports__btn" disabled={busy}>
+            {busy ? 'Working…' : 'Export'}
+          </button>
+        </form>
+      </section>
+
+      {state.status === 'loading' ? <Skeleton label="Loading exports…" rows={6} /> : null}
 
       {state.status === 'unavailable' ? (
         <section className="exports__unavailable" aria-labelledby="exports-unavailable">
-          <h2 id="exports-unavailable">Exports cannot be shown</h2>
+          <h2 id="exports-unavailable">Previous exports cannot be shown</h2>
           <p>{state.reason}</p>
         </section>
       ) : null}
 
       {state.status === 'ready' ? (
-        <>
-          <section aria-labelledby="batches-heading">
-            <h2 id="batches-heading" className="exports__heading">
-              Export batches
-            </h2>
-            {batches.length === 0 ? (
-              <p>No export batches yet. Create one to snapshot the checked cases.</p>
-            ) : (
-              <>
-                <FilterBar
-                  summary={`${filteredBatches.length} of ${batches.length} batches`}
-                  onClear={() => {
-                    setBatchStatus('');
-                    setBatchFrom('');
-                    setBatchTo('');
-                  }}
-                  clearDisabled={!batchesFiltered}
-                >
-                  <FilterField label="Status" htmlFor="batch-status">
-                    <select
-                      id="batch-status"
-                      value={batchStatus}
-                      onChange={(e) => setBatchStatus(e.target.value)}
-                    >
-                      <option value="">All statuses</option>
-                      {batchStatuses.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                  </FilterField>
-                  <FilterField label="Generated from" htmlFor="batch-from">
-                    <input
-                      id="batch-from"
-                      type="date"
-                      value={batchFrom}
-                      onChange={(e) => setBatchFrom(e.target.value)}
-                    />
-                  </FilterField>
-                  <FilterField label="Generated to" htmlFor="batch-to">
-                    <input
-                      id="batch-to"
-                      type="date"
-                      value={batchTo}
-                      onChange={(e) => setBatchTo(e.target.value)}
-                    />
-                  </FilterField>
-                </FilterBar>
-                <table className="exports__table">
-                  <thead>
+        <section aria-labelledby="batches-heading">
+          <h2 id="batches-heading" className="exports__heading">
+            Previous exports
+          </h2>
+          {batches.length === 0 ? (
+            <p>No exports yet.</p>
+          ) : (
+            <>
+              <FilterBar
+                summary={`${filteredBatches.length} of ${batches.length} exports`}
+                onClear={() => {
+                  setBatchStatus('');
+                  setBatchFrom('');
+                  setBatchTo('');
+                }}
+                clearDisabled={!batchesFiltered}
+              >
+                <FilterField label="Status" htmlFor="batch-status">
+                  <select id="batch-status" value={batchStatus} onChange={(e) => setBatchStatus(e.target.value)}>
+                    <option value="">All statuses</option>
+                    {batchStatuses.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </FilterField>
+                <FilterField label="Generated from" htmlFor="batch-from">
+                  <input id="batch-from" type="date" value={batchFrom} onChange={(e) => setBatchFrom(e.target.value)} />
+                </FilterField>
+                <FilterField label="Generated to" htmlFor="batch-to">
+                  <input id="batch-to" type="date" value={batchTo} onChange={(e) => setBatchTo(e.target.value)} />
+                </FilterField>
+              </FilterBar>
+              <table className="exports__table">
+                <thead>
+                  <tr>
+                    <th scope="col">Export</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Generated</th>
+                    <th scope="col">Rows</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredBatches.length === 0 ? (
                     <tr>
-                      <th scope="col">Batch</th>
-                      <th scope="col">Status</th>
-                      <th scope="col">Generated</th>
-                      <th scope="col">Rows</th>
-                      <th scope="col">Action</th>
+                      <td colSpan={4} className="exports__empty">
+                        No exports match your current filters.
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {filteredBatches.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="exports__empty">
-                          No batches match your current filters.
-                        </td>
+                  ) : (
+                    paged.rows.map((b) => (
+                      <tr key={b.id}>
+                        <td>{b.name || b.code || 'Export batch'}</td>
+                        <td>{b.status}</td>
+                        <td>{dateTime(b.generatedOn)}</td>
+                        <td>{b.rowCount}</td>
                       </tr>
-                    ) : (
-                      filteredBatches.map((b) => {
-                        // AD-042: only a Draft batch may be generated. Leaving the button
-                        // live made the plug-in's refusal the way users discovered that.
-                        const isDraft = b.status === 'Draft';
-                        return (
-                          <tr key={b.id}>
-                            <td>
-                              <Link to={`/exports/${b.id}`}>{b.name || b.code || 'Export batch'}</Link>
-                            </td>
-                            <td>{b.status}</td>
-                            <td>{dateTime(b.generatedOn)}</td>
-                            <td>{b.rowCount}</td>
-                            <td className="exports__actions">
-                              <button
-                                type="button"
-                                className="exports__btn exports__btn--ghost"
-                                onClick={() => onGenerate(b.id)}
-                                disabled={busy || !isDraft}
-                                title={
-                                  isDraft
-                                    ? undefined
-                                    : `This batch is ${b.status}. Create a new batch to produce a fresh export.`
-                                }
-                              >
-                                Generate
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </>
-            )}
-          </section>
-
-        </>
+                    ))
+                  )}
+                </tbody>
+              </table>
+              <Pager {...paged} label="exports" />
+            </>
+          )}
+        </section>
       ) : null}
     </>
   );
