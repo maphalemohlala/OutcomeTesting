@@ -400,8 +400,20 @@
             <li><span class="ot-people__role">AQS</span>{% if aqs_checker == 'No check of this type' %}<span class="ot-checker ot-checker--na">No check of this type</span>{% elsif aqs_checker == 'Not yet allocated' %}<span class="ot-checker ot-unallocated">Not yet allocated</span>{% else %}<span class="ot-avatar" data-ot-initials="{{ aqs_checker | escape }}" aria-hidden="true"></span>{{ aqs_checker | escape }}{% endif %}</li>
           </ul>
         </dd></div>
-        {% comment %}The case list's Outcome cell: the advice grade (a regrade first), else the Tax check's own grade.{% endcomment %}
+        {% comment %}
+          After a regrade, both grades side by side (reported 2026-11-25 on 254399947: Pass
+          with issues regraded to Potential harm read as a bare "Potential harm"). Without one,
+          the case list's single Outcome cell: the advice grade, else the Tax check's own grade.
+        {% endcomment %}
+        {% assign sum_regraded = '' %}
+        {% if sum_outcome %}{% capture sum_regraded %}{% include 'OT Outcome Label' final: sum_outcome.al_finaloutcome %}{% endcapture %}{% assign sum_regraded = sum_regraded | strip %}{% endif %}
+        {% if sum_regraded != '' %}
+        {% capture sum_initial %}{% include 'OT Outcome Label' initial: sum_outcome.al_initialoutcome %}{% endcapture %}{% assign sum_initial = sum_initial | strip %}
+        <div><dt>Initial outcome</dt><dd>{% if sum_initial != '' %}{% include 'OT Status Badge' status: sum_initial %}{% else %}—{% endif %}</dd></div>
+        <div><dt>Regraded outcome</dt><dd>{% include 'OT Status Badge' status: sum_regraded %}{% if sum_outcome.al_regradedon %}<span class="ot-muted">{{ sum_outcome.al_regradedon | date: 'dd MMM yyyy' }}</span>{% endif %}</dd></div>
+        {% else %}
         <div><dt>Outcome</dt><dd>{% capture sum_grade %}{% include 'OT Outcome Label' final: sum_outcome.al_finaloutcome initial: sum_outcome.al_initialoutcome %}{% endcapture %}{% assign sum_grade = sum_grade | strip %}{% if sum_grade != '' %}{% include 'OT Status Badge' status: sum_grade %}{% elsif c.al_taxoutcome %}{% assign sum_tax = c.al_taxoutcome.label %}{% if sum_tax == null or sum_tax == '' %}{% assign sum_traw = c.al_taxoutcome.value | default: c.al_taxoutcome | integer %}{% case sum_traw %}{% when 120910300 %}{% assign sum_tax = 'Pass' %}{% when 120910301 %}{% assign sum_tax = 'Fail' %}{% when 120910302 %}{% assign sum_tax = 'Pass with issues' %}{% endcase %}{% endif %}{% if sum_tax and sum_tax != '' %}{% capture sum_taxlabel %}Tax: {{ sum_tax }}{% endcapture %}{% include 'OT Status Badge' status: sum_taxlabel %}{% else %}<span class="ot-badge ot-badge--none">Not yet graded</span>{% endif %}{% else %}<span class="ot-badge ot-badge--none">Not yet graded</span>{% endif %}</dd></div>
+        {% endif %}
         <div><dt>Due</dt><dd class="ot-case-summary__due">{{ c.al_duedate | date: 'dd MMM yyyy' | default: '—' }}{% if c.al_duedate %}{% unless sum_stage contains 'Closed' or sum_stage contains 'No Check' %}<span class="ot-overdue" data-ot-overdue="{{ c.al_duedate | date: 'yyyy-MM-dd' }}"></span>{% endunless %}{% endif %}</dd></div>
       </dl>
     </section>
