@@ -666,6 +666,16 @@
         <div><dt>Adviser</dt><dd>{{ c.al_advisername | default: '—' | escape }}</dd></div>
         {% comment %}Each grade the remediation was raised for, as the grade mark OT Status Badge draws.{% endcomment %}
         <div><dt>Initial outcome</dt><dd>{% if ot_outcome != '' %}{% assign ot_outcome_parts = ot_outcome | split: ';' %}{% for ot_op in ot_outcome_parts %}{% assign ot_op_label = ot_op | strip %}{% include 'OT Status Badge' status: ot_op_label %}{% endfor %}{% else %}—{% endif %}</dd></div>
+        {% comment %}
+          The regraded outcome beside the initial one, so the summary says where the case ended
+          up and not only where it started (reported 2026-11-25 on 254399947: Pass with issues
+          regraded to Pass showed only in the card). The newest outcome row, as the card reads.
+          Hidden until there is one; the regrade script below fills and shows it in place.
+        {% endcomment %}
+        {% assign ot_sum_final = '' %}
+        {% for o in caseoutcomes.results.entities %}{% if forloop.first %}{% capture ot_sum_final %}{% include 'OT Outcome Label' final: o.al_finaloutcome %}{% endcapture %}{% endif %}{% endfor %}
+        {% assign ot_sum_final = ot_sum_final | strip %}
+        <div data-ot-summary-regraded{% if ot_sum_final == '' %} hidden{% endif %}><dt>Regraded outcome</dt><dd data-ot-summary-regraded-value>{% if ot_sum_final != '' %}{% include 'OT Status Badge' status: ot_sum_final %}{% endif %}</dd></div>
         <div><dt>Checklist version</dt><dd>V8</dd></div>
       </dl>
     </section>
@@ -1850,6 +1860,13 @@
           when.className = 'ot-remedial-form__note';
           when.textContent = '\u00b7 ' + today();
           cell.appendChild(when);
+        }
+
+        var summary = document.querySelector('[data-ot-summary-regraded]');
+        var summaryValue = document.querySelector('[data-ot-summary-regraded-value]');
+        if (summary && summaryValue) {
+          badge(summaryValue, label);
+          summary.hidden = false;
         }
 
         var status = document.querySelector('[data-ot-case-status]');
