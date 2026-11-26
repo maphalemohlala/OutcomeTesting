@@ -329,8 +329,10 @@ namespace OutcomeTesting.Plugins
         /// Working days, Monday to Friday (2026-11-26: every day count in the app leaves out
         /// weekends). Bank holidays are not deducted, the same calendar as remediation's
         /// clock (OD-018). Until then this counted calendar days.
+        ///
+        /// Five from 2026-11-26 (client UAT: the turnaround time is 5 working days).
         /// </summary>
-        public const int DueWithinDays = 3;
+        public const int DueWithinDays = 5;
 
         /// <summary>
         /// The case column carrying the para-planner's name, from the extract's AssignedBy
@@ -349,9 +351,9 @@ namespace OutcomeTesting.Plugins
         public const string ParaplannerEmailAttribute = "al_paraplanneremail";
 
         /// <summary>
-        /// When a case uploaded at <paramref name="uploadedAt"/> falls due: three working days
-        /// after the UK DAY of the upload, at midnight. A Friday or weekend upload is due on
-        /// the Wednesday.
+        /// When a case uploaded at <paramref name="uploadedAt"/> falls due: DueWithinDays
+        /// working days after the UK DAY of the upload, at midnight. A Friday or weekend
+        /// upload is due on the next Friday.
         ///
         /// The UK day, not UTC's (audit finding 5, 2026-09-20). Uploads are timestamped in
         /// UTC and the users are in London, so through British Summer Time a file uploaded at

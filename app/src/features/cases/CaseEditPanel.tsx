@@ -114,7 +114,7 @@ const SECTIONS: Section[] = [
         attr: 'al_duedate',
         label: 'Due date',
         kind: 'date',
-        help: 'Three working days after upload. Editable by a manager.',
+        help: 'Five working days after upload. Editable by a manager.',
       },
     ],
   },
@@ -707,7 +707,7 @@ export function CaseEditPanel({ detail, reviews, directory, listRows, onSaved, o
             {typeof value === 'string' && value.length > 0 ? value : 'Not set'}
           </p>
           <small className="case-edit__help">
-            Set to three working days after the case was uploaded. Only a manager can move it.
+            Set to five working days after the case was uploaded. Only a manager can move it.
           </small>
         </div>
       );

@@ -3636,20 +3636,15 @@
           {% comment %}// The Tax form: comments follow their Yes, and File Quality is AQS's unless Tax only.{% endcomment %}
           function syncTax(list, fails) {
             var pairs = [['Q-TAX-05', 'Q-TAX-06'], ['Q-TAX-07', 'Q-TAX-08'], ['Q-TAX-11', 'Q-TAX-12']];
-            var owed = fails.length > 0;
             for (var p = 0; p < pairs.length; p++) {
               var picked = answerRow(pairs[p][0]) && answerRow(pairs[p][0]).querySelector('input:checked');
-              var yes = !!picked && picked.value === '120910305';
-              owed = owed || yes;
-              hideRow(pairs[p][1], !yes);
-            }
-            for (var i = 0; i < list.length; i++) {
-              if (list[i].code === 'Q-TAX-02' && (list[i].value === '120910301' || list[i].value === '120910302')) { owed = true; }
+              hideRow(pairs[p][1], !(!!picked && picked.value === '120910305'));
             }
 
             var alone = taxOnly();
             if (fails.length > 0 || !alone) { setAnswer('Q-FQTAX-01', fails.length > 0 ? '120910301' : '120910300'); }
-            setAnswer('Q-FQTAX-03', owed ? '120910305' : '120910306');
+            {% comment %}// File Quality's own remediation (UAT 2026-11-26): a Yes category or the Tax outcome raises remediation by itself.{% endcomment %}
+            setAnswer('Q-FQTAX-03', fails.length > 0 ? '120910305' : '120910306');
 
             var codes = ['Q-FQTAX-01', 'Q-FQTAX-02', 'Q-FQTAX-03'];
             var table = null;

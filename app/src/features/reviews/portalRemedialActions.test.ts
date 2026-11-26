@@ -130,6 +130,13 @@ describe('the fail points the page lists', () => {
     expect(result.items).toEqual(['No OEL', 'Wording', 'Other']);
   });
 
+  it('leaves File Quality "Remedial action required?" to File Quality: a Yes category owes remediation by itself (UAT 2026-11-26)', () => {
+    const category = answer('Q-TAX-05', YES_NO, 'Calculations: remediation required?', '120910305');
+    expect(items([category], [], true).owed).toBe(true);
+    expect(template).toContain("setAnswer('Q-FQTAX-03', fails.length > 0 ? '120910305' : '120910306');");
+    expect(template).not.toContain("setAnswer('Q-FQTAX-03', owed ?");
+  });
+
   it('shows the card whenever remediation is owed, categories being rows of it', () => {
     expect(template).toContain('root.hidden = !result.owed;');
   });

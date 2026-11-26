@@ -20,24 +20,24 @@ namespace OutcomeTesting.Plugins.Tests
         // ------------------------------------------------------------------ the default
 
         [Fact]
-        public void Falls_due_three_working_days_after_the_day_of_the_upload()
+        public void Falls_due_five_working_days_after_the_day_of_the_upload()
         {
             var uploaded = new DateTime(2026, 9, 18, 16, 0, 0, DateTimeKind.Utc);
 
-            Assert.Equal(new DateTime(2026, 9, 23), ImportRules.DueDateFor(uploaded));
+            Assert.Equal(new DateTime(2026, 9, 25), ImportRules.DueDateFor(uploaded));
         }
 
         [Fact]
         public void Counts_working_days_and_skips_the_weekend()
         {
             // Every day count leaves out weekends (2026-11-26), so a Thursday upload is due on
-            // the Tuesday, not the Sunday, and a Saturday upload on the Wednesday.
+            // the next Thursday, and a Saturday upload on the Friday after.
             var thursday = new DateTime(2026, 9, 17, 9, 0, 0, DateTimeKind.Utc);
             var due = ImportRules.DueDateFor(thursday);
 
-            Assert.Equal(DayOfWeek.Tuesday, due.DayOfWeek);
-            Assert.Equal(new DateTime(2026, 9, 22), due);
-            Assert.Equal(new DateTime(2026, 9, 23), ImportRules.DueDateFor(new DateTime(2026, 9, 19, 9, 0, 0, DateTimeKind.Utc)));
+            Assert.Equal(DayOfWeek.Thursday, due.DayOfWeek);
+            Assert.Equal(new DateTime(2026, 9, 24), due);
+            Assert.Equal(new DateTime(2026, 9, 25), ImportRules.DueDateFor(new DateTime(2026, 9, 19, 9, 0, 0, DateTimeKind.Utc)));
         }
 
         [Fact]

@@ -642,12 +642,12 @@ namespace OutcomeTesting.Plugins.Tests
         /// overriding this system's rule.
         /// </summary>
         [Fact]
-        public void Due_three_working_days_after_the_day_of_the_upload()
+        public void Due_five_working_days_after_the_day_of_the_upload()
         {
-            // A Saturday upload: Monday, Tuesday, Wednesday.
+            // A Saturday upload: Monday to Friday.
             var uploadedAt = new DateTime(2026, 9, 19, 9, 30, 0, DateTimeKind.Utc);
 
-            Assert.Equal(new DateTime(2026, 9, 23), ImportRules.DueDateFor(uploadedAt));
+            Assert.Equal(new DateTime(2026, 9, 25), ImportRules.DueDateFor(uploadedAt));
         }
 
         [Fact]
@@ -665,12 +665,12 @@ namespace OutcomeTesting.Plugins.Tests
         [Fact]
         public void Skips_the_weekend()
         {
-            // Friday to Wednesday: Saturday and Sunday are not counted (2026-11-26).
+            // Friday to the next Friday: Saturday and Sunday are not counted (2026-11-26).
             var friday = new DateTime(2026, 9, 18, 16, 0, 0, DateTimeKind.Utc);
             var due = ImportRules.DueDateFor(friday);
 
-            Assert.Equal(new DateTime(2026, 9, 23), due);
-            Assert.Equal(DayOfWeek.Wednesday, due.DayOfWeek);
+            Assert.Equal(new DateTime(2026, 9, 25), due);
+            Assert.Equal(DayOfWeek.Friday, due.DayOfWeek);
         }
 
         // ------------------------------------------- the stamp the real extract writes
@@ -778,14 +778,14 @@ namespace OutcomeTesting.Plugins.Tests
         {
             // 23:30 UTC on 17 June is 00:30 on the 18th in British Summer Time. The person
             // who pressed the button did so on the 18th (a Thursday), so their deadline is
-            // the 23rd, three working days on.
+            // the 25th, five working days on.
             //
             // THE defect (audit finding 5). Adding 72 hours to the UTC instant gave
             // 2026-06-20, a day earlier than the same file uploaded a minute later - a seam
             // in the middle of the night that nobody would have found by testing at noon.
             var uploadedAt = new DateTime(2026, 6, 17, 23, 30, 0, DateTimeKind.Utc);
 
-            Assert.Equal(new DateTime(2026, 6, 23), ImportRules.DueDateFor(uploadedAt));
+            Assert.Equal(new DateTime(2026, 6, 25), ImportRules.DueDateFor(uploadedAt));
         }
 
         [Fact]
@@ -808,29 +808,29 @@ namespace OutcomeTesting.Plugins.Tests
             // than a blanket "add a day to late uploads".
             var uploadedAt = new DateTime(2026, 1, 15, 23, 30, 0, DateTimeKind.Utc);
 
-            Assert.Equal(new DateTime(2026, 1, 20), ImportRules.DueDateFor(uploadedAt));
+            Assert.Equal(new DateTime(2026, 1, 22), ImportRules.DueDateFor(uploadedAt));
         }
 
         [Fact]
         public void Spans_the_spring_clock_change()
         {
-            // BST began 29 March 2026. An upload on Friday the 27th is due on 1 April: the clocks
+            // BST began 29 March 2026. An upload on Friday the 27th is due on 3 April: the clocks
             // going forward does not cost anyone a day, because the arithmetic is on dates
             // and not on elapsed hours. Adding 72 hours would have been an hour short of
             // three days here.
             var uploadedAt = new DateTime(2026, 3, 27, 12, 0, 0, DateTimeKind.Utc);
 
-            Assert.Equal(new DateTime(2026, 4, 1), ImportRules.DueDateFor(uploadedAt));
+            Assert.Equal(new DateTime(2026, 4, 3), ImportRules.DueDateFor(uploadedAt));
         }
 
         [Fact]
         public void Spans_the_autumn_clock_change()
         {
-            // BST ended 25 October 2026. An upload on Friday the 23rd is due on the 28th, and the
+            // BST ended 25 October 2026. An upload on Friday the 23rd is due on the 30th, and the
             // extra hour does not buy one either.
             var uploadedAt = new DateTime(2026, 10, 23, 12, 0, 0, DateTimeKind.Utc);
 
-            Assert.Equal(new DateTime(2026, 10, 28), ImportRules.DueDateFor(uploadedAt));
+            Assert.Equal(new DateTime(2026, 10, 30), ImportRules.DueDateFor(uploadedAt));
         }
 
         [Fact]
