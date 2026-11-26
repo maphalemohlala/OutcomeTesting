@@ -353,6 +353,7 @@ export function CaseDetailPage() {
       <div className="case-detail__main">
         <CaseOutcomeSummary
           state={outcomes}
+          taxOutcome={detail.taxOutcome}
           action={
             <CaseAmendOutcomeAction
               caseId={detail.id}
@@ -390,6 +391,7 @@ export function CaseDetailPage() {
         */}
         <FailAccountabilityPanel
           state={outcomes}
+          taxOnly={detail.taxOutcome != null}
           onSaved={() => setOutcomeKey((key) => key + 1)}
           people={{
             adviser: detail.edit.al_advisername || null,

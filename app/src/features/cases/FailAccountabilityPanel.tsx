@@ -357,17 +357,20 @@ export function FailAccountabilityPanel({
   state,
   people,
   onSaved,
+  taxOnly = false,
 }: {
   /** The page's read of the case's outcomes, shared with the outcome summary. */
   state: CaseOutcomeState;
   people: PeopleNames;
+  /** The case has a Tax grade; a Tax check writes no outcome row to attribute a fail on. */
+  taxOnly?: boolean;
   // The page re-reads after a save, so the row flips from "Derived by default" to "Recorded"
   // and the ticks shown are the ones the extract will now use.
   onSaved: () => void;
 }) {
   return (
     <PermissionGate resource="page.cases" need="Edit">
-      <AccountabilitySection state={state} people={people} onSaved={onSaved} />
+      <AccountabilitySection state={state} people={people} onSaved={onSaved} taxOnly={taxOnly} />
     </PermissionGate>
   );
 }
@@ -377,10 +380,12 @@ function AccountabilitySection({
   state,
   people,
   onSaved,
+  taxOnly,
 }: {
   state: CaseOutcomeState;
   people: PeopleNames;
   onSaved: () => void;
+  taxOnly: boolean;
 }) {
   // One read of the role holders for every outcome on the case (owner, 2026-11-17: a
   // contact is an adviser or paraplanner by the role assigned to them).
@@ -409,7 +414,9 @@ function AccountabilitySection({
 
       {state.status === 'ready' && state.outcomes.length === 0 ? (
         <p className="accountability__note">
-          No outcome has been recorded for this case yet, so there is no fail to attribute.
+          {taxOnly
+            ? "No AQS outcome has been recorded for this case. Who carries a Tax check fail is taken from the Tax checker's submitted check, not set here."
+            : "No outcome has been recorded for this case yet, so there is no fail to attribute."}
         </p>
       ) : null}
 

@@ -21,15 +21,18 @@ function Grade({ value }: { value: string }) {
 export function CaseOutcomeSummary({
   state,
   action,
+  taxOutcome = null,
 }: {
   /** The page's read of the case's outcomes, shared with the accountability editor. */
   state: CaseOutcomeState;
   /** Drawn beside the newest grade: the amend button, which amends that one. */
   action?: ReactNode;
+  /** The case's own Tax grade (al_taxoutcome); a Tax check writes no al_outcome row. */
+  taxOutcome?: string | null;
 }) {
   const outcomes = state.status === 'ready' ? state.outcomes : [];
   // One check: its name sits in the card's header, as a label for the whole card.
-  const single = outcomes.length === 1 ? outcomes[0] : null;
+  const single = outcomes.length === 1 && !taxOutcome ? outcomes[0] : null;
 
   return (
     <section className="case-outcome" aria-labelledby="panel-outcome">
@@ -46,15 +49,31 @@ export function CaseOutcomeSummary({
         <p className="case-outcome__note">The outcome for this case could not be loaded.</p>
       ) : null}
 
-      {state.status === 'ready' && outcomes.length === 0 ? (
+      {state.status === 'ready' && outcomes.length === 0 && !taxOutcome ? (
         <>
           <p className="case-outcome__note">No outcome has been recorded for this case yet.</p>
           {action}
         </>
       ) : null}
 
-      {outcomes.length > 0 ? (
+      {outcomes.length > 0 || taxOutcome ? (
         <ul className="case-outcome__list">
+          {taxOutcome ? (
+            <li className="case-outcome__item">
+              <span className="case-outcome__check">Tax check</span>
+              <div className="case-outcome__row">
+                <div className="case-outcome__grades">
+                  <div className="case-outcome__box">
+                    <span className="case-outcome__label">Outcome</span>
+                    <span className="case-outcome__grade">
+                      <Grade value={taxOutcome} />
+                    </span>
+                  </div>
+                </div>
+                {outcomes.length === 0 && action ? <div className="case-outcome__action">{action}</div> : null}
+              </div>
+            </li>
+          ) : null}
           {outcomes.map((outcome, index) => (
             <li key={outcome.id} className="case-outcome__item">
               {single ? null : (

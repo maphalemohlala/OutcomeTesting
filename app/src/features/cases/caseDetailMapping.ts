@@ -3,6 +3,7 @@ import { adviserUnmatched } from './allocationScope';
 import {
   Al_outcomecasesal_casestatus,
   Al_outcomecasesal_priority,
+  Al_outcomecasesal_taxoutcome,
   type Al_outcomecases,
 } from '../../generated/models/Al_outcomecasesModel';
 import {
@@ -80,6 +81,8 @@ export interface CaseDetail {
   serviceCaseRef: string | null;
   status: CaseStatus;
   statusValue: number;
+  /** The Tax check's grade, held on the case: a Tax check writes no al_outcome row. */
+  taxOutcome: string | null;
   route: ReviewRoute | null;
   owner: string | null;
   ageInDays: number;
@@ -149,6 +152,7 @@ export function toDetail(
     serviceCaseRef: text(record.al_servicecaseref),
     status: Al_outcomecasesal_casestatus[record.al_casestatus] as CaseStatus,
     statusValue: record.al_casestatus,
+    taxOutcome: choice(Al_outcomecasesal_taxoutcome, record.al_taxoutcome, record.al_taxoutcomename),
     route: toRoute(lookupLabel(record, 'al_reviewrouteid', record.al_reviewrouteidname)),
     owner: lookupLabel(record, 'ownerid', record.owneridname),
     ageInDays: ageInDays(record.createdon),
