@@ -218,8 +218,9 @@ namespace OutcomeTesting.Plugins.Tests
 
             Generate(service, batchId);
 
+            // Not the abandoned AQS check's Fail; and a Tax-only Pass is not reported (client, 2026-11-26).
             var record = Assert.Single(service.All("al_exportrecord"));
-            Assert.Equal("Pass", record.GetAttributeValue<string>("al_filequalitygrade"));
+            Assert.Null(record.GetAttributeValue<string>("al_filequalitygrade"));
             Assert.Equal(string.Empty, record.GetAttributeValue<string>("al_fqfailparaplannername"));
         }
 

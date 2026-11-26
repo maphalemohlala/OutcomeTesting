@@ -67,7 +67,6 @@ namespace OutcomeTesting.Plugins
         // Since 2026-11-25 the choice is "an administrator", with no name (project owner).
         // The contact above stays for outcomes recorded before then and still counts.
         public const string FqAdministratorFlag = "al_fqadministratoraccountable";
-        private const string TaxOutcomeAttr = "al_taxoutcome";
         private const int CaseStatusClosed = 120910591;
         private const int BatchStatusDraft = 120910770;
         private const int BatchStatusGenerated = 120910771;
@@ -173,7 +172,7 @@ namespace OutcomeTesting.Plugins
                     "al_productsolutiontype", ListOptionRules.ProductTypeAttribute,
                     "al_checkdate", "al_clientname",
                     "al_preorpostcheck", ListOptionRules.PreOrPostCheckAttribute,
-                    CaseReviewRouteAttr, TaxOutcomeAttr),
+                    CaseReviewRouteAttr),
                 Criteria = new FilterExpression(),
             };
             cases.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
@@ -271,8 +270,7 @@ namespace OutcomeTesting.Plugins
                 var fileGrade = daily && adviceRow != null
                     ? CommandHelpers.Formatted(adviceRow, Outcomes.InitialOutcomeAttr) ?? adviceGrade
                     : adviceGrade;
-                var taxOutcome = aqsExpected ? null : outcomeCase.GetAttributeValue<OptionSetValue>(TaxOutcomeAttr)?.Value;
-                if (daily && !BelongsInDailyFile(fileQualityChoice, fileOutcome, taxOutcome))
+                if (daily && !BelongsInDailyFile(fileQualityChoice, fileOutcome))
                 {
                     continue;
                 }
@@ -331,10 +329,7 @@ namespace OutcomeTesting.Plugins
                     ["al_preorpostcheck"] = ManagedOption(
                         outcomeCase, ListOptionRules.PreOrPostCheckAttribute, "al_preorpostcheck"),
                     ["al_advicequalitygrade"] = fileGrade,
-                    // A Tax-only case's own verdict, which no Trail Light column carries; the
-                    // daily file includes the row on it (client, 2026-11-16).
-                    ["al_taxoutcome"] = aqsExpected ? null : CommandHelpers.Formatted(outcomeCase, TaxOutcomeAttr),
-                    ["al_filequalitygrade"] = fileQualityGrade,
+                    ["al_filequalitygrade"] = ReportedFileQuality(aqsExpected, fileQualityChoice, fileQualityGrade),
                     ["statecode"] = new OptionSetValue(0),
                     ["statuscode"] = new OptionSetValue(1),
                 };
@@ -723,18 +718,24 @@ namespace OutcomeTesting.Plugins
 
         /// <summary>
         /// Whether a row belongs in the daily file (client, 2026-11-16): any type of failure - a
-        /// File Quality Fail; an advice grade of Pass with issues, Insufficient evidence or
-        /// Potential harm; or a Tax-only check that came back Fail or Pass with issues, which no
-        /// Trail Light column carries. A clean pass is left out.
+        /// File Quality Fail, or an advice grade of Pass with issues, Insufficient evidence or
+        /// Potential harm. A clean pass is left out. A Tax-only case's Tax check outcome has no
+        /// column in either file and no longer decides (client, 2026-11-26).
         /// </summary>
-        public static bool BelongsInDailyFile(int? fileQualityChoice, int? adviceOutcome, int? taxOutcome)
+        public static bool BelongsInDailyFile(int? fileQualityChoice, int? adviceOutcome)
         {
-            // The Tax scale is Pass / Fail / ChoiceInsufficient, which the Tax check labels "Pass
-            // with issues" (AD-055); al_taxoutcome holds that value, never ChoicePassWithIssues.
             return FileQuality.Failed(fileQualityChoice)
                 || adviceOutcome == OutcomeRules.OutcomePassWithIssues
-                || AdviceQualityFailed(adviceOutcome)
-                || (taxOutcome.HasValue && OutcomeRules.TaxResultRequiresRemediation(taxOutcome.Value));
+                || AdviceQualityFailed(adviceOutcome);
+        }
+
+        /// <summary>
+        /// The File Quality grade a file reports: a Tax-only case's only when it is a Fail (client,
+        /// 2026-11-26); a case that owes AQS reports its grade as it always did.
+        /// </summary>
+        public static string ReportedFileQuality(bool aqsExpected, int? fileQualityChoice, string fileQualityGrade)
+        {
+            return aqsExpected || FileQuality.Failed(fileQualityChoice) ? fileQualityGrade : null;
         }
 
         /// <summary>Graded, so dated and holding its first grades, but not yet closed.</summary>

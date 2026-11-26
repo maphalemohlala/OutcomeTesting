@@ -89,20 +89,32 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Theory]
-        [InlineData(ResponseRules.ChoiceFail, OutcomeRules.OutcomePass, null, true)]
-        [InlineData(ResponseRules.ChoicePass, OutcomeRules.OutcomePassWithIssues, null, true)]
-        [InlineData(ResponseRules.ChoicePass, OutcomeRules.OutcomeInsufficient, null, true)]
-        [InlineData(ResponseRules.ChoicePass, OutcomeRules.OutcomePotentialHarm, null, true)]
-        [InlineData(ResponseRules.ChoicePass, OutcomeRules.OutcomePass, null, false)]
-        // A Tax-only case: no advice grade, the Tax verdict decides. The Tax "Pass with issues" is
-        // stored as ChoiceInsufficient (120910302), as case 991106001 in DEV holds it.
-        [InlineData(ResponseRules.ChoicePass, null, ResponseRules.ChoiceFail, true)]
-        [InlineData(ResponseRules.ChoicePass, null, ResponseRules.ChoiceInsufficient, true)]
-        [InlineData(ResponseRules.ChoicePass, null, ResponseRules.ChoicePass, false)]
+        [InlineData(ResponseRules.ChoiceFail, OutcomeRules.OutcomePass, true)]
+        [InlineData(ResponseRules.ChoicePass, OutcomeRules.OutcomePassWithIssues, true)]
+        [InlineData(ResponseRules.ChoicePass, OutcomeRules.OutcomeInsufficient, true)]
+        [InlineData(ResponseRules.ChoicePass, OutcomeRules.OutcomePotentialHarm, true)]
+        [InlineData(ResponseRules.ChoicePass, OutcomeRules.OutcomePass, false)]
+        // A Tax-only case has no advice grade, so only a File Quality Fail puts it in the file. Its
+        // Tax check outcome has no column in either file and no longer decides (client, 2026-11-26).
+        [InlineData(ResponseRules.ChoiceFail, null, true)]
+        [InlineData(ResponseRules.ChoicePass, null, false)]
         public void The_daily_file_holds_any_type_of_failure_and_no_clean_pass(
-            int fileChoice, int? advice, int? tax, bool belongs)
+            int fileChoice, int? advice, bool belongs)
         {
-            Assert.Equal(belongs, GenerateExportPlugin.BelongsInDailyFile(fileChoice, advice, tax));
+            Assert.Equal(belongs, GenerateExportPlugin.BelongsInDailyFile(fileChoice, advice));
+        }
+
+        [Theory]
+        // Tax-only (no AQS owed): the grade is reported only when it is a Fail (client, 2026-11-26).
+        [InlineData(false, ResponseRules.ChoiceFail, "Fail", "Fail")]
+        [InlineData(false, ResponseRules.ChoicePass, "Pass", null)]
+        // A case that owes AQS reports its File Quality grade as it always did.
+        [InlineData(true, ResponseRules.ChoicePass, "Pass", "Pass")]
+        [InlineData(true, ResponseRules.ChoiceFail, "Fail", "Fail")]
+        public void A_tax_only_case_reports_its_file_quality_grade_only_on_a_fail(
+            bool aqsExpected, int choice, string grade, string reported)
+        {
+            Assert.Equal(reported, GenerateExportPlugin.ReportedFileQuality(aqsExpected, choice, grade));
         }
 
         [Fact]
