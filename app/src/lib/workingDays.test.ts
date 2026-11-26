@@ -4,6 +4,7 @@ import {
   isWorkingDay,
   remediationClock,
   workingDaysBetween,
+  workingDaysSince,
 } from './workingDays';
 
 /** A UK calendar date at midday UTC, which is unambiguous under both GMT and BST. */
@@ -55,6 +56,25 @@ describe('workingDaysBetween', () => {
 
   it('counts a weekend-only span as zero working days', () => {
     expect(workingDaysBetween(at('2026-08-29'), at('2026-08-30'))).toBe(0);
+  });
+});
+
+describe('workingDaysSince', () => {
+  it('reads 0 on the start day and 1 on the next working day', () => {
+    expect(workingDaysSince(at('2026-08-24'), at('2026-08-24'))).toBe(0);
+    expect(workingDaysSince(at('2026-08-24'), at('2026-08-25'))).toBe(1);
+  });
+
+  it('adds nothing for a weekend', () => {
+    // Friday to Monday is one working day, not three.
+    expect(workingDaysSince(at('2026-08-28'), at('2026-08-31'))).toBe(1);
+    // Started on a Saturday: the Monday is the first working day since.
+    expect(workingDaysSince(at('2026-08-29'), at('2026-08-31'))).toBe(1);
+    expect(workingDaysSince(at('2026-08-29'), at('2026-08-30'))).toBe(0);
+  });
+
+  it('is 0 when the end falls before the start', () => {
+    expect(workingDaysSince(at('2026-08-31'), at('2026-08-24'))).toBe(0);
   });
 });
 

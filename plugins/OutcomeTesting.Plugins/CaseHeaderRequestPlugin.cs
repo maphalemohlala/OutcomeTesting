@@ -409,6 +409,9 @@ namespace OutcomeTesting.Plugins
                 "al_samplesource",
                 "al_preorpostcheck",
                 "al_vulnerableclient",
+                // Set from the import's Group2, which can be blank or wrong, so the checker
+                // corrects it on the check (user, 2026-11-26).
+                CaseHeaderRules.BusinessUnitAttribute,
             };
 
         /// <summary>

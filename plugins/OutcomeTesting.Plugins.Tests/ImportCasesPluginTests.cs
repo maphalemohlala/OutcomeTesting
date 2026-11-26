@@ -188,7 +188,7 @@ namespace OutcomeTesting.Plugins.Tests
         /// proven where it was computed, never where it was applied.
         /// </summary>
         [Fact]
-        public void An_imported_case_carries_a_deadline_three_days_after_the_upload()
+        public void An_imported_case_carries_a_deadline_three_working_days_after_the_upload()
         {
             var service = WithRoutes();
             var uploadedAt = new DateTime(2026, 9, 19, 9, 30, 0, DateTimeKind.Utc);
@@ -199,7 +199,7 @@ namespace OutcomeTesting.Plugins.Tests
             var result = ImportCasesPlugin.CreateRoutedCase(service, Resolver(service), record);
             var row = service.Row("al_outcomecase", result.CaseId);
 
-            Assert.Equal(new DateTime(2026, 9, 22), row.GetAttributeValue<DateTime>("al_duedate"));
+            Assert.Equal(new DateTime(2026, 9, 23), row.GetAttributeValue<DateTime>("al_duedate"));
         }
 
         [Fact]

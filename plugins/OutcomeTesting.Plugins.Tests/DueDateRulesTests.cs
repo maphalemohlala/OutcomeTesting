@@ -20,25 +20,24 @@ namespace OutcomeTesting.Plugins.Tests
         // ------------------------------------------------------------------ the default
 
         [Fact]
-        public void Falls_due_three_days_after_the_day_of_the_upload()
+        public void Falls_due_three_working_days_after_the_day_of_the_upload()
         {
             var uploaded = new DateTime(2026, 9, 18, 16, 0, 0, DateTimeKind.Utc);
 
-            Assert.Equal(new DateTime(2026, 9, 21), ImportRules.DueDateFor(uploaded));
+            Assert.Equal(new DateTime(2026, 9, 23), ImportRules.DueDateFor(uploaded));
         }
 
         [Fact]
-        public void Counts_calendar_time_and_not_working_days()
+        public void Counts_working_days_and_skips_the_weekend()
         {
-            // "3 days" (project owner, 2026-09-19), so a Friday upload is due on Monday and a
-            // Thursday upload is due on Sunday - not the following Tuesday. Pinned because
-            // the business asked to be told which this was: it is the calendar, and
-            // remediation's own deadline is the one that counts working days.
+            // Every day count leaves out weekends (2026-11-26), so a Thursday upload is due on
+            // the Tuesday, not the Sunday, and a Saturday upload on the Wednesday.
             var thursday = new DateTime(2026, 9, 17, 9, 0, 0, DateTimeKind.Utc);
             var due = ImportRules.DueDateFor(thursday);
 
-            Assert.Equal(DayOfWeek.Sunday, due.DayOfWeek);
-            Assert.Equal(new DateTime(2026, 9, 20), due);
+            Assert.Equal(DayOfWeek.Tuesday, due.DayOfWeek);
+            Assert.Equal(new DateTime(2026, 9, 22), due);
+            Assert.Equal(new DateTime(2026, 9, 23), ImportRules.DueDateFor(new DateTime(2026, 9, 19, 9, 0, 0, DateTimeKind.Utc)));
         }
 
         [Fact]

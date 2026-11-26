@@ -207,7 +207,7 @@ export function CaseDetailPage() {
             </div>
             <div className="case-fields__item">
               <dt>Age</dt>
-              <dd>{detail.ageInDays} days</dd>
+              <dd>{detail.ageInDays} working day{detail.ageInDays === 1 ? '' : 's'}</dd>
             </div>
           </dl>
         </section>

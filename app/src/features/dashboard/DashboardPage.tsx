@@ -219,7 +219,7 @@ function DashboardBody({ data, filters }: { data: DashboardData; filters: Report
   const noCheck = data.byStatus.find((entry) => entry.status === 'No Check Required')?.count ?? 0;
   const pipeline = data.byStatus.filter((entry) => entry.status !== 'No Check Required');
   const overThirty = data.ageing[data.ageing.length - 1]?.count ?? 0;
-  // The bands between the first and the last (8 to 30 days); empty says the backlog is old, not growing.
+  // The bands between the first and the last (8 to 30 working days); empty says the backlog is old, not growing.
   const middleEmpty = data.ageing.length > 2 && data.ageing.slice(1, -1).every((band) => band.count === 0);
   const graded = data.completedTotal;
 
@@ -231,9 +231,9 @@ function DashboardBody({ data, filters }: { data: DashboardData; filters: Report
             <p className="dashboard__alert">
               <span className="numeral">{overThirty}</span>
               <span>
-                <strong>open case{overThirty === 1 ? ' has' : 's have'} waited more than 30 days</strong>
-                The oldest was imported {data.oldestOpenDays} days ago.
-                {middleEmpty ? ' Nothing sits between 8 and 30 days.' : null}
+                <strong>open case{overThirty === 1 ? ' has' : 's have'} waited more than 30 working days</strong>
+                The oldest was imported {data.oldestOpenDays} working days ago.
+                {middleEmpty ? ' Nothing sits between 8 and 30 working days.' : null}
               </span>
             </p>
           ) : null}
@@ -268,7 +268,7 @@ function DashboardBody({ data, filters }: { data: DashboardData; filters: Report
         />
         <Figure
           value={data.oldestOpenDays}
-          unit="days"
+          unit="working days"
           label="Oldest open case"
           to={
             data.oldestOpenCaseId
@@ -432,7 +432,7 @@ function DashboardBody({ data, filters }: { data: DashboardData; filters: Report
               />
             ))}
           </ul>
-          <p className="dashboard__footnote">Calendar days since import.</p>
+          <p className="dashboard__footnote">Working days since import. Weekends are left out; bank holidays are not.</p>
         </section>
       </div>
     </>

@@ -140,6 +140,7 @@ namespace OutcomeTesting.Plugins.Tests
         [InlineData("al_products")]
         [InlineData("al_advicedate")]
         [InlineData("al_vulnerableclient")]
+        [InlineData("al_businessunit")]
         public void Allows_the_header_fields_a_checker_owns(string field)
         {
             var fields = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)

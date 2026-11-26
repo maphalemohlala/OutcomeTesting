@@ -76,6 +76,15 @@ export function workingDaysBetween(start: Date, end: Date): number {
   return count;
 }
 
+/**
+ * Working days that have passed since `start`, up to and including `end`: 0 on the start day
+ * itself, and a weekend adds nothing. For ages, durations and lateness, which read 0 on the
+ * day they begin, unlike the remediation clock's day 1.
+ */
+export function workingDaysSince(start: Date, end: Date): number {
+  return Math.max(0, workingDaysBetween(start, end) - (isWorkingDay(start) ? 1 : 0));
+}
+
 /** The clock as it stands on one remediation action (OD-018). */
 export interface RemediationClock {
   /** Working days in the period now running. The BR-010 threshold measures this one. */

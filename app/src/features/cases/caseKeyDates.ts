@@ -1,3 +1,5 @@
+import { workingDaysSince } from '../../lib/workingDays';
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** "23 Sep 2026", as lib/format's date() writes it, to a day number; null for anything else. */
@@ -21,7 +23,7 @@ interface ReviewDates {
 
 /**
  * The case's dates in the order they happened: each check started and submitted, and the due
- * date. A submission after the due date says by how many days. Dates that cannot be read are
+ * date. A submission after the due date says by how many working days (weekends left out). Dates that cannot be read are
  * left out rather than guessed into place.
  */
 export function caseKeyDates(reviews: readonly ReviewDates[], dueDate: string | null): KeyDate[] {
@@ -34,11 +36,15 @@ export function caseKeyDates(reviews: readonly ReviewDates[], dueDate: string | 
 
   for (const review of reviews) {
     add(review.startedOn, `${review.type} check started`);
-    const late = review.submittedOn && due !== null ? (dayOf(review.submittedOn) ?? due) - due : 0;
+    const submitted = review.submittedOn ? dayOf(review.submittedOn) : null;
+    const late =
+      submitted !== null && due !== null
+        ? workingDaysSince(new Date(due * 86_400_000), new Date(submitted * 86_400_000))
+        : 0;
     add(
       review.submittedOn,
       late > 0
-        ? `${review.type} check submitted, ${late} day${late === 1 ? '' : 's'} after the due date`
+        ? `${review.type} check submitted, ${late} working day${late === 1 ? '' : 's'} after the due date`
         : `${review.type} check submitted`,
     );
   }

@@ -183,7 +183,7 @@ export function PersonCasesPage() {
                           'Not yet graded'
                         )}
                       </td>
-                      <td className="people__numeric">{item.ageInDays} days</td>
+                      <td className="people__numeric">{item.ageInDays} working day{item.ageInDays === 1 ? '' : 's'}</td>
                     </tr>
                   ))}
                 </tbody>

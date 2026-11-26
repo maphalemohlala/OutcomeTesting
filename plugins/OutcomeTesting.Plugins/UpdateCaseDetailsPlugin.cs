@@ -630,6 +630,7 @@ namespace OutcomeTesting.Plugins
                 // a manager can usefully be offered. Absent from this map is what refuses it:
                 // anything not listed here is rejected by name.
                 { "al_preorpostcheck", new EditableField(EditableKind.Option, "Pre or post check") },
+                { CaseHeaderRules.BusinessUnitAttribute, new EditableField(EditableKind.Option, "Business Unit") },
                 { "al_vulnerableclient", new EditableField(EditableKind.Option, "Vulnerable client") },
                 { "al_taxcheckrequired", new EditableField(EditableKind.Option, "Tax check required") },
                 { "al_taxteamdisposition", new EditableField(EditableKind.Option, "Tax team disposition") },

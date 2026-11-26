@@ -70,10 +70,10 @@ export type DashboardState =
     };
 
 const AGEING_BANDS: { label: string; min: number; max: number }[] = [
-  { label: '0–7 days', min: 0, max: 7 },
-  { label: '8–14 days', min: 8, max: 14 },
-  { label: '15–30 days', min: 15, max: 30 },
-  { label: 'Over 30 days', min: 31, max: Infinity },
+  { label: '0–7 working days', min: 0, max: 7 },
+  { label: '8–14 working days', min: 8, max: 14 },
+  { label: '15–30 working days', min: 15, max: 30 },
+  { label: 'Over 30 working days', min: 31, max: Infinity },
 ];
 
 export function aggregate(

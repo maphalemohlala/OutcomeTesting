@@ -496,7 +496,7 @@ export function CaseWorklistPage() {
                           <StageLabel status={item.status} />
                         </td>
                         <td>{date(item.createdOn) ?? '—'}</td>
-                        <td className="worklist__numeric">{item.ageInDays} days</td>
+                        <td className="worklist__numeric">{item.ageInDays} working day{item.ageInDays === 1 ? '' : 's'}</td>
                         <td>
                           {item.latestOutcome ? (
                             <OutcomeIndicator outcome={item.latestOutcome} />

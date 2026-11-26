@@ -792,7 +792,7 @@ namespace OutcomeTesting.Plugins
         /// therefore the Friday of the following week, which is the date the BR-010
         /// threshold falls due.
         ///
-        /// Mirrors <c>addWorkingDays</c> in app/src/lib/workingDays.ts deliberately: the
+        /// Uses the calendar of <c>workingDaysBetween</c> in app/src/lib/workingDays.ts deliberately: the
         /// date written here and the age the portal renders against it have to be the same
         /// arithmetic, or a case reads as breached a day before its own due date.
         ///

@@ -326,11 +326,9 @@ namespace OutcomeTesting.Plugins
         /// "72 hours" and stored as "three days at midnight", and the deployment note claimed
         /// the upload's time of day was preserved. It never was.
         ///
-        /// Calendar days, not working days. That differs from remediation, where an action is
-        /// due ThresholdWorkingDays after it is raised - the two deadlines belong to
-        /// different people and were set by different rules, so they are not reconciled
-        /// here. If the business ever means three working days by this, it is one change,
-        /// in DueDateFor.
+        /// Working days, Monday to Friday (2026-11-26: every day count in the app leaves out
+        /// weekends). Bank holidays are not deducted, the same calendar as remediation's
+        /// clock (OD-018). Until then this counted calendar days.
         /// </summary>
         public const int DueWithinDays = 3;
 
@@ -351,8 +349,9 @@ namespace OutcomeTesting.Plugins
         public const string ParaplannerEmailAttribute = "al_paraplanneremail";
 
         /// <summary>
-        /// When a case uploaded at <paramref name="uploadedAt"/> falls due: three days after
-        /// the UK DAY of the upload, at midnight.
+        /// When a case uploaded at <paramref name="uploadedAt"/> falls due: three working days
+        /// after the UK DAY of the upload, at midnight. A Friday or weekend upload is due on
+        /// the Wednesday.
         ///
         /// The UK day, not UTC's (audit finding 5, 2026-09-20). Uploads are timestamped in
         /// UTC and the users are in London, so through British Summer Time a file uploaded at
@@ -374,7 +373,17 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static DateTime DueDateFor(DateTime uploadedAt)
         {
-            return CaseHeaderRules.UkDate(uploadedAt).AddDays(DueWithinDays);
+            var due = CaseHeaderRules.UkDate(uploadedAt);
+            for (var left = DueWithinDays; left > 0;)
+            {
+                due = due.AddDays(1);
+                if (due.DayOfWeek != DayOfWeek.Saturday && due.DayOfWeek != DayOfWeek.Sunday)
+                {
+                    left -= 1;
+                }
+            }
+
+            return due;
         }
 
         /// <summary>

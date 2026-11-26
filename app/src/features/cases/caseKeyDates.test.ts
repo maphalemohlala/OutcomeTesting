@@ -8,7 +8,8 @@ describe('the case key dates', () => {
     ).toEqual([
       { date: '23 Sep 2026', label: 'AQS check started' },
       { date: '26 Sep 2026', label: 'Case due' },
-      { date: '29 Sep 2026', label: 'AQS check submitted, 3 days after the due date' },
+      // Due Saturday 26th, submitted Tuesday 29th: Monday and Tuesday count, the Sunday does not.
+      { date: '29 Sep 2026', label: 'AQS check submitted, 2 working days after the due date' },
     ]);
   });
 
@@ -24,9 +25,16 @@ describe('the case key dates', () => {
     expect(caseKeyDates([{ type: 'AQS', startedOn: null, submittedOn: 'soon' }], null)).toEqual([]);
   });
 
-  it('counts one day late in the singular', () => {
-    expect(caseKeyDates([{ type: 'AQS', startedOn: null, submittedOn: '27 Sep 2026' }], '26 Sep 2026')[1].label).toBe(
-      'AQS check submitted, 1 day after the due date',
+  it('counts one day late in the singular, over a weekend', () => {
+    // Due Friday 2 Oct, submitted Monday 5 Oct.
+    expect(caseKeyDates([{ type: 'AQS', startedOn: null, submittedOn: '05 Oct 2026' }], '02 Oct 2026')[1].label).toBe(
+      'AQS check submitted, 1 working day after the due date',
     );
+  });
+
+  it('is not late for a weekend submission after a Friday due date', () => {
+    expect(
+      caseKeyDates([{ type: 'AQS', startedOn: null, submittedOn: '04 Oct 2026' }], '02 Oct 2026').map((d) => d.label),
+    ).toEqual(['Case due', 'AQS check submitted']);
   });
 });

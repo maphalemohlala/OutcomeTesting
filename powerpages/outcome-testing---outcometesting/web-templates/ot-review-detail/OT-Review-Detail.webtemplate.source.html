@@ -463,6 +463,7 @@
       option objects, so their label is read rather than their value.
     {% endcomment %}
     {% assign h_adviserstatus = rv['case.al_adviserstatus'] %}
+    {% assign h_businessunit = rv['case.al_businessunit'] %}
     {% assign h_casetype = rv['case.al_casetype'] %}
     {% assign h_producttype = rv['case.al_productsolutiontype'] %}
     {% comment %}
@@ -789,7 +790,8 @@
           {% endcomment %}
           <tr>
             <td class="lbl">Check date</td><td class="val">{{ rv['case.al_checkdate'] | date: 'dd MMM yyyy' | default: 'Stamped when this check is submitted' }}</td>
-            <td class="lbl">Business Unit</td><td class="val">{{ rv['case.al_businessunit'].label | escape }}</td>
+            {% comment %}Editable (user, 2026-11-26): the import's Group2 can leave it blank or wrong. Values are al_businessunit's two options.{% endcomment %}
+            <td class="lbl">Business Unit</td><td class="val"><select class="ot-hdr-input" data-ot-hdr="al_businessunit" aria-label="Business Unit"><option value="">&mdash;</option><option value="120910900" {% if h_businessunit.value == 120910900 %}selected{% endif %}>Independent</option><option value="120910901" {% if h_businessunit.value == 120910901 %}selected{% endif %}>Restricted</option></select></td>
           </tr>
           <tr>
             <td class="lbl">Client name / initials</td><td class="val"><input type="text" class="ot-hdr-input" data-ot-hdr="al_clientname" value="{{ rv['case.al_clientname'] | escape }}" aria-label="Client name or initials" /></td>

@@ -216,18 +216,25 @@
   })();
 </script>
 <script>
-  {% comment %}// "N days overdue" under a due date: <span data-ot-overdue="yyyy-MM-dd"></span> stays empty
+  {% comment %}// "N working days overdue" under a due date: <span data-ot-overdue="yyyy-MM-dd"></span> stays empty
   // until the date has passed. Liquid cannot subtract dates, so the page's own clock does it.
+  // Weekends are not counted (bank holidays are), the remediation clock's calendar.
   // Filters that submit their form on change (data-ot-autosubmit) - a date only once its year
   // is whole, so typing 2026 does not send 0002.{% endcomment %}
   (function () {
     function run() {
-      var today = new Date(); today.setHours(0, 0, 0, 0);
+      var now = new Date();
+      var today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
       var marks = document.querySelectorAll('[data-ot-overdue]');
       for (var i = 0; i < marks.length; i++) {
-        var due = new Date(marks[i].getAttribute('data-ot-overdue') + 'T00:00:00');
-        var days = Math.round((today - due) / 86400000);
-        if (days > 0) { marks[i].textContent = days + (days === 1 ? ' day' : ' days') + ' overdue'; }
+        var ymd = /^(\d{4})-(\d{2})-(\d{2})/.exec(marks[i].getAttribute('data-ot-overdue') || '');
+        if (!ymd) { continue; }
+        var days = 0;
+        for (var day = Date.UTC(+ymd[1], +ymd[2] - 1, +ymd[3]) + 86400000; day <= today; day += 86400000) {
+          var weekday = new Date(day).getUTCDay();
+          if (weekday >= 1 && weekday <= 5) { days += 1; }
+        }
+        if (days > 0) { marks[i].textContent = days + (days === 1 ? ' working day' : ' working days') + ' overdue'; }
       }
       // A person's initials in a circle; the tint is fixed by the name's length, so a person keeps one colour.
       var faces = document.querySelectorAll('[data-ot-initials]');

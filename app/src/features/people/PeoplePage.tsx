@@ -52,7 +52,7 @@ const EXPORT_HEADERS = [
   'Closed',
   ...OUTCOMES,
   'Not yet graded',
-  'Oldest open (days)',
+  'Oldest open (working days)',
 ];
 
 type Banner = { tone: 'success' | 'error'; message: string } | null;
