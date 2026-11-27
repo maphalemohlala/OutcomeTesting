@@ -55,7 +55,7 @@ namespace OutcomeTesting.Plugins
             }
 
             // On Update the Target carries only changed columns, so the review link comes
-            // from the pre-image registered by Register-ResponseGuard.ps1.
+            // from the step's pre-image (src/SdkMessageProcessingSteps).
             var pre = context.PreEntityImages.Values.FirstOrDefault();
             var reviewRef = target.GetAttributeValue<EntityReference>("al_reviewinstanceid")
                 ?? (pre == null ? null : pre.GetAttributeValue<EntityReference>("al_reviewinstanceid"));

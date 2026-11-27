@@ -21,7 +21,6 @@ import {
   filterTickOptions,
   heldOptionLabels,
   listByKey,
-  lookupFormattedField,
   lookupLabelOn,
   lookupValueField,
   offeredOptions,
@@ -188,7 +187,6 @@ describe('the managed lists', () => {
     const unmigrated = { ...MANAGED_LISTS[0], caseAttribute: null };
     expect(MIGRATED_LISTS).not.toContain(unmigrated);
     expect(lookupValueField(unmigrated)).toBeNull();
-    expect(lookupFormattedField(unmigrated)).toBeNull();
     expect(lookupLabelOn({ al_producttypeidname: 'IHT' }, unmigrated)).toBeNull();
   });
 
@@ -212,9 +210,6 @@ describe('the managed lists', () => {
 
   it('builds the Web API field names for each list', () => {
     expect(lookupValueField(PRODUCT)).toBe('_al_producttypeid_value');
-    expect(lookupFormattedField(PRODUCT)).toBe(
-      '_al_producttypeid_value@OData.Community.Display.V1.FormattedValue',
-    );
     expect(lookupValueField(MANAGED_LISTS.find((list) => list.value === LIST_SAMPLE_SOURCE)!)).toBe('_al_samplesourceid_value');
     expect(lookupValueField(MANAGED_LISTS.find((list) => list.value === LIST_CASE_TYPE)!)).toBe('_al_casetypeid_value');
     expect(lookupValueField(MANAGED_LISTS.find((list) => list.value === LIST_PRE_OR_POST_CHECK)!)).toBe('_al_preorpostcheckid_value');

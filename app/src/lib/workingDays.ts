@@ -78,8 +78,8 @@ export function workingDaysBetween(start: Date, end: Date): number {
 
 /**
  * Working days that have passed since `start`, up to and including `end`: 0 on the start day
- * itself, and a weekend adds nothing. For ages, durations and lateness, which read 0 on the
- * day they begin, unlike the remediation clock's day 1.
+ * itself, and a weekend adds nothing. For lateness only ("N working days after the due date"):
+ * a submission on the due date is not late. Ages and durations count day 1, as above.
  */
 export function workingDaysSince(start: Date, end: Date): number {
   return Math.max(0, workingDaysBetween(start, end) - (isWorkingDay(start) ? 1 : 0));

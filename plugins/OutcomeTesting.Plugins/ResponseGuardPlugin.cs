@@ -98,7 +98,7 @@ namespace OutcomeTesting.Plugins
             }
 
             // On Update the Target carries only changed columns, so the review and question
-            // links come from the pre-image registered by Register-ResponseGuard.ps1.
+            // links come from the step's pre-image (src/SdkMessageProcessingSteps).
             var pre = context.PreEntityImages.Values.FirstOrDefault();
 
             var reviewRef = target.GetAttributeValue<EntityReference>("al_reviewinstanceid")

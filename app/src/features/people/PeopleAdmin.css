@@ -33,27 +33,6 @@
   margin-left: var(--space-2);
 }
 
-.users__link {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--colour-action);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: none;
-}
-
-.users__link:hover {
-  color: var(--colour-action-hover);
-  text-decoration: underline;
-}
-
-.users__link:focus-visible {
-  outline: 2px solid var(--colour-focus);
-  outline-offset: 2px;
-}
-
 .users__btn {
   padding: var(--space-2) var(--space-4);
   border: 1px solid var(--colour-action);

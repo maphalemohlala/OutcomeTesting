@@ -368,43 +368,6 @@ export const dataSourcesInfo = {
     "dataSourceType": "Dataverse",
     "apis": {}
   },
-  "al_completeremediation": {
-    "tableId": "",
-    "version": "",
-    "primaryKey": "",
-    "dataSourceType": "Dataverse",
-    "apis": {
-      "al_CompleteRemediation": {
-        "path": "/api/data/v9.2/al_CompleteRemediation",
-        "method": "POST",
-        "parameters": [
-          {
-            "name": "TargetId",
-            "in": "body",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "ExpectedRowVersion",
-            "in": "body",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "IdempotencyKey",
-            "in": "body",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "responseInfo": {
-          "200": {
-            "type": "object"
-          }
-        }
-      }
-    }
-  },
   "al_createrole": {
     "tableId": "",
     "version": "",

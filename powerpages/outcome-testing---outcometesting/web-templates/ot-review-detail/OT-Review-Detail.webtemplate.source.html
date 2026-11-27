@@ -4096,31 +4096,12 @@
            * Where the submit left the case, read from Dataverse rather than predicted
            * (reported 2026-10-07: the wording suggested the case was going to the T&C
            * Manager when it was not). SubmitReviewPlugin decides; the page only reports. The
-           * values are CaseLifecycle.cs's, and portalNextStepMessages.test.ts holds them to it.
+           * values and the read are OT Layout's (window.OT_CASE_STATUS, window.otCaseStatusNow).
            */{% endcomment %}
-          var CASE_STATUS = {
-            queued: 120910583,
-            awaitingRemediation: 120910587,
-            remediationInProgress: 120910588,
-            awaitingSignoff: 120910589,
-            awaitingRecheck: 120910590,
-            closed: 120910591
-          };
+          var CASE_STATUS = window.OT_CASE_STATUS;
 
           function caseStatusNow(done) {
-            if (!caseId) { done(null); return; }
-            var read = new XMLHttpRequest();
-            read.open('GET', '/_api/al_outcomecases(' + caseId + ')?$select=al_casestatus', true);
-            read.setRequestHeader('Accept', 'application/json');
-            read.onreadystatechange = function () {
-              if (read.readyState !== 4) { return; }
-              var value = null;
-              if (read.status >= 200 && read.status < 300) {
-                try { value = JSON.parse(read.responseText).al_casestatus; } catch (e) { value = null; }
-              }
-              done(typeof value === 'number' ? value : null);
-            };
-            read.send();
+            window.otCaseStatusNow(done, caseId);
           }
 
           {% comment %}// Nothing is said about a status the submit cannot lead to; a read that fails says

@@ -86,31 +86,8 @@ namespace OutcomeTesting.Plugins
                         RemediationDocument.Status(status, labels),
                     };
 
-                    var issues = RemediationDocument.Issues(action.GetAttributeValue<string>("al_description"));
-                    if (issues.Count == 0)
-                    {
-                        issues.Add("—");
-                    }
-
-                    for (var i = 0; i < issues.Count; i++)
-                    {
-                        number++;
-                        var cells = new List<PdfCell>
-                        {
-                            PdfCell.Of(number.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                            PdfCell.Of(issues[i]),
-                        };
-
-                        // The action's own columns sit on its first issue; the rows under it
-                        // belong to the same action, as on the remediation form.
-                        // The remedial action, first, is the checker's own words and may be formatted.
-                        for (var d = 0; d < details.Length; d++)
-                        {
-                            cells.Add(i > 0 ? PdfCell.Blank() : d == 0 ? PdfCell.FromMarkup(details[d]) : PdfCell.Of(details[d]));
-                        }
-
-                        table.Add(cells.ToArray());
-                    }
+                    number = RemediationDocument.AddIssueRows(
+                        table, number, action.GetAttributeValue<string>("al_description"), details);
                 }
 
                 var blocks = new List<PdfBlock>();

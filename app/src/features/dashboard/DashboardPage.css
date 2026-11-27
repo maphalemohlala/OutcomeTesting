@@ -265,10 +265,6 @@ a.dashboard__row:hover {
   color: var(--colour-text-muted);
 }
 
-.dashboard__muted {
-  color: var(--colour-text-muted);
-}
-
 .dashboard__footnote,
 .dashboard__empty {
   font-size: var(--text-xs);

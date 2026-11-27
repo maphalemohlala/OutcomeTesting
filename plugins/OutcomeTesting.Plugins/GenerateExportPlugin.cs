@@ -38,14 +38,10 @@ namespace OutcomeTesting.Plugins
         private const string RecordEntity = "al_exportrecord";
         private const string CaseEntity = "al_outcomecase";
         private const string OutcomeEntity = "al_outcome";
-        private const string ResponseEntity = "al_response";
         private const string ReviewEntity = "al_reviewinstance";
-        private const string QuestionVersionEntity = "al_questionversion";
-        private const string QuestionEntity = "al_question";
         private const string RouteEntity = "al_reviewroute";
         private const string CaseReviewRouteAttr = "al_reviewrouteid";
         private const string RouteRequiresAqsAttr = "al_requiresaqsreview";
-        private const string AnswerChoiceAttr = "al_answerchoice";
 
         public const string FqAdviserFlag = "al_fqadviseraccountable";
         public const string FqParaplannerFlag = "al_fqparaplanneraccountable";

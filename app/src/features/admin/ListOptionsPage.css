@@ -11,43 +11,6 @@
   border-radius: var(--radius-lg);
 }
 
-.lists__add {
-  justify-self: start;
-}
-
-.lists__table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  background: var(--colour-surface);
-  border: 1px solid var(--colour-border);
-  border-radius: var(--radius-lg);
-}
-
-.lists__table th,
-.lists__table td {
-  padding: var(--space-3) var(--space-4);
-  text-align: left;
-  border-bottom: 1px solid var(--colour-border);
-}
-
-.lists__table thead th {
-  background: var(--colour-surface);
-  font-weight: 500;
-  color: var(--colour-text-muted);
-}
-
-.lists__table tbody tr:last-child td {
-  border-bottom: none;
-}
-
-/* A mapping with no manager routes nothing, so it is marked rather than left looking
-   like an ordinary empty cell. */
-.lists__missing {
-  color: var(--colour-text-muted);
-  font-style: italic;
-}
-
 .lists__form {
   display: grid;
   gap: var(--space-2);
@@ -80,15 +43,6 @@
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--colour-danger, #b3261e);
   background: var(--colour-surface-sunken);
-}
-
-/* A table cell: display flex would take it out of the table and break the row rules. */
-.lists__actions {
-  white-space: nowrap;
-}
-
-.lists__actions > * + * {
-  margin-left: var(--space-3);
 }
 
 /* Visually hidden, still read out: the actions column has no visible heading but the
@@ -145,32 +99,10 @@
   border-color: var(--colour-action);
 }
 
-.lists__picker {
-  display: flex;
-  gap: var(--space-3);
-  align-items: center;
-}
-
-.lists__picker select {
-  padding: var(--space-2);
-  border: 1px solid var(--colour-border);
-  background: var(--colour-surface);
-  color: inherit;
-}
-
-.lists__heading {
-  margin: 0;
-  font-size: var(--text-lg);
-}
-
 /* Retired options are shown rather than hidden, so they have to read as retired at a glance
    and not as ordinary rows somebody could expect to see in the dropdown. */
 .lists__row--retired td {
   color: var(--colour-text-muted);
-}
-
-.lists__retired {
-  font-style: italic;
 }
 
 .lists__buttons {

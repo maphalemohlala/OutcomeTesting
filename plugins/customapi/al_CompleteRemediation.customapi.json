@@ -1,5 +1,5 @@
 {
-  "$comment": "Contract for the CompleteRemediation server-side command (AD-003, command-concurrency skill). Deployed by plugins/deploy/Register-CompleteRemediation.ps1. Custom API parameter Type codes: 0=Boolean, 10=String.",
+  "$comment": "Contract for the CompleteRemediation server-side command (AD-003, command-concurrency skill). Ships in the solution (src/customapis/al_CompleteRemediation); the registration tool's registerall verb registers it from this contract. Custom API parameter Type codes: 0=Boolean, 10=String.",
   "customApi": {
     "uniquename": "al_CompleteRemediation",
     "name": "al_CompleteRemediation",

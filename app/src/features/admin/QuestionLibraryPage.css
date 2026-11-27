@@ -521,12 +521,6 @@
   font-weight: var(--weight-medium, 500);
 }
 
-.library__toolbar {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: var(--space-3);
-}
-
 /* A consequence the administrator cannot recover by guessing: changing a section's team
    reaches submitted reviews, and making one optional takes effect immediately. */
 .library__warning {

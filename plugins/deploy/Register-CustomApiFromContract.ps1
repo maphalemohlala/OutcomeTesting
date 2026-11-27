@@ -4,7 +4,7 @@
     *.customapi.json contract, and adds both to the solution.
 
 .DESCRIPTION
-    This is the generic form of the Web API half of Register-CompleteRemediation.ps1.
+    One script serves every command.
     Every field it writes is read from the contract, so nothing is hand-typed here and
     a new command needs a contract file rather than a new script.
 

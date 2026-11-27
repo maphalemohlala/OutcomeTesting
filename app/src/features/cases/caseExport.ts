@@ -4,7 +4,7 @@ import { ADVICE_DATE_LABEL } from './caseHeaderDates';
 import { SERVICE_CASE_REF_LABEL, UPLOADED_BY_LABEL } from '../../types/domain';
 import type { CaseSummary } from './caseWorklistMapping';
 import { isoDay } from '../../lib/format';
-import { workingDaysSince } from '../../lib/workingDays';
+import { workingDaysBetween } from '../../lib/workingDays';
 
 /**
  * The case extract used by the worklist, the person view and the full data extract.
@@ -107,12 +107,12 @@ export const COMPLETED_CASE_HEADERS = [
   'Status',
 ];
 
-/** Working days between two timestamps, weekends left out; blank where either is missing or unreadable. */
+/** Working days between two timestamps, both days counted and weekends left out; blank where either is missing or unreadable. */
 function daysBetween(from: string | null | undefined, to: string | null | undefined): number | '' {
   const start = new Date(from ?? '');
   const end = new Date(to ?? '');
   if (!from || !to || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return '';
-  return workingDaysSince(start, end);
+  return workingDaysBetween(start, end);
 }
 
 export function completedCaseRow(item: CaseSummary): CellValue[] {

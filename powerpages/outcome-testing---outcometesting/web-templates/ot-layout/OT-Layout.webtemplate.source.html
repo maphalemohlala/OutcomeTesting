@@ -26,7 +26,7 @@
 {% comment %}Source Serif 4 for page titles and headline numbers, the display face the Code App uses.{% endcomment %}
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap">
-<link rel="stylesheet" href="/outcome-testing.css?v=34">
+<link rel="stylesheet" href="/outcome-testing.css?v=37">
 
 {% comment %}
   The one place a failed Web API call is put into words (project owner, 2026-11-17: every
@@ -174,6 +174,242 @@
   })();
 </script>
 <script>
+  {% comment %}/*
+   * Feedback while the portal works (UAT, 2026-11-26: a click gave no sign anything was
+   * happening, and the AQS claim message sat below the table, out of sight). One place, so
+   * every page has it without its own code:
+   *
+   *   leaving the page     html.ot-navigating: the bar at the top and, after a moment, a
+   *                        skeleton over the page being left. Cleared if the page is shown
+   *                        again (Back from the next page) or is still here after 20 seconds.
+   *   a Web API call       html.ot-requesting while any /_api/ call is out: the same bar.
+   *   a write              the button clicked just before it gets aria-busy (a spinner) until
+   *                        it answers, unless the page already set aria-busy itself.
+   *   a status line        when one changes while out of view, its words are repeated in the
+   *                        toast. The line keeps its own aria-live, so the toast is visual only
+   *                        and nothing is announced twice. Silent until the first click or key,
+   *                        so a line a page fills as it loads does not pop up.
+   */{% endcomment %}
+  (function () {
+    'use strict';
+
+    var root = document.documentElement;
+    var STATUS = '.ot-response__status, .ot-submit__status, .ot-accountability__status, .ot-inline-status';
+    var stuck = null;
+    var open = 0;
+    var clicked = null;
+    var clickedAt = 0;
+    var interacted = false;
+    var hideTimer = null;
+
+    function arrived() {
+      root.classList.remove('ot-navigating');
+      clearTimeout(stuck);
+    }
+    window.addEventListener('beforeunload', function () {
+      root.classList.add('ot-navigating');
+      clearTimeout(stuck);
+      stuck = setTimeout(arrived, 20000);
+    });
+    window.addEventListener('pageshow', arrived);
+
+    function requests(delta) {
+      open = Math.max(0, open + delta);
+      root.classList.toggle('ot-requesting', open > 0);
+    }
+
+    document.addEventListener('click', function (event) {
+      interacted = true;
+      var button = event.target && event.target.closest ? event.target.closest('button') : null;
+      if (button) { clicked = button; clickedAt = Date.now(); }
+    }, true);
+    document.addEventListener('keydown', function () { interacted = true; }, true);
+
+    var xhrOpen = XMLHttpRequest.prototype.open;
+    var xhrSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.open = function (method, url) {
+      this.otTracked = /\/_api\//i.test(String(url));
+      this.otWrite = !/^(GET|HEAD)$/i.test(String(method));
+      return xhrOpen.apply(this, arguments);
+    };
+    XMLHttpRequest.prototype.send = function () {
+      if (this.otTracked) {
+        // The token fetch sits between the click and the send, so "just before" is a few seconds.
+        var button = this.otWrite && clicked && Date.now() - clickedAt < 3000 ? clicked : null;
+        var marked = button && button.getAttribute('aria-busy') !== 'true';
+        var before = marked ? button.getAttribute('aria-busy') : null;
+        if (marked) { button.setAttribute('aria-busy', 'true'); }
+        requests(1);
+        this.addEventListener('loadend', function () {
+          requests(-1);
+          if (!marked || button.getAttribute('aria-busy') !== 'true') { return; }
+          if (before === null) { button.removeAttribute('aria-busy'); } else { button.setAttribute('aria-busy', before); }
+        });
+      }
+      return xhrSend.apply(this, arguments);
+    };
+
+    function toast(line) {
+      var box = document.querySelector('[data-ot-toast]');
+      if (!box) { return; }
+      var text = (line.textContent || '').replace(/\s+/g, ' ').trim();
+      var at = line.getBoundingClientRect();
+      var inView = at.height > 0 && at.top >= 0 && at.bottom <= window.innerHeight;
+      clearTimeout(hideTimer);
+      if (!text || inView) { box.hidden = true; return; }
+      var kind = /--error\b/.test(line.className) || line.getAttribute('role') === 'alert' ? 'error'
+        : /--success\b/.test(line.className) ? 'success' : 'info';
+      box.className = 'ot-toast ot-toast--' + kind;
+      box.querySelector('[data-ot-toast-text]').textContent = text;
+      box.hidden = false;
+      // An error stays until it is dismissed or replaced; work in hand stays until it ends.
+      if (kind === 'success') { hideTimer = setTimeout(function () { box.hidden = true; }, 6000); }
+    }
+
+    function watch() {
+      var close = document.querySelector('[data-ot-toast-close]');
+      if (close) {
+        close.addEventListener('click', function () { document.querySelector('[data-ot-toast]').hidden = true; });
+      }
+      new MutationObserver(function (records) {
+        if (!interacted) { return; }
+        var line = null;
+        for (var i = 0; i < records.length; i++) {
+          var node = records[i].target;
+          if (node.nodeType !== 1) { node = node.parentNode; }
+          var found = node && node.closest ? node.closest(STATUS) : null;
+          if (found) { line = found; }
+        }
+        if (line) { toast(line); }
+      }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class'] });
+    }
+    if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', watch); } else { watch(); }
+  })();
+</script>
+<script>
+  {% comment %}/*
+   * Working days and the case status, shared by every page that shows either (they were
+   * copied into OT Case Detail, OT Remediation, OT Review List and OT Review Detail).
+   *
+   *   window.otDays.midday(text)      a yyyy-MM-dd pinned to midday UTC, or null; pinning
+   *                                   is what stops a day slipping in another region
+   *   window.otDays.between(from, to) working days from one to the other, both counted:
+   *                                   Monday to Friday, the opening day is day 1, bank
+   *                                   holidays are not deducted (app/src/lib/workingDays.ts)
+   *   window.otDays.today()           today, pinned the same way
+   *   window.otDays.renderAges()      fills every [data-ot-age] cell: the BR-010 remediation
+   *                                   clock (OD-018), against the ten-working-day threshold
+   *   window.OT_CASE_STATUS           CaseLifecycle.cs's case status values
+   *   window.otCaseStatusNow(done, caseId)
+   *                                   the case's status read from Dataverse, not the render
+   *                                   cache; caseId defaults to [data-ot-case-status]
+   *
+   * renderAges: data-opened is the start of the CURRENT period, which a rejected sign-off
+   * resets; data-created is the original start, so where the two differ the period the
+   * rejection ended is shown beside the current one rather than added to it - an action back
+   * with the adviser is on a fresh ten days. A completed action is aged to its completion
+   * date, so a finished action stops ticking.
+   *
+   * The case status is read after a write because the pages report what the server did
+   * rather than predicting it (reported 2026-10-07: "the wording sometimes suggests that a
+   * case is going to T&C or adviser even when that isn't the case"). A read that fails
+   * answers null, and the messages then say only what is certain. portalNextStepMessages.test.ts
+   * holds the values to CaseLifecycle.cs.
+   */{% endcomment %}
+  (function () {
+    'use strict';
+
+    var THRESHOLD = 10;
+
+    function midday(text) {
+      var parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text || '');
+      return parts ? new Date(Date.UTC(+parts[1], +parts[2] - 1, +parts[3], 12, 0, 0)) : null;
+    }
+
+    function between(from, to) {
+      if (to.getTime() < from.getTime()) { return 0; }
+      var count = 0;
+      var cursor = new Date(from.getTime());
+      while (cursor.getTime() <= to.getTime()) {
+        var day = cursor.getUTCDay();
+        if (day >= 1 && day <= 5) { count += 1; }
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
+      }
+      return count;
+    }
+
+    function today() {
+      var now = new Date();
+      return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0));
+    }
+
+    function renderAges() {
+      var now = today();
+      var cells = document.querySelectorAll('[data-ot-age]');
+      for (var i = 0; i < cells.length; i += 1) {
+        var cell = cells[i];
+        var opened = midday(cell.getAttribute('data-opened'));
+        if (!opened) { continue; }
+
+        var completed = midday(cell.getAttribute('data-completed'));
+        var age = between(opened, completed || now);
+        cell.textContent = age + (age === 1 ? ' working day' : ' working days');
+
+        var created = midday(cell.getAttribute('data-created'));
+        if (created && created.getTime() < opened.getTime()) {
+          var previous = between(created, opened);
+          var note = document.createElement('span');
+          note.className = 'ot-age__previous';
+          note.textContent = ' (reworked; previous period ' + previous +
+            (previous === 1 ? ' working day)' : ' working days)');
+          cell.appendChild(note);
+          cell.setAttribute('title',
+            'Sent back after sign-off. The ten-working-day threshold runs from the restart.');
+        }
+
+        if (!completed && age > THRESHOLD) {
+          cell.classList.add('ot-age--breached');
+          var existing = cell.getAttribute('title');
+          cell.setAttribute('title',
+            (existing ? existing + ' ' : '') + 'Past the ten-working-day threshold.');
+        }
+      }
+    }
+
+    window.otDays = { midday: midday, between: between, today: today, renderAges: renderAges };
+
+    window.OT_CASE_STATUS = {
+      queued: 120910583,
+      awaitingRemediation: 120910587,
+      remediationInProgress: 120910588,
+      awaitingSignoff: 120910589,
+      awaitingRecheck: 120910590,
+      closed: 120910591
+    };
+
+    window.otCaseStatusNow = function (done, caseId) {
+      if (caseId === undefined) {
+        var marker = document.querySelector('[data-ot-case-status]');
+        caseId = marker ? marker.getAttribute('data-ot-case-id') : null;
+      }
+      if (!caseId) { done(null); return; }
+
+      var read = new XMLHttpRequest();
+      read.open('GET', '/_api/al_outcomecases(' + caseId + ')?$select=al_casestatus', true);
+      read.setRequestHeader('Accept', 'application/json');
+      read.onreadystatechange = function () {
+        if (read.readyState !== 4) { return; }
+        var value = null;
+        if (read.status >= 200 && read.status < 300) {
+          try { value = JSON.parse(read.responseText).al_casestatus; } catch (e) { value = null; }
+        }
+        done(typeof value === 'number' ? value : null);
+      };
+      read.send();
+    };
+  })();
+</script>
+<script>
   {% comment %}// "x of N characters" under every textarea with a maxlength - N is its Dataverse
   // column's length, past which a save is refused - and under every formatting editor with a
   // data-ot-maxlength, which counts its words. Delegated, so boxes a page draws later get one
@@ -259,6 +495,14 @@
 </script>
 
 <main class="ot-page" id="ot-main">
+  <div class="ot-skeleton" aria-hidden="true">
+    <div class="ot-skeleton__inner">
+      <span class="ot-skeleton__line ot-skeleton__line--crumb"></span>
+      <span class="ot-skeleton__line ot-skeleton__line--title"></span>
+      <span class="ot-skeleton__line ot-skeleton__line--short"></span>
+      <div class="ot-skeleton__card">{% for n in (1..6) %}<span class="ot-skeleton__line"></span>{% endfor %}</div>
+    </div>
+  </div>
   <div class="ot-page__inner">
     {% comment %}Ascot Lloyd branding on a printed or saved page (owner, 2026-11-23): the site header is hidden in print, so this copy of the logo shows there and nowhere else. Hidden from screen readers: the header logo carries the name.{% endcomment %}
     <div class="ot-print-logo" aria-hidden="true"><svg focusable="false" xmlns="http://www.w3.org/2000/svg" width="173.876" height="55.969" viewBox="0 0 173.876 55.969"><g><g><circle cx="8.354" cy="8.354" r="8.354" transform="translate(3.123 1.255)" fill="#2b5257"/><circle cx="8.354" cy="8.354" r="8.354" transform="translate(51.195 32.699)" fill="#2b5257"/><path d="M128.33,40.056V29.309h0V15.286A15.331,15.331,0,0,0,113.043,0H102.45a10.8,10.8,0,0,1,9.057,10.619V21.366h0V35.389a15.331,15.331,0,0,0,15.286,15.286h10.593A10.8,10.8,0,0,1,128.33,40.056Z" transform="translate(-84.766)" fill="#b0ed70"/><path d="M7.6,111.372h0a12.784,12.784,0,0,0,3.545,24.364h0a.071.071,0,0,1,.019,0,16.43,16.43,0,0,0,2.114.123c.318,0,.623-.007.911-.021a9.518,9.518,0,0,0,1.36-.124l.088-.014c1.738-.288,4.158-1.1,4.194-3.155v-29.6c-1.585,6.173-4.743,5-12.238,8.422Z" transform="translate(0 -85.18)" fill="#2b5257"/></g><g transform="translate(84.153 0.085)"><path d="M487.53,22.859,496.927.49h4.162l9.43,22.369h-3.576l-2.731-6.632H493.742l-2.731,6.632h-3.48Zm7.381-9.463h8.161l-4.063-9.884-4.1,9.884Z" transform="translate(-487.53 -0.49)" fill="#2b5257"/><path d="M647.779,41.25c0,3.252-2.47,4.975-6.34,4.975a14.361,14.361,0,0,1-6.827-1.755V41.478a13.964,13.964,0,0,0,6.958,2.049c2.049,0,3.316-.585,3.316-2.211,0-1.5-1.3-1.983-3.511-2.568L639.2,38.1c-2.568-.651-4.747-1.918-4.747-4.909s2.406-5.007,6.406-5.007A12.193,12.193,0,0,1,647,29.773V32.83a11.7,11.7,0,0,0-6.307-1.918c-1.821,0-3.283.715-3.283,2.178,0,1.56,1.431,2.08,3.642,2.731l2.113.618c2.763.78,4.617,2.146,4.617,4.812Z" transform="translate(-609.09 -23.4)" fill="#2b5257"/><path d="M739.047,32.559a8.721,8.721,0,0,0-5.04-1.495c-3.675,0-6.34,2.341-6.34,6.079s2.665,6.048,6.307,6.048a8.762,8.762,0,0,0,5.071-1.528V44.72a9.39,9.39,0,0,1-5.17,1.365c-5.268,0-9.266-3.706-9.266-8.941s4.032-8.974,9.3-8.974a9.357,9.357,0,0,1,5.137,1.333v3.057Z" transform="translate(-683.687 -23.392)" fill="#2b5257"/><path d="M832.561,46.242A8.718,8.718,0,0,1,823.62,37.3a8.941,8.941,0,0,1,17.883,0A8.68,8.68,0,0,1,832.561,46.242Zm0-2.86a5.818,5.818,0,0,0,5.917-6.079,5.919,5.919,0,1,0-11.834,0A5.818,5.818,0,0,0,832.561,43.382Z" transform="translate(-765.607 -23.549)" fill="#2b5257"/><path d="M946.128,32.218c-2.7,0-5.1-1.041-5.1-5.2V17.36H938.39v-.78l4.975-5.17h.715v3.252h6.079v2.7h-6.079v9.331c0,1.983,1.041,2.763,2.8,2.763a6.755,6.755,0,0,0,3.414-.942v2.634a7.641,7.641,0,0,1-4.162,1.074Z" transform="translate(-860.567 -9.525)" fill="#2b5257"/><path d="M491.059,163.01v19.344h12.323v3.024H487.84V163.01Z" transform="translate(-487.787 -134.957)" fill="#2b5257"/><path d="M605.437,160.19v22.857H602.38V160.678Z" transform="translate(-582.556 -132.624)" fill="#2b5257"/><path d="M649.871,208.772a8.941,8.941,0,1,1,8.941-8.941A8.718,8.718,0,0,1,649.871,208.772Zm0-2.862a6.082,6.082,0,1,0-5.917-6.079A5.818,5.818,0,0,0,649.871,205.911Z" transform="translate(-614.451 -158.025)" fill="#2b5257"/><path d="M753.139,214v-3.024a5.5,5.5,0,0,0,3.8,1.69,3.077,3.077,0,0,0,2.86-1.885l.585-1.269L752.78,192.77h3.414L761.82,206.1l5.461-13.331h3.381l-8.128,18.468c-1.3,3.024-3.154,4.227-5.43,4.227A6.091,6.091,0,0,1,753.137,214Z" transform="translate(-706.995 -159.58)" fill="#2b5257"/><path d="M874.761,181.509a8.366,8.366,0,0,1-5.365,1.854c-4.032,0-7.576-2.764-7.576-8.486,0-6.34,4.389-9.4,9.3-9.4a14.441,14.441,0,0,1,3.447.423v-5.235l3.057-.488v22.857h-2.862v-1.528Zm-9.818-6.827c0,3.8,2.08,5.95,5.266,5.95a7.942,7.942,0,0,0,4.357-1.4V168.766a10,10,0,0,0-3.283-.552C867.706,168.213,864.943,170.262,864.943,174.683Z" transform="translate(-797.214 -132.616)" fill="#2b5257"/></g></g></svg></div>
@@ -295,6 +539,12 @@
 
   </div>
 </main>
+<div class="ot-progress" aria-hidden="true"></div>
+<div class="ot-toast" data-ot-toast hidden>
+  <span class="ot-toast__icon" aria-hidden="true"></span>
+  <p class="ot-toast__text" data-ot-toast-text></p>
+  <button type="button" class="ot-toast__close" data-ot-toast-close aria-label="Dismiss message">&times;</button>
+</div>
 
 {% comment %}
   A text box prints at its screen height and hides the rest of a long answer, in portrait

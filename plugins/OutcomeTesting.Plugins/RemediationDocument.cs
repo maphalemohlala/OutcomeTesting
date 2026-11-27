@@ -169,31 +169,7 @@ namespace OutcomeTesting.Plugins
                     SignOff(latest, completed, labels),
                 };
 
-                var issues = Issues(action.GetAttributeValue<string>("al_description"));
-                if (issues.Count == 0)
-                {
-                    issues.Add("—");
-                }
-
-                for (var i = 0; i < issues.Count; i++)
-                {
-                    number++;
-                    var cells = new List<PdfCell>
-                    {
-                        PdfCell.Of(number.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                        PdfCell.Of(issues[i]),
-                    };
-
-                    // The page runs the action's own columns down the rows of its issues; here
-                    // they sit on the first, and the rows under it belong to the same action.
-                    // The remedial action, first, is the checker's own words and may be formatted.
-                    for (var d = 0; d < details.Length; d++)
-                    {
-                        cells.Add(i > 0 ? PdfCell.Blank() : d == 0 ? PdfCell.FromMarkup(details[d]) : PdfCell.Of(details[d]));
-                    }
-
-                    table.Add(cells.ToArray());
-                }
+                number = AddIssueRows(table, number, action.GetAttributeValue<string>("al_description"), details);
             }
 
             if (formSource == null)
@@ -445,6 +421,42 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>The issues an action lists, one per "- " line of its description.</summary>
+        /// <summary>
+        /// One numbered row per issue an action lists ("—" when it lists none), with the
+        /// action's own <paramref name="details"/> cells on its first row. Returns the last
+        /// row number used, so numbering runs on across actions.
+        /// </summary>
+        internal static int AddIssueRows(PdfTable table, int number, string description, string[] details)
+        {
+            var issues = Issues(description);
+            if (issues.Count == 0)
+            {
+                issues.Add("—");
+            }
+
+            for (var i = 0; i < issues.Count; i++)
+            {
+                number++;
+                var cells = new List<PdfCell>
+                {
+                    PdfCell.Of(number.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                    PdfCell.Of(issues[i]),
+                };
+
+                // The page runs the action's own columns down the rows of its issues; here
+                // they sit on the first, and the rows under it belong to the same action.
+                // The remedial action, first, is the checker's own words and may be formatted.
+                for (var d = 0; d < details.Length; d++)
+                {
+                    cells.Add(i > 0 ? PdfCell.Blank() : d == 0 ? PdfCell.FromMarkup(details[d]) : PdfCell.Of(details[d]));
+                }
+
+                table.Add(cells.ToArray());
+            }
+
+            return number;
+        }
+
         internal static List<string> Issues(string description)
         {
             var issues = new List<string>();
@@ -608,7 +620,7 @@ namespace OutcomeTesting.Plugins
             return count + (count == 1 ? " working day" : " working days");
         }
 
-        private static PdfCell Stacked(string label, string value)
+        internal static PdfCell Stacked(string label, string value)
         {
             var cell = new PdfCell();
             cell.Runs.Add(PdfRun.Of(label, true));

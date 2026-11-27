@@ -193,16 +193,16 @@ namespace OutcomeTesting.Plugins
             var sequence = review.GetAttributeValue<int?>("al_sequence");
 
             card.Add(
-                Stacked("CASE", row == null ? null : row.GetAttributeValue<string>("al_casereference")),
-                Stacked("CLIENT", row == null ? null : row.GetAttributeValue<string>("al_clientname")));
+                RemediationDocument.Stacked("CASE", row == null ? null : row.GetAttributeValue<string>("al_casereference")),
+                RemediationDocument.Stacked("CLIENT", row == null ? null : row.GetAttributeValue<string>("al_clientname")));
             card.Add(
-                Stacked("ADVISER", row == null ? null : row.GetAttributeValue<string>("al_advisername")),
-                Stacked("CHECKLIST VERSION", version == null ? null : version.Name));
+                RemediationDocument.Stacked("ADVISER", row == null ? null : row.GetAttributeValue<string>("al_advisername")),
+                RemediationDocument.Stacked("CHECKLIST VERSION", version == null ? null : version.Name));
             card.Add(
-                Stacked("SEQUENCE", sequence.HasValue ? sequence.Value.ToString(CultureInfo.InvariantCulture) : null),
-                Stacked("STARTED", Day(review.GetAttributeValue<DateTime?>("al_startedon"))));
+                RemediationDocument.Stacked("SEQUENCE", sequence.HasValue ? sequence.Value.ToString(CultureInfo.InvariantCulture) : null),
+                RemediationDocument.Stacked("STARTED", Day(review.GetAttributeValue<DateTime?>("al_startedon"))));
             card.Add(
-                Stacked("SUBMITTED", Day(review.GetAttributeValue<DateTime?>("al_submittedon"))),
+                RemediationDocument.Stacked("SUBMITTED", Day(review.GetAttributeValue<DateTime?>("al_submittedon"))),
                 PdfCell.Blank());
 
             blocks.Add(PdfBlock.Table(card));
@@ -222,15 +222,6 @@ namespace OutcomeTesting.Plugins
             }
 
             return blocks;
-        }
-
-        private static PdfCell Stacked(string label, string value)
-        {
-            var cell = new PdfCell();
-            cell.Runs.Add(PdfRun.Of(label, true));
-            cell.Runs.Add(PdfRun.LineBreak());
-            cell.Runs.Add(PdfRun.Of(string.IsNullOrWhiteSpace(value) ? "—" : value.Trim()));
-            return cell;
         }
 
         /// <summary>
@@ -1285,7 +1276,7 @@ namespace OutcomeTesting.Plugins
             return value.HasValue ? value.Value : int.MaxValue;
         }
 
-        private static Entity Lookup(Dictionary<Guid, Entity> rows, Entity from, string attribute)
+        internal static Entity Lookup(Dictionary<Guid, Entity> rows, Entity from, string attribute)
         {
             if (from == null)
             {

@@ -32,14 +32,13 @@ import outcomeRulesSource from '../../../../plugins/OutcomeTesting.Plugins/Outco
 
 describe('the events a letter can be attached to', () => {
   it('lists exactly the events the plug-in raises', () => {
-    // KnownEvents() is what the guard validates against, so a value here that is not there
-    // would offer an administrator an event nothing ever fires.
-    const block = outboxSource.slice(
-      outboxSource.indexOf('public static int[] KnownEvents()'),
-      outboxSource.indexOf('/// Writes one outbox row'),
-    );
+    // EventName's switch is what the guard validates against (IsKnownEvent), so a value here
+    // that is not there would offer an administrator an event nothing ever fires.
+    const start = outboxSource.indexOf('public static string EventName(int eventValue)');
+    const block = outboxSource.slice(start, outboxSource.indexOf('default: return "Unknown";', start));
 
-    const named = [...block.matchAll(/Event([A-Za-z]+),/g)].map((m) => m[1]);
+    const named = [...block.matchAll(/case Event([A-Za-z]+):/g)].map((m) => m[1]);
+    expect(start).toBeGreaterThan(-1);
     expect(named).toHaveLength(TRIGGER_EVENTS.length);
   });
 

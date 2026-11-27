@@ -24,11 +24,6 @@ namespace OutcomeTesting.Plugins
         private const string InExpectedRowVersion = "ExpectedRowVersion";
         private const string InIdempotencyKey = "IdempotencyKey";
 
-        // Custom API response parameters.
-        private const string OutStatus = CommandHelpers.OutStatus;
-        private const string OutAuditEventId = CommandHelpers.OutAuditEventId;
-        private const string OutConflict = CommandHelpers.OutConflict;
-
         // al_reviewinstance.
         private const string ReviewEntity = "al_reviewinstance";
         private const string ReviewStatus = "al_reviewstatus";
@@ -42,7 +37,6 @@ namespace OutcomeTesting.Plugins
 
         // al_outcomecase and its route.
         private const string CaseEntity = "al_outcomecase";
-        private const string CaseStatus = "al_casestatus";
         private const string RouteEntity = "al_reviewroute";
         private const string CaseReviewRoute = "al_reviewrouteid";
 
@@ -707,12 +701,6 @@ namespace OutcomeTesting.Plugins
         /// exists. Before 2026-09-09 this was "whichever answer was modified last", which on
         /// the one Tax review submitted in DEV was the retired version's answer.
         /// </summary>
-        private static Entity AnswerFor(
-            IOrganizationService service, Guid reviewId, string questionCode, params string[] columns)
-        {
-            return AnswerFor(null, service, reviewId, questionCode, columns);
-        }
-
         /// <summary>
         /// What one Submit has already read, so its gates and its finalising do not each ask
         /// again: the choice answered to a question code, and a review's reference day. Kept

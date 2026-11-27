@@ -47,15 +47,10 @@ namespace OutcomeTesting.Plugins
         public const string AdviserRole = "AL Portal - Adviser Remediation";
         public const string PlannerRole = "AL Portal - Planner";
 
-        /// <summary>Refuses a named person <see cref="AccountableRefusal"/> rejects; nobody named passes.</summary>
-        public static void EnsureAccountable(IOrganizationService service, EntityReference contact)
-        {
-            EnsureAccountable(service, contact, null);
-        }
-
         /// <summary>
-        /// As above, but the person the check already names passes: re-saving the ticks must not
-        /// be refused because a role was withdrawn after that person was named.
+        /// Refuses a named person <see cref="AccountableRefusal"/> rejects; nobody named passes,
+        /// and nor does the person the check already names: re-saving the ticks must not be
+        /// refused because a role was withdrawn after that person was named.
         /// </summary>
         public static void EnsureAccountable(IOrganizationService service, EntityReference contact, EntityReference alreadyNamed)
         {

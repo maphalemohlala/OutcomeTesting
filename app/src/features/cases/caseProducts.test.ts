@@ -30,10 +30,10 @@ describe('a case in a report', () => {
     expect(cell('AQS Checker')).toBe('Abe Aqs');
     expect(cell('Tax outcome')).toBe('Pass with issues');
     expect(cell('Received on')).toBe('2026-10-01');
-    // Thu 1 Oct to Sun 4 Oct, Sun 4 to Fri 9, Thu 1 to Sun 11: weekends left out.
-    expect(cell('Working days in Tax')).toBe(1);
+    // Thu 1 Oct to Sun 4 Oct, Sun 4 to Fri 9, Thu 1 to Sun 11: the first day is day 1, weekends left out.
+    expect(cell('Working days in Tax')).toBe(2);
     expect(cell('Working days in AQS')).toBe(5);
-    expect(cell('Overall age (working days)')).toBe(6);
+    expect(cell('Overall age (working days)')).toBe(7);
   });
 
   it('times an AQS-only case from receipt and leaves the Tax stage blank', () => {
@@ -44,8 +44,8 @@ describe('a case in a report', () => {
     } as unknown as CaseSummary);
 
     expect(row[COMPLETED_CASE_HEADERS.indexOf('Working days in Tax')]).toBe('');
-    // Thu 1 Oct to Sat 3 Oct: only the Friday counts.
-    expect(row[COMPLETED_CASE_HEADERS.indexOf('Working days in AQS')]).toBe(1);
+    // Thu 1 Oct to Sat 3 Oct: Thursday and Friday count.
+    expect(row[COMPLETED_CASE_HEADERS.indexOf('Working days in AQS')]).toBe(2);
   });
 
   it('takes the later submission of a check that was submitted twice', () => {

@@ -129,7 +129,7 @@ namespace OutcomeTesting.Plugins
             // AD-218: each team manager allocates their own discipline, and only to someone
             // holding that discipline's reviewer role. After ResolveReviewInstance because the
             // discipline is the review's; a refusal rolls back any review it opened.
-            var reviewType = ReviewTypeOf(review) ?? 0;
+            var reviewType = CommandHelpers.ReviewTypeOf(review) ?? 0;
             AllocationScope.EnsureCallerMayAllocate(systemService, context, reviewType);
             AllocationScope.EnsureAssigneeHoldsDiscipline(systemService, assignee, reviewType);
 
@@ -148,7 +148,7 @@ namespace OutcomeTesting.Plugins
             // by hand - and why editing that name was mistaken for allocating the check
             // (2026-09-09). The allocation is the one thing that knows who holds the check,
             // so it is what says so. The field was removed from the form on 2026-09-10.
-            StampCheckerName(userService, caseId, ReviewTypeOf(review), assignee.ContactName);
+            StampCheckerName(userService, caseId, CommandHelpers.ReviewTypeOf(review), assignee.ContactName);
 
             // Queued -> Assigned, refused by AD-057 if the case is not somewhere the
             // lifecycle allows it from. Deliberately after the assignment row exists: a case
@@ -471,13 +471,6 @@ namespace OutcomeTesting.Plugins
             {
                 [attribute] = checkerName,
             });
-        }
-
-        /// <summary>The discipline of a review row, where it carries one.</summary>
-        private static int? ReviewTypeOf(Entity review)
-        {
-            var type = review == null ? null : review.GetAttributeValue<OptionSetValue>(ReviewTypeAttr);
-            return type == null ? (int?)null : type.Value;
         }
 
         /// <summary>

@@ -31,7 +31,6 @@ namespace OutcomeTesting.Plugins
                 { "Q-GR-03", "Q-GR-03 is the AQS case notes, which the portal's AQS check notes card finds by this code." },
                 { "Q-GR-04", "Q-GR-04 is the AQS \"Even Better If\" note, which the portal's AQS check notes card finds by this code." },
                 { "Q-TAX-03", "Q-TAX-03 is the Tax case notes, which the portal's Tax check notes card finds by this code." },
-                { "Q-TAX-04", "Q-TAX-04 is the Tax remedial note, which the portal's Tax check notes card finds by this code." },
                 { "Q-TAX-05", "Q-TAX-05 is the Calculations remediation answer; a Yes raises its own remedial action." },
                 { "Q-TAX-06", "Q-TAX-06 holds the Calculations remediation comments, which become that action's wording." },
                 { "Q-TAX-07", "Q-TAX-07 is the Wording remediation answer; a Yes raises its own remedial action." },

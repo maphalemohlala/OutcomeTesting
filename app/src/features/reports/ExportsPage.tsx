@@ -5,7 +5,8 @@ import { useExportBatches } from './useExports';
 import { exportTrailLight } from './exportTrailLight';
 import { useIntentKeys } from '../../hooks/useIntentKey';
 import type { TrailLightFileKind } from '../../services/commands/exports';
-import { ukDayOf, ukToday } from '../cases/caseHeaderDates';
+import { ukToday } from '../cases/caseHeaderDates';
+import { withinRange } from '../cases/worklistFilters';
 import { buildFullExtract } from './fullExtract';
 import { downloadWorkbook, stampedFilename } from '../../lib/tabular';
 import { dayBefore, recentQuarters } from './trailLight';
@@ -17,16 +18,6 @@ import { Pager } from '../../components/navigation/Pager';
 import { PAGE_SIZE, usePaged } from '../../components/navigation/paging';
 
 type Notice = { tone: 'ok' | 'error'; message: string } | null;
-
-function inRange(iso: string | null, from: string, to: string): boolean {
-  if (!from && !to) return true;
-  if (!iso) return false;
-  const day = ukDayOf(iso);
-  if (!day) return false;
-  if (from && day < from) return false;
-  if (to && day > to) return false;
-  return true;
-}
 
 /**
  * The Trail Light export in one action (2026-11-25): choose the file and the check dates, and
@@ -61,7 +52,7 @@ export function ExportsPage() {
       batches.filter(
         (b) =>
           (!batchStatus || b.status === batchStatus) &&
-          inRange(b.generatedOn, batchFrom, batchTo),
+          withinRange(b.generatedOn, batchFrom, batchTo),
       ),
     [batches, batchStatus, batchFrom, batchTo],
   );

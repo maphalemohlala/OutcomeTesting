@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import reviewTemplate from '../../../../powerpages/outcome-testing---outcometesting/web-templates/ot-review-detail/OT-Review-Detail.webtemplate.source.html?raw';
 import remediationTemplate from '../../../../powerpages/outcome-testing---outcometesting/web-templates/ot-remediation/OT-Remediation.webtemplate.source.html?raw';
+import layoutTemplate from '../../../../powerpages/outcome-testing---outcometesting/web-templates/ot-layout/OT-Layout.webtemplate.source.html?raw';
 import lifecycleSource from '../../../../plugins/OutcomeTesting.Plugins/CaseLifecycle.cs?raw';
 
 /**
@@ -18,6 +19,7 @@ import lifecycleSource from '../../../../plugins/OutcomeTesting.Plugins/CaseLife
 
 const review = reviewTemplate.replace(/\r\n/g, '\n');
 const remediation = remediationTemplate.replace(/\r\n/g, '\n');
+const layout = layoutTemplate.replace(/\r\n/g, '\n');
 
 function lifecycle(name: string): number {
   const match = new RegExp(`public const int ${name} = (\\d+);`).exec(lifecycleSource);
@@ -36,16 +38,24 @@ const STATUS_KEYS: Record<string, string> = {
   closed: 'Closed',
 };
 
-describe.each([
-  ['OT Review Detail', review],
-  ['OT Remediation', remediation],
-])('%s reads the case status from Dataverse after the write', (_name, page) => {
+describe('OT Layout reads the case status from Dataverse after a write, for every page', () => {
   it('asks the Web API, not the render cache', () => {
-    expect(page).toContain("'/_api/al_outcomecases(' + caseId + ')?$select=al_casestatus'");
+    expect(layout).toContain("'/_api/al_outcomecases(' + caseId + ')?$select=al_casestatus'");
   });
 
   it.each(Object.entries(STATUS_KEYS))('names %s with the value CaseLifecycle.cs holds', (key, name) => {
-    expect(page).toContain(`${key}: ${lifecycle(name)}`);
+    expect(layout).toContain(`${key}: ${lifecycle(name)}`);
+  });
+});
+
+describe.each([
+  ['OT Review Detail', review],
+  ['OT Remediation', remediation],
+])('%s uses that read rather than a copy of it', (_name, page) => {
+  it("calls the layout's read and keeps no status values of its own", () => {
+    expect(page).toContain('window.otCaseStatusNow(');
+    expect(page).not.toContain('window.otCaseStatusNow = ');
+    expect(page).not.toContain(`closed: ${lifecycle('Closed')}`);
   });
 });
 

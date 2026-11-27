@@ -6847,8 +6847,7 @@ int SetWebRoleAuth(string orgUrl, string roleName, string value)
 // is corrected by no command - blocked the 2026-09-13 audit deployment.
 //
 // Refuses a type whose .cs still sits beside this project: that is not an orphan, and
-// unregistering it would remove live behaviour. The order is the one
-// deploy/Remove-OrphanedPluginTypes.ps1 established: custom API request parameters and
+// unregistering it would remove live behaviour. The order: custom API request parameters and
 // response properties, then the custom API (whose delete cascades its implementation step -
 // deleting that step directly returns "Invalid plug-in registration stage"), then any step
 // still standing, then the type. Every delete is verified by re-query, as every other

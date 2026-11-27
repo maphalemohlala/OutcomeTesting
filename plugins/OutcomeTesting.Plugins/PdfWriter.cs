@@ -33,39 +33,8 @@ namespace OutcomeTesting.Plugins
         /// <summary>A bulleted item.</summary>
         Bullet,
 
-        /// <summary>
-        /// One row of a two-column table: a test point on the left and its answer in a
-        /// column of its own on the right.
-        ///
-        /// Added so the para-planner's attachment can be the Checker Checklist rather than a
-        /// description of it (project owner, 2026-09-22: "the pdf that goes to paraplanners
-        /// needs to match the pdf form in the reviews"). The form's own shape is a ruled
-        /// table of test points against a tick column, and a <see cref="Field"/> - which puts
-        /// the answer immediately after the question, wherever that falls - cannot line
-        /// answers up for a reader scanning down them.
-        /// </summary>
-        Row,
-
-        /// <summary>
-        /// The column headings of a <see cref="Row"/> table: the same two columns, bold,
-        /// with a rule under them.
-        /// </summary>
-        TableHead,
-
         /// <summary>A hairline across the content width, closing a table.</summary>
         Rule,
-
-        /// <summary>
-        /// A bold line at body size, with no value after it.
-        ///
-        /// The document's subsection rows - "E1. Client Objectives &amp; Information (COBS
-        /// 9.2)" inside Suitability core checks - which are shaded bands on the form. Drawn as
-        /// a <see cref="Paragraph"/> first, where they were indistinguishable from the Outcome
-        /// lens line beneath them; and a <see cref="Field"/> would have put a colon on the end
-        /// of a heading. <see cref="Subheading"/> is a size up and is the BLOCK's, so using it
-        /// here would make a subsection look like a sibling of the block containing it.
-        /// </summary>
-        Label,
 
         /// <summary>Vertical space.</summary>
         Spacer,
@@ -74,9 +43,7 @@ namespace OutcomeTesting.Plugins
         /// A ruled table of cells, which may hold tick boxes (project owner, 2026-09-24: the
         /// emailed PDF "needs to match the pdf form in the system"). The review page prints
         /// every block of the Checker Checklist as a table with every cell ruled, tick
-        /// columns of empty and ticked squares, shaded heading rows and shaded label cells;
-        /// <see cref="Row"/> could only put an answer's WORD in a column, which is a
-        /// description of the form rather than the form.
+        /// columns of empty and ticked squares, shaded heading rows and shaded label cells.
         /// </summary>
         Table,
 
@@ -650,28 +617,10 @@ namespace OutcomeTesting.Plugins
             return new PdfBlock { Kind = PdfBlockKind.Bullet, Text = text };
         }
 
-        /// <summary>One row of a two-column table: a test point and its answer.</summary>
-        public static PdfBlock Row(string text, string value)
-        {
-            return new PdfBlock { Kind = PdfBlockKind.Row, Text = text, Value = value };
-        }
-
-        /// <summary>The column headings above a run of <see cref="Row(string, string)"/>.</summary>
-        public static PdfBlock TableHead(string text, string value)
-        {
-            return new PdfBlock { Kind = PdfBlockKind.TableHead, Text = text, Value = value };
-        }
-
         /// <summary>A hairline across the content width.</summary>
         public static PdfBlock Rule()
         {
             return new PdfBlock { Kind = PdfBlockKind.Rule };
-        }
-
-        /// <summary>A bold line at body size, for the document's subsection rows.</summary>
-        public static PdfBlock Label(string text)
-        {
-            return new PdfBlock { Kind = PdfBlockKind.Label, Text = text };
         }
 
         /// <summary>Vertical space.</summary>
@@ -760,16 +709,6 @@ namespace OutcomeTesting.Plugins
         private const double LineGap = 1.35;         // multiplied by the font size
         private const double BlockGap = 6;
         private const double BulletIndent = 14;
-
-        /// <summary>
-        /// The width of a Row table's answer column. 120pt holds the longest answer the
-        /// checklist can record - "Insufficient evidence" at body size is 96pt - with room
-        /// for the padding, so no answer wraps and the column reads as a column.
-        /// </summary>
-        private const double AnswerColumn = 120;
-
-        /// <summary>Space between the two columns, so a long test point cannot touch its answer.</summary>
-        private const double ColumnGap = 10;
 
         /// <summary>A rule's thickness, in points. Hairline: the form's tables are ruled, not boxed.</summary>
         private const double RuleWeight = 0.5;
@@ -1220,62 +1159,6 @@ namespace OutcomeTesting.Plugins
                     case PdfBlockKind.Rule:
                         DrawRule();
                         break;
-
-                    case PdfBlockKind.Label:
-                        // A little air above it, so a subsection reads as opening something
-                        // rather than as one more row of the table above.
-                        y -= BlockGap / 2;
-                        foreach (var line in Wrap(block.Text, Bold, BodySize, ContentWidth))
-                        {
-                            Emit(Bold, BodySize, Margin, line);
-                        }
-
-                        break;
-
-                    case PdfBlockKind.TableHead:
-                    case PdfBlockKind.Row:
-                        {
-                            var head = block.Kind == PdfBlockKind.TableHead;
-                            var font = head ? Bold : Regular;
-                            var cellWidth = ContentWidth - AnswerColumn - ColumnGap;
-
-                            var cells = Wrap(block.Text, font, BodySize, cellWidth);
-                            if (cells.Count == 0)
-                            {
-                                cells.Add(string.Empty);
-                            }
-
-                            // The answer is not wrapped. AnswerColumn is sized to hold the
-                            // longest the checklist can record, and an answer that did wrap
-                            // would put its second line against the NEXT test point - which
-                            // is worse than running a few points wide.
-                            var answer = block.Value ?? string.Empty;
-
-                            Emit(font, BodySize, Margin, cells[0]);
-                            var first = current[current.Count - 1];
-                            if (answer.Length > 0)
-                            {
-                                current.Add(new Line
-                                {
-                                    Font = font,
-                                    Size = BodySize,
-                                    X = Margin + cellWidth + ColumnGap,
-                                    Y = first.Y,
-                                    Text = answer,
-                                });
-                            }
-
-                            for (var i = 1; i < cells.Count; i++)
-                            {
-                                Emit(font, BodySize, Margin, cells[i]);
-                            }
-
-                            // Under the headings, so the table has a head; and under every row,
-                            // so a reader following a long test point across to its answer has
-                            // a line to follow. That is how the form itself is ruled.
-                            DrawRule();
-                            break;
-                        }
 
                     case PdfBlockKind.Note:
                         foreach (var line in Wrap(block.Text, Regular, NoteSize, ContentWidth))

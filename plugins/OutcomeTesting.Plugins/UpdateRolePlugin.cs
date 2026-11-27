@@ -113,8 +113,8 @@ namespace OutcomeTesting.Plugins
             // Retiring the role must also stop it granting access; see the class remarks.
             if (active.HasValue && !active.Value && !string.IsNullOrWhiteSpace(roleCode))
             {
-                var mappings = DeactivateByRoleCode(userService, MappingEntity, "al_userrolemappingid", roleCode);
-                var rules = DeactivateByRoleCode(userService, PermissionEntity, "al_pagepermissionid", roleCode);
+                var mappings = DeactivateByRoleCode(userService, MappingEntity, roleCode);
+                var rules = DeactivateByRoleCode(userService, PermissionEntity, roleCode);
                 Append(details, "Cascaded to " + mappings + " assignment(s) and " + rules + " permission rule(s)");
 
                 PermissionHelpers.EnsureSomeoneCanManagePermissions(systemService);
@@ -215,7 +215,7 @@ namespace OutcomeTesting.Plugins
 
         /// <summary>Deactivates every active row of <paramref name="entity"/> holding the role code.</summary>
         private static int DeactivateByRoleCode(
-            IOrganizationService service, string entity, string idAttribute, string roleCode)
+            IOrganizationService service, string entity, string roleCode)
         {
             var query = new QueryExpression(entity)
             {

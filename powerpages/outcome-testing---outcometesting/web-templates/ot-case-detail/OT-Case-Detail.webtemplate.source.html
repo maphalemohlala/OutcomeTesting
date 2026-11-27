@@ -1108,75 +1108,8 @@
           </tbody>
         </table>
 
-        <script>
-          /*
-           * Working-day ageing for the BR-010 remediation clock (OD-018), for the Age
-           * column above. The same script as OT Remediation's: Monday to Friday, the
-           * opening day counts as day 1, bank holidays are not deducted, a completed action
-           * is aged to its completion date. data-opened is the start of the CURRENT period,
-           * which a rejected sign-off resets; data-created is the original start, shown
-           * beside the current period where the two differ. Each yyyy-MM-dd is pinned to
-           * midday UTC before arithmetic so a day cannot slip with the browser's region.
-           */
-          (function () {
-            'use strict';
-
-            var THRESHOLD = 10;
-
-            function midday(text) {
-              if (!text) { return null; }
-              var parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
-              if (!parts) { return null; }
-              return new Date(Date.UTC(+parts[1], +parts[2] - 1, +parts[3], 12, 0, 0));
-            }
-
-            function workingDaysBetween(from, to) {
-              if (to.getTime() < from.getTime()) { return 0; }
-              var count = 0;
-              var cursor = new Date(from.getTime());
-              while (cursor.getTime() <= to.getTime()) {
-                var day = cursor.getUTCDay();
-                if (day >= 1 && day <= 5) { count += 1; }
-                cursor.setUTCDate(cursor.getUTCDate() + 1);
-              }
-              return count;
-            }
-
-            var now = new Date();
-            var today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0));
-
-            var cells = document.querySelectorAll('[data-ot-age]');
-            for (var i = 0; i < cells.length; i += 1) {
-              var cell = cells[i];
-              var opened = midday(cell.getAttribute('data-opened'));
-              if (!opened) { continue; }
-
-              var completed = midday(cell.getAttribute('data-completed'));
-              var age = workingDaysBetween(opened, completed || today);
-
-              cell.textContent = age + (age === 1 ? ' working day' : ' working days');
-
-              var created = midday(cell.getAttribute('data-created'));
-              if (created && created.getTime() < opened.getTime()) {
-                var previous = workingDaysBetween(created, opened);
-                var note = document.createElement('span');
-                note.className = 'ot-age__previous';
-                note.textContent = ' (reworked; previous period ' + previous +
-                  (previous === 1 ? ' working day)' : ' working days)');
-                cell.appendChild(note);
-                cell.setAttribute('title',
-                  'Sent back after sign-off. The ten-working-day threshold runs from the restart.');
-              }
-
-              if (!completed && age > THRESHOLD) {
-                cell.classList.add('ot-age--breached');
-                var existing = cell.getAttribute('title');
-                cell.setAttribute('title',
-                  (existing ? existing + ' ' : '') + 'Past the ten-working-day threshold.');
-              }
-            }
-          })();
-        </script>
+        {% comment %}The Age column above: OT Layout's window.otDays fills it.{% endcomment %}
+        <script>window.otDays.renderAges();</script>
       {% else %}
         {% include 'OT Empty State' title: 'No remediation' message: 'A pass outcome requires no remediation. Actions appear here for any non-pass outcome.' %}
       {% endif %}

@@ -19,11 +19,6 @@ namespace OutcomeTesting.Plugins
         private const string InExpectedRowVersion = "ExpectedRowVersion";
         private const string InIdempotencyKey = "IdempotencyKey";
 
-        // Custom API response parameters.
-        private const string OutStatus = CommandHelpers.OutStatus;
-        private const string OutAuditEventId = CommandHelpers.OutAuditEventId;
-        private const string OutConflict = CommandHelpers.OutConflict;
-
         // al_remediationaction.
         private const string ActionEntity = "al_remediationaction";
         private const string ActionStatus = "al_actionstatus";

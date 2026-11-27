@@ -180,12 +180,6 @@ export function lookupValueField(list: ManagedList): string | null {
   return list.caseAttribute === null ? null : `_${list.caseAttribute}_value`;
 }
 
-/** The Web API annotation carrying that lookup's label. */
-export function lookupFormattedField(list: ManagedList): string | null {
-  const field = lookupValueField(list);
-  return field === null ? null : `${field}@OData.Community.Display.V1.FormattedValue`;
-}
-
 /** The shape the Web API returns for an al_listoption row. */
 export interface RawListOption {
   al_listoptionid: string;

@@ -518,14 +518,14 @@ namespace OutcomeTesting.Plugins
 
                 // One lookup of the question serves both the outcome test and the ordering
                 // below, which is why it is resolved here rather than inside SectionOrder.
-                var question = Lookup(questions, version, "al_questionid");
+                var question = CompletedCheck.Lookup(questions, version, "al_questionid");
                 if (question != null
                     && OutcomeQuestionCodes.Contains(question.GetAttributeValue<string>("al_questioncode") ?? string.Empty))
                 {
                     continue;
                 }
 
-                var section = Lookup(sections, question, "al_sectionid");
+                var section = CompletedCheck.Lookup(sections, question, "al_sectionid");
                 if (!SectionDrawn(section, reviewType, asOf))
                 {
                     continue;
@@ -569,7 +569,7 @@ namespace OutcomeTesting.Plugins
                 Entity host;
                 if (versionOfResponse.TryGetValue(link.Key, out hostVersion)
                     && versions.TryGetValue(hostVersion, out host)
-                    && !SectionDrawn(Lookup(sections, Lookup(questions, host, "al_questionid"), "al_sectionid"), reviewType, asOf))
+                    && !SectionDrawn(CompletedCheck.Lookup(sections, CompletedCheck.Lookup(questions, host, "al_questionid"), "al_sectionid"), reviewType, asOf))
                 {
                     continue;
                 }
@@ -738,27 +738,6 @@ namespace OutcomeTesting.Plugins
             }
 
             return byId;
-        }
-
-        /// <summary>
-        /// The row a lookup on <paramref name="from"/> points at, out of an already-read set;
-        /// null where there is no lookup or the target was not returned.
-        /// </summary>
-        private static Entity Lookup(Dictionary<Guid, Entity> rows, Entity from, string attribute)
-        {
-            if (from == null)
-            {
-                return null;
-            }
-
-            var reference = from.GetAttributeValue<EntityReference>(attribute);
-            if (reference == null)
-            {
-                return null;
-            }
-
-            Entity row;
-            return rows.TryGetValue(reference.Id, out row) ? row : null;
         }
 
         private sealed class RankedItem

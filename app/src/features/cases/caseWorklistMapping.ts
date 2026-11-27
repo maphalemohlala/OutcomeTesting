@@ -18,7 +18,7 @@ import {
 } from '../../generated/models/Al_outcomesModel';
 import { MIGRATED_LISTS, heldOptionLabels, listByKey, lookupLabelOn, managedList } from '../admin/listOptions';
 import { choiceLabel } from '../../lib/choiceLabel';
-import { workingDaysSince } from '../../lib/workingDays';
+import { workingDaysBetween } from '../../lib/workingDays';
 import { lookupLabel } from './lookupLabel';
 import type { CaseRemediation } from './caseRemediation';
 
@@ -120,12 +120,12 @@ export function toRoute(name: string | null): ReviewRoute | null {
   return REVIEW_ROUTES.find((route) => route === name) ?? null;
 }
 
-/** Working days since the case was created, weekends left out; 0 on the day itself. */
+/** Working days since the case was created, weekends left out; the day it arrived is day 1. */
 export function ageInDays(createdOn: string | undefined): number {
   if (!createdOn) return 0;
   const created = new Date(createdOn);
   if (Number.isNaN(created.getTime())) return 0;
-  return workingDaysSince(created, new Date());
+  return workingDaysBetween(created, new Date());
 }
 
 /**

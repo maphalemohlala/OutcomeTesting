@@ -58,10 +58,25 @@ namespace OutcomeTesting.Plugins.Tests
             return found.Select(code => new object[] { code });
         }
 
+        /// <summary>
+        /// Codes read only to show earlier answers, which may therefore be retired. Q-TAX-04
+        /// "Tax Remedial" was replaced by the Tax categories (client, 2026-11-06) and is retired
+        /// in DEV and TEST; OT Tax Notes still fetches its answers by code with no date filter,
+        /// so a check completed before the retirement keeps its note.
+        /// </summary>
+        private static readonly HashSet<string> ReadForHistoryOnly =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Q-TAX-04" };
+
         [Theory]
         [MemberData(nameof(CodesReadByLiteral))]
         public void Every_code_read_by_literal_is_protected(string code)
         {
+            if (ReadForHistoryOnly.Contains(code))
+            {
+                Assert.Null(ChecklistGuards.ProtectedReason(code));
+                return;
+            }
+
             // A prefix guards every code that starts with it; check a code it would cover.
             var asCode = Regex.IsMatch(code, "-[0-9]+$") ? code : code + "-01";
 

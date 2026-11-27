@@ -30,10 +30,6 @@ namespace OutcomeTesting.Plugins
     {
         public const string NotificationEntity = "al_notification";
 
-        // The Power Pages site, for the links the bodies carry. See CaseLink.
-        private const string SiteEntity = "powerpagesite";
-        private const string SiteDomainAttr = "primarydomainname";
-
         // Option values from the al_notification_event set created with the table.
         public const int EventAllocation = 120910800;
         public const int EventReviewSubmitted = 120910801;
@@ -118,22 +114,6 @@ namespace OutcomeTesting.Plugins
         public static bool IsKnownEvent(int eventValue)
         {
             return EventName(eventValue) != "Unknown";
-        }
-
-        /// <summary>Every event a template can be attached to, in the order they occur.</summary>
-        public static int[] KnownEvents()
-        {
-            return new[]
-            {
-                EventAllocation,
-                EventReviewSubmitted,
-                EventRemediationAssigned,
-                EventSignoffApproved,
-                EventSignoffRejected,
-                EventCasePassed,
-                EventRecheckDue,
-                EventSignoffDue,
-            };
         }
 
         /// <summary>

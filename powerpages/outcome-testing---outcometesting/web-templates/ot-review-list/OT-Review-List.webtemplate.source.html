@@ -618,6 +618,7 @@
       }
 
       button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
       show('Assigning the case to you...', 'info');
 
       {% comment %}/*
@@ -656,12 +657,14 @@
 
           show(window.otApi.error('Claiming the case', request), 'error');
           button.disabled = false;
+          button.removeAttribute('aria-busy');
         };
 
         request.send(JSON.stringify(payload));
       }).fail(function () {
         show(window.otApi.error('Claiming the case', null), 'error');
         button.disabled = false;
+        button.removeAttribute('aria-busy');
       });
     }
 
@@ -701,23 +704,9 @@
      clock: Monday to Friday, the first day counts, bank holidays not deducted. */{% endcomment %}
   (function () {
     'use strict';
-    function midday(text) {
-      var parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text || '');
-      return parts ? new Date(Date.UTC(+parts[1], +parts[2] - 1, +parts[3], 12, 0, 0)) : null;
-    }
-    function workingDaysBetween(from, to) {
-      if (to.getTime() < from.getTime()) { return 0; }
-      var count = 0;
-      var cursor = new Date(from.getTime());
-      while (cursor.getTime() <= to.getTime()) {
-        var day = cursor.getUTCDay();
-        if (day >= 1 && day <= 5) { count += 1; }
-        cursor.setUTCDate(cursor.getUTCDate() + 1);
-      }
-      return count;
-    }
-    var now = new Date();
-    var today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0));
+    var midday = window.otDays.midday;
+    var workingDaysBetween = window.otDays.between;
+    var today = window.otDays.today();
     var cells = document.querySelectorAll('[data-ot-workdays]');
     for (var i = 0; i < cells.length; i += 1) {
       var from = midday(cells[i].getAttribute('data-from'));
