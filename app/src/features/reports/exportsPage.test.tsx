@@ -26,6 +26,15 @@ describe('the Exports page is one form and one action', () => {
     expect(html).toContain(`id="check-to" type="date" min="${yesterday}" value="${yesterday}"`);
   });
 
+  it('says the daily file holds File Quality fails and advice fails only', () => {
+    const note = html.replace(/\s+/g, ' ');
+    expect(note).toContain(
+      'The daily file holds only the cases with a File Quality Fail and/or an Advice Quality grade first recorded as Insufficient evidence or Potential harm.',
+    );
+    expect(note).toContain('A Tax-only case appears only when its File Quality is Fail.');
+    expect(note).not.toContain('Pass with issues');
+  });
+
   it('has one Export button and no batch to create or generate', () => {
     expect(html).toContain('<button type="submit" class="exports__btn">Export</button>');
     expect(html).not.toContain('New export batch');

@@ -90,15 +90,18 @@ namespace OutcomeTesting.Plugins.Tests
 
         [Theory]
         [InlineData(ResponseRules.ChoiceFail, OutcomeRules.OutcomePass, true)]
-        [InlineData(ResponseRules.ChoicePass, OutcomeRules.OutcomePassWithIssues, true)]
+        [InlineData(ResponseRules.ChoiceFail, OutcomeRules.OutcomePassWithIssues, true)]
+        [InlineData(ResponseRules.ChoiceFail, OutcomeRules.OutcomeInsufficient, true)]
         [InlineData(ResponseRules.ChoicePass, OutcomeRules.OutcomeInsufficient, true)]
         [InlineData(ResponseRules.ChoicePass, OutcomeRules.OutcomePotentialHarm, true)]
+        // Pass with issues is not a fail, so on a passed file it stays out (client, 2026-11-27).
+        [InlineData(ResponseRules.ChoicePass, OutcomeRules.OutcomePassWithIssues, false)]
         [InlineData(ResponseRules.ChoicePass, OutcomeRules.OutcomePass, false)]
         // A Tax-only case has no advice grade, so only a File Quality Fail puts it in the file. Its
         // Tax check outcome has no column in either file and no longer decides (client, 2026-11-26).
         [InlineData(ResponseRules.ChoiceFail, null, true)]
         [InlineData(ResponseRules.ChoicePass, null, false)]
-        public void The_daily_file_holds_any_type_of_failure_and_no_clean_pass(
+        public void The_daily_file_holds_file_quality_fails_and_advice_fails_only(
             int fileChoice, int? advice, bool belongs)
         {
             Assert.Equal(belongs, GenerateExportPlugin.BelongsInDailyFile(fileChoice, advice));

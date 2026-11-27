@@ -713,15 +713,15 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// Whether a row belongs in the daily file (client, 2026-11-16): any type of failure - a
-        /// File Quality Fail, or an advice grade of Pass with issues, Insufficient evidence or
-        /// Potential harm. A clean pass is left out. A Tax-only case's Tax check outcome has no
-        /// column in either file and no longer decides (client, 2026-11-26).
+        /// Whether a row belongs in the daily file (client, 2026-11-27): a File Quality Fail and/or
+        /// an advice grade of Insufficient evidence or Potential harm. Pass with issues and a clean
+        /// pass are left out (reversing 2026-11-16, which took Pass with issues in). A Tax-only
+        /// case has no advice grade, so only a File Quality Fail puts it in; its Tax check outcome
+        /// has no column in either file and does not decide (client, 2026-11-26).
         /// </summary>
         public static bool BelongsInDailyFile(int? fileQualityChoice, int? adviceOutcome)
         {
             return FileQuality.Failed(fileQualityChoice)
-                || adviceOutcome == OutcomeRules.OutcomePassWithIssues
                 || AdviceQualityFailed(adviceOutcome);
         }
 

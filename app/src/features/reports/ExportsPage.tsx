@@ -132,10 +132,9 @@ export function ExportsPage() {
           Trail Light file
         </h2>
         <p className="exports__note">
-          The daily file holds every case with a type of failure: a File Quality Fail, an Advice
-          Quality grade first recorded as Pass with issues, Insufficient evidence or Potential harm,
-          or a Tax-only check that came back Fail or Pass with issues. It reports the grade first
-          recorded. The quarterly file holds every closed case and reports the grade in force after
+          The daily file holds only the cases with a File Quality Fail and/or an Advice Quality
+          grade first recorded as Insufficient evidence or Potential harm. A Tax-only case appears
+          only when its File Quality is Fail. It reports the grade first recorded. The quarterly file holds every closed case and reports the grade in force after
           any regrade. The check date is the day each case's review was submitted; both dates are
           included, and an empty date sets no limit.
         </p>
